@@ -22,6 +22,10 @@
 #include "dl_rt_api.h"
 #include "shmemi_scope_guard.h"
 
+#ifndef ACL_STREAM_DEVICE_USE_ONLY
+#define ACL_STREAM_DEVICE_USE_ONLY 0x00000020U
+#endif
+
 namespace shm {
 namespace transport {
 namespace device {
@@ -70,14 +74,7 @@ Result SdmaTransportManager::CreateStarsStreams(int32_t channel_num)
         op_res_info_.streams[i].stream_ = 0;
 
         void *stream = nullptr;
-        constexpr size_t num_attrs = 2;
-        rtStreamCreateAttr_t attrs[num_attrs];
-        attrs[0].id = RT_STREAM_CREATE_ATTR_PRIORITY;
-        attrs[0].value.priority = 0;
-        attrs[1].id = RT_STREAM_CREATE_ATTR_FLAGS;
-        attrs[1].value.flags = 0x800; // 0x800: MC2类型的流，只有此类型的流可以查询stars信息
-        rtStreamCreateConfig_t config = {attrs, num_attrs};
-        ACLSHMEM_CHECK_RET(DlRtApi::RtsStreamCreate(&stream, &config));
+        ACLSHMEM_CHECK_RET(aclrtCreateStreamWithConfig(&stream, 0, ACL_STREAM_DEVICE_USE_ONLY));
         op_res_info_.streams[i].stream_ = reinterpret_cast<uint64_t>(stream);
 
         int32_t stream_id = 0;

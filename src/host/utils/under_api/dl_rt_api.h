@@ -17,7 +17,6 @@
 #include "host/shmem_host_def.h"
 
 namespace shm {
-using rtsStreamCreateFunc = int32_t (*)(void **, rtStreamCreateConfig_t *);
 using rtStreamGetSqidFunc = int32_t (*)(const void *, uint32_t *);
 using rtStreamGetCqidFunc = int32_t (*)(const void *, uint32_t *, uint32_t *);
 
@@ -25,14 +24,6 @@ class DlRtApi {
 public:
     static Result LoadLibrary();
     static void CleanupLibrary();
-
-    static inline Result RtsStreamCreate(void **stream, rtStreamCreateConfig_t *config)
-    {
-        if (pRtsStreamCreate == nullptr) {
-            return ACLSHMEM_UNDER_API_UNLOAD;
-        }
-        return pRtsStreamCreate(stream, config);
-    }
 
     static inline Result RtStreamGetSqid(const void *stm, uint32_t *sqId)
     {
@@ -56,7 +47,6 @@ private:
     static void *rtHandle;
     static const char *gRtLibName;
 
-    static rtsStreamCreateFunc pRtsStreamCreate;
     static rtStreamGetSqidFunc pRtStreamGetSqid;
     static rtStreamGetCqidFunc pRtStreamGetCqid;
 };

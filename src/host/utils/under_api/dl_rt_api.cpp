@@ -18,7 +18,6 @@ std::mutex DlRtApi::gMutex;
 void *DlRtApi::rtHandle;
 const char *DlRtApi::gRtLibName = "libruntime.so";
 
-rtsStreamCreateFunc DlRtApi::pRtsStreamCreate = nullptr;
 rtStreamGetSqidFunc DlRtApi::pRtStreamGetSqid = nullptr;
 rtStreamGetCqidFunc DlRtApi::pRtStreamGetCqid = nullptr;
 
@@ -37,7 +36,6 @@ Result DlRtApi::LoadLibrary()
     }
 
     /* load sym */
-    DL_LOAD_SYM(pRtsStreamCreate, rtsStreamCreateFunc, rtHandle, "rtsStreamCreate");
     DL_LOAD_SYM(pRtStreamGetSqid, rtStreamGetSqidFunc, rtHandle, "rtStreamGetSqid");
     DL_LOAD_SYM(pRtStreamGetCqid, rtStreamGetCqidFunc, rtHandle, "rtStreamGetCqid");
 
@@ -52,7 +50,6 @@ void DlRtApi::CleanupLibrary()
         return;
     }
 
-    pRtsStreamCreate = nullptr;
     pRtStreamGetSqid = nullptr;
     pRtStreamGetCqid = nullptr;
 

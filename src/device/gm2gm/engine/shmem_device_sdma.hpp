@@ -18,6 +18,7 @@
 constexpr uint8_t ACLSHMEM_SQE_TYPE_SDMA = 11;
 constexpr uint8_t ACLSHMEM_CREDIT_TIME_DEFAULT = 240;
 constexpr uint32_t ACLSHMEM_SDMA_SQ_DEPTH = 2048U;
+constexpr uint32_t ACLSHMEM_SDMA_FLAG_BUFFER_SIZE = 64U;
 
 template <typename T>
 ACLSHMEM_DEVICE void copy_gm_to_gm(__gm__ uint8_t *dst, __gm__ uint8_t *src, uint32_t size,
@@ -285,6 +286,7 @@ ACLSHMEM_DEVICE void aclshmemx_sdma_put_nbi(AscendC::GlobalTensor<T> &dst, Ascen
     AscendC::LocalTensor<uint32_t> ub_tensor;
     ub_tensor.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor.address_.bufferAddr = reinterpret_cast<uint64_t>(buf.GetPhyAddr());
+    ub_tensor.address_.dataLen = ACLSHMEM_SDMA_FLAG_BUFFER_SIZE;
 
     aclshmemi_sdma_post_send((__gm__ uint8_t *)ptr, (__gm__ uint8_t *)(src.GetPhyAddr()), elem_size * sizeof(T),
         ub_tensor, sync_id);
@@ -318,6 +320,7 @@ ACLSHMEM_DEVICE void aclshmemx_sdma_get_nbi(AscendC::GlobalTensor<T> &dst, Ascen
     AscendC::LocalTensor<uint32_t> ub_tensor;
     ub_tensor.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor.address_.bufferAddr = reinterpret_cast<uint64_t>(buf.GetPhyAddr());
+    ub_tensor.address_.dataLen = ACLSHMEM_SDMA_FLAG_BUFFER_SIZE;
 
     aclshmemi_sdma_post_send((__gm__ uint8_t *)(dst.GetPhyAddr()), (__gm__ uint8_t *)ptr, elem_size * sizeof(T),
         ub_tensor, sync_id);
@@ -329,6 +332,7 @@ ACLSHMEM_DEVICE void aclshmemi_sdma_quiet(AscendC::LocalTensor<T> &buf, uint32_t
     AscendC::LocalTensor<uint32_t> ub_tensor;
     ub_tensor.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor.address_.bufferAddr = reinterpret_cast<uint64_t>(buf.GetPhyAddr());
+    ub_tensor.address_.dataLen = ACLSHMEM_SDMA_FLAG_BUFFER_SIZE;
     aclshmemi_sdma_poll_for_completion(ub_tensor, sync_id);
 }
 

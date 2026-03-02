@@ -14,6 +14,7 @@
 #include <limits>
 #include <string>
 #include <cctype>
+#include <cstdint>
 
 enum MfIndex : uint8_t {
     INDEX_0 = 0U,

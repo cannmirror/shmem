@@ -248,7 +248,6 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 
 /**@} */ // end of group_macros
 
-/**@} */
 // synchronization
 /**
  * @addtogroup group_typedef

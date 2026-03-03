@@ -12,11 +12,15 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/device/
 )
 
+if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
+    add_compile_definitions(ENABLE_ASCENDC_DUMP)
+    add_compile_definitions(ASCENDC_DUMP=1)
+    add_compile_definitions(ASCENDC_DEBUG)
+    link_libraries(ascend_dump)
+endif()
+
 function(aclshmem_add_fusion_example NAME)
     add_executable(${NAME} ${ARGN})
-    if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
-        target_compile_definitions(${NAME} PRIVATE ENABLE_ASCENDC_DUMP ASCENDC_DUMP=1 ASCENDC_DEBUG)
-    endif()
     
     target_compile_options(${NAME} PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
     target_include_directories(${NAME} PRIVATE 
@@ -32,9 +36,6 @@ function(aclshmem_add_fusion_example NAME)
     )
     target_link_options(${NAME} PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
 
-    if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
-        target_link_libraries(${NAME} PRIVATE ascend_dump)
-    endif()
     target_link_libraries(${NAME} PRIVATE shmem)
     target_compile_options(${NAME} PRIVATE ${MPI_CXX_COMPILE_FLAGS})
 

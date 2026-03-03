@@ -15,9 +15,9 @@ UTILS_PATH=${PROJECT_ROOT}/examples/utils
 CSV_FILE="${SCRIPT_DIR}/test_shapes.csv"
 
 IFS=',' read -ra DEVICE_ID_LIST <<< "$1"
-RANK_SIZE=${#DEVICE_ID_LIST[@]}
-if [ $RANK_SIZE -gt 8 ]; then
-    echo "Rank size is illegal"
+PE_SIZE=${#DEVICE_ID_LIST[@]}
+if [ $PE_SIZE -gt 8 ]; then
+    echo "PE size is illegal"
     exit 1
 fi
 
@@ -34,15 +34,15 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r M K N; do
 
     #Generate golden data
     rm -rf ./out/*.bin
-    python3 ${UTILS_PATH}/gen_data.py 1 1 ${RANK_SIZE} ${M} ${N} ${K} 0 0 ${DATA_DIR}
+    python3 ${UTILS_PATH}/gen_data.py 1 1 ${PE_SIZE} ${M} ${N} ${K} 0 0 ${DATA_DIR}
 
     # Set necessary parameters
     IPPORT="tcp://127.0.0.1:8899"
 
     # Start Process
     export SHMEM_UID_SESSION_ID=127.0.0.1:8899
-    for (( idx = 0; idx < ${RANK_SIZE}; idx = idx + 1 )); do
-        ${EXEC_BIN} "$RANK_SIZE" "$idx" "$IPPORT" "$M" "$N" "$K" "${DATA_DIR}" "$1" &
+    for (( idx = 0; idx < ${PE_SIZE}; idx = idx + 1 )); do
+        ${EXEC_BIN} "$PE_SIZE" "$idx" "$IPPORT" "$M" "$N" "$K" "${DATA_DIR}" "$1" &
     done
 
     # Wait until all process exit

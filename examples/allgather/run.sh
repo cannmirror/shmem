@@ -14,11 +14,11 @@ PROJECT_ROOT=$( dirname $(dirname "$SCRIPT_DIR"))
 
 cd ${SCRIPT_DIR}
 
-RANK_SIZE="2"
+PE_SIZE="2"
 IPPORT="tcp://127.0.0.1:8766"
 GNPU_NUM="8"
 FIRST_NPU="0"
-FIRST_RANK="0"
+FIRST_PE="0"
 TEST_TYPE="int"
 TOOL="msprof"
 
@@ -33,25 +33,25 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
-        -ranks)
+        -pes)
             if [ -n "$2" ]; then
-                RANK_SIZE="$2"
-                 if [[ "$GNPU_NUM" -gt "$RANK_SIZE" ]]; then
-                    GNPU_NUM="$RANK_SIZE"
-                    echo "Because GNPU_NUM is greater than RANK_SIZE, GNPU_NUM is assigned the value of RANK_SIZE=${RANK_SIZE}."
+                PE_SIZE="$2"
+                 if [[ "$GNPU_NUM" -gt "$PE_SIZE" ]]; then
+                    GNPU_NUM="$PE_SIZE"
+                    echo "Because GNPU_NUM is greater than PE_SIZE, GNPU_NUM is assigned the value of PE_SIZE=${PE_SIZE}."
                 fi
                 shift 2
             else
-                echo "Error: -ranks requires a value."
+                echo "Error: -pes requires a value."
                 exit 1
             fi
             ;;
-        -frank)
+        -fpe)
             if [ -n "$2" ]; then
-                FIRST_RANK="$2"
+                FIRST_PE="$2"
                 shift 2
             else
-                echo "Error: -frank requires a value."
+                echo "Error: -fpe requires a value."
                 exit 1
             fi
             ;;
@@ -105,7 +105,7 @@ done
 # Golden generate
 rm -rf ./golden
 mkdir -p golden
-python3 ./scripts/data_gen.py $RANK_SIZE $TEST_TYPE
+python3 ./scripts/data_gen.py $PE_SIZE $TEST_TYPE
 
 # Kernel test
 rm -rf ./output
@@ -115,10 +115,10 @@ pids=()
 for (( idx =0; idx < ${GNPU_NUM}; idx = idx + 1 )); do
     if [[ "$TOOL" == "msprof" ]]; then
         PERF_TIME=50
-        msprof --application="${PROJECT_ROOT}/build/bin/allgather $RANK_SIZE $idx $IPPORT $GNPU_NUM $FIRST_RANK $FIRST_NPU $TEST_TYPE $PERF_TIME" --output=${PROJECT_ROOT}/examples/allgather/output/ &
+        msprof --application="${PROJECT_ROOT}/build/bin/allgather $PE_SIZE $idx $IPPORT $GNPU_NUM $FIRST_PE $FIRST_NPU $TEST_TYPE $PERF_TIME" --output=${PROJECT_ROOT}/examples/allgather/output/ &
     elif [[ "$TOOL" == "mssanitizer" ]]; then
         PERF_TIME=1
-        mssanitizer --log-level=error ${PROJECT_ROOT}/build/bin/allgather $RANK_SIZE $idx $IPPORT $GNPU_NUM $FIRST_RANK $FIRST_NPU $TEST_TYPE $PERF_TIME &
+        mssanitizer --log-level=error ${PROJECT_ROOT}/build/bin/allgather $PE_SIZE $idx $IPPORT $GNPU_NUM $FIRST_PE $FIRST_NPU $TEST_TYPE $PERF_TIME &
     fi
     pid=$!
     pids+=("$pid")

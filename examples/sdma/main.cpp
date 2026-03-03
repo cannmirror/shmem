@@ -286,7 +286,7 @@ int test_allgather_sdma(int my_pe, int n_pes)
     CHECK_RET(aclrtFreeHost(y_host));
     aclshmem_free(gva);
 
-    std::cout << " Rank " << my_pe << "Finised !! Result Correct !!" << std::endl;
+    std::cout << " Pe " << my_pe << "Finised !! Result Correct !!" << std::endl;
 
     CHECK_RET(aclrtDestroyStream(stream));
     return 0;
@@ -332,6 +332,6 @@ int main(int argc, char *argv[])
     CHECK_RET(aclrtResetDevice(device_id));
     CHECK_RET(aclFinalize());
 
-    std::cout << "[SUCCESS] demo run success in rank " << my_pe << std::endl;
+    std::cout << "[SUCCESS] demo run success in pe " << my_pe << std::endl;
     return 0;
 }

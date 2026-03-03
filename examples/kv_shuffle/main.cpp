@@ -37,7 +37,7 @@ using bfloat16 = op::bfloat16;
 #include "kv_shuffle_kernel.h"
 int g_npus = 8;
 const char *ipport;
-int f_rank = 0;
+int f_pe = 0;
 int f_npu = 0;
 const char *data_type;
 
@@ -48,7 +48,7 @@ constexpr int64_t max_block_nums = MAX_SEQLEN * MAX_BATCH / page_size;
 constexpr int64_t kv_head_num = 8;
 constexpr int64_t head_dim = 128;
 
-int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
+int test_aclshmem_kv_shuffle(int pe_id, int n_pes)
 {
     // ACLStream init
     int status = 0;
@@ -63,7 +63,7 @@ int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
     // k_cache input
     uint8_t *k_cache_host;
     aclrtMallocHost(reinterpret_cast<void **>(&k_cache_host), kv_cache_size);
-    inputFile = "../../examples/kv_shuffle/scripts/output/k_cache_input_rank_" + std::to_string(rank_id) + ".bin";
+    inputFile = "../../examples/kv_shuffle/scripts/output/k_cache_input_pe_" + std::to_string(pe_id) + ".bin";
     ReadFile(inputFile, k_cache_host, kv_cache_size);
     void *k_cache_ptr = aclshmem_malloc(kv_cache_size);
     aclrtMemcpy(k_cache_ptr, kv_cache_size, k_cache_host, kv_cache_size, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -71,26 +71,26 @@ int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
     // v_cache input
     uint8_t *v_cache_host;
     aclrtMallocHost(reinterpret_cast<void **>(&v_cache_host), kv_cache_size);
-    inputFile = "../../examples/kv_shuffle/scripts/output/v_cache_input_rank_" + std::to_string(rank_id) + ".bin";
+    inputFile = "../../examples/kv_shuffle/scripts/output/v_cache_input_pe_" + std::to_string(pe_id) + ".bin";
     ReadFile(inputFile, v_cache_host, kv_cache_size);
     void *v_cache_ptr = aclshmem_malloc(kv_cache_size);
     aclrtMemcpy(v_cache_ptr, kv_cache_size, v_cache_host, kv_cache_size, ACL_MEMCPY_HOST_TO_DEVICE);
 
     // global_shuffle_table input
     uint8_t *global_shuffle_table_host;
-    constexpr uint32_t PAIR_PER_RANK = 2;
-    aclrtMallocHost(reinterpret_cast<void **>(&global_shuffle_table_host), n_ranks * PAIR_PER_RANK * sizeof(int64_t));
+    constexpr uint32_t PAIR_PER_PE = 2;
+    aclrtMallocHost(reinterpret_cast<void **>(&global_shuffle_table_host), n_pes * PAIR_PER_PE * sizeof(int64_t));
     inputFile = "../../examples/kv_shuffle/scripts/output/pair_list.bin";
-    ReadFile(inputFile, global_shuffle_table_host, n_ranks * PAIR_PER_RANK * sizeof(int64_t));
+    ReadFile(inputFile, global_shuffle_table_host, n_pes * PAIR_PER_PE * sizeof(int64_t));
     void *global_shuffle_table_ptr;
-    aclrtMalloc(&global_shuffle_table_ptr, n_ranks * PAIR_PER_RANK * sizeof(int64_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemcpy(global_shuffle_table_ptr, n_ranks * PAIR_PER_RANK * sizeof(int64_t),
-                global_shuffle_table_host, n_ranks * PAIR_PER_RANK * sizeof(int64_t), ACL_MEMCPY_HOST_TO_DEVICE);
+    aclrtMalloc(&global_shuffle_table_ptr, n_pes * PAIR_PER_PE * sizeof(int64_t), ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMemcpy(global_shuffle_table_ptr, n_pes * PAIR_PER_PE * sizeof(int64_t),
+                global_shuffle_table_host, n_pes * PAIR_PER_PE * sizeof(int64_t), ACL_MEMCPY_HOST_TO_DEVICE);
 
     // global_block_num input
     uint8_t *global_block_num_host;
     aclrtMallocHost(reinterpret_cast<void **>(&global_block_num_host), sizeof(int64_t));
-    inputFile = "../../examples/kv_shuffle/scripts/output/block_num_rank_" + std::to_string(rank_id) + ".bin";
+    inputFile = "../../examples/kv_shuffle/scripts/output/block_num_pe_" + std::to_string(pe_id) + ".bin";
     ReadFile(inputFile, global_block_num_host, sizeof(int64_t));
     void *global_block_num_ptr;
     aclrtMalloc(&global_block_num_ptr, sizeof(int64_t), ACL_MEM_MALLOC_HUGE_FIRST);
@@ -104,14 +104,14 @@ int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
     void *src_block_table_ptr;
     if (block_nums != 0) {
         aclrtMallocHost(reinterpret_cast<void **>(&src_block_table_host), block_nums * sizeof(int64_t));
-        inputFile = "../../examples/kv_shuffle/scripts/output/src_block_table_rank_" + std::to_string(rank_id) + ".bin";
+        inputFile = "../../examples/kv_shuffle/scripts/output/src_block_table_pe_" + std::to_string(pe_id) + ".bin";
 
         aclrtMalloc(&src_block_table_ptr, block_nums * sizeof(int64_t), ACL_MEM_MALLOC_HUGE_FIRST);
         ReadFile(inputFile, src_block_table_host, block_nums * sizeof(int64_t));
         aclrtMemcpy(src_block_table_ptr, block_nums * sizeof(int64_t),
                     src_block_table_host, block_nums * sizeof(int64_t), ACL_MEMCPY_HOST_TO_DEVICE);
     } else {
-        std::cout << "Rank " << rank_id << " block_nums = 0, Skip src_block_table input" << std::endl;
+        std::cout << "Relative pe " << pe_id << " block_nums = 0, Skip src_block_table input" << std::endl;
     }
 
     // dst_block_table input
@@ -119,14 +119,14 @@ int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
     void *dst_block_table_ptr;
     if (block_nums != 0) {
         aclrtMallocHost(reinterpret_cast<void **>(&dst_block_table_host), block_nums * sizeof(int64_t));
-        inputFile = "../../examples/kv_shuffle/scripts/output/dst_block_table_rank_" + std::to_string(rank_id) + ".bin";
+        inputFile = "../../examples/kv_shuffle/scripts/output/dst_block_table_pe_" + std::to_string(pe_id) + ".bin";
 
         aclrtMalloc(&dst_block_table_ptr, block_nums * sizeof(int64_t), ACL_MEM_MALLOC_HUGE_FIRST);
         ReadFile(inputFile, dst_block_table_host, block_nums * sizeof(int64_t));
         aclrtMemcpy(dst_block_table_ptr, block_nums * sizeof(int64_t),
                     dst_block_table_host, block_nums * sizeof(int64_t), ACL_MEMCPY_HOST_TO_DEVICE);
     } else {
-        std::cout << "Rank " << rank_id << " block_nums = 0, Skip dst_block_table input" << std::endl;
+        std::cout << "Relative pe " << pe_id << " block_nums = 0, Skip dst_block_table input" << std::endl;
     }
 
     // KVShuffle
@@ -149,13 +149,13 @@ int test_aclshmem_kv_shuffle(int rank_id, int n_ranks)
     int8_t *k_output_host;
     status = aclrtMallocHost(reinterpret_cast<void**>(&k_output_host), kv_cache_size);
     status = aclrtMemcpy(k_output_host, kv_cache_size, k_cache_ptr, kv_cache_size, ACL_MEMCPY_DEVICE_TO_HOST);
-    outputFile = "../../examples/kv_shuffle/scripts/output/k_cache_output_rank_" + std::to_string(rank_id) + ".bin";
+    outputFile = "../../examples/kv_shuffle/scripts/output/k_cache_output_pe_" + std::to_string(pe_id) + ".bin";
     WriteFile(outputFile, k_output_host, kv_cache_size);
 
     int8_t *v_output_host;
     status = aclrtMallocHost(reinterpret_cast<void**>(&v_output_host), kv_cache_size);
     status = aclrtMemcpy(v_output_host, kv_cache_size, v_cache_ptr, kv_cache_size, ACL_MEMCPY_DEVICE_TO_HOST);
-    outputFile = "../../examples/kv_shuffle/scripts/output/v_cache_output_rank_" + std::to_string(rank_id) + ".bin";
+    outputFile = "../../examples/kv_shuffle/scripts/output/v_cache_output_pe_" + std::to_string(pe_id) + ".bin";
     WriteFile(outputFile, v_output_host, kv_cache_size);
 
     aclshmem_free(k_cache_ptr);
@@ -187,23 +187,23 @@ aclshmemx_uniqueid_t default_flag_uid;
 int main(int argc, char *argv[])
 {
     int status = 0;
-    int n_ranks = atoi(argv[INDEX1]);
-    int rank_id = atoi(argv[INDEX2]);
+    int n_pes = atoi(argv[INDEX1]);
+    int pe_id = atoi(argv[INDEX2]);
     ipport = argv[INDEX3];
     // int32_t ret = aclshmemx_set_conf_store_tls(false, nullptr, 0);
 
     // Acl && Shmem init
-    int32_t device_id = rank_id % g_npus + f_npu;
+    int32_t device_id = pe_id % g_npus + f_npu;
     status = aclInit(nullptr);
     status = aclrtSetDevice(device_id);
 
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     aclshmemx_init_attr_t attributes;
-    test_set_attr(rank_id, n_ranks, local_mem_size, ipport, default_flag_uid, &attributes);
+    test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
 
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
-    status = test_aclshmem_kv_shuffle(rank_id, n_ranks);
+    status = test_aclshmem_kv_shuffle(pe_id, n_pes);
 
     status = aclshmem_finalize();
     status = aclrtResetDevice(device_id);
@@ -212,6 +212,6 @@ int main(int argc, char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     return 0;
 }

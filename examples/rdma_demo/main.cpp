@@ -21,16 +21,16 @@
 
 int g_npus = 8;
 const char *ipport;
-int f_rank = 0;
+int f_pe = 0;
 int f_npu = 0;
 extern void allgather_demo(uint32_t block_dim, void* stream, uint8_t* gva, int message_length);
 
 aclshmemx_uniqueid_t default_flag_uid;
 
-int test_aclshmem_team_all_gather(int rank_id, int n_ranks, uint64_t local_mem_size)
+int test_aclshmem_team_all_gather(int pe_id, int n_pes, uint64_t local_mem_size)
 {
     // 初始化ACL和ACLSHMEM
-    int32_t device_id = rank_id % g_npus + f_npu;
+    int32_t device_id = pe_id % g_npus + f_npu;
     int status = 0;
     const int num10 = 10;
     aclrtStream stream = nullptr;
@@ -40,7 +40,7 @@ int test_aclshmem_team_all_gather(int rank_id, int n_ranks, uint64_t local_mem_s
     status |= aclrtCreateStream(&stream);
 
     aclshmemx_init_attr_t attributes;
-    test_set_attr(rank_id, n_ranks, local_mem_size, ipport, default_flag_uid, &attributes);
+    test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
 
     attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_ROCE;
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
@@ -51,7 +51,7 @@ int test_aclshmem_team_all_gather(int rank_id, int n_ranks, uint64_t local_mem_s
     uint32_t trans_size = 16;
     std::vector<int32_t> input(trans_size, 0);
     for (int i = 0; i < trans_size; i++) {
-        input[i] = (rank_id + num10);
+        input[i] = (pe_id + num10);
     }
 
     status |= aclrtMemcpy(ptr + aclshmem_my_pe() * trans_size * sizeof(int32_t), trans_size * sizeof(int32_t),
@@ -67,12 +67,12 @@ int test_aclshmem_team_all_gather(int rank_id, int n_ranks, uint64_t local_mem_s
 
     // 结果校验打印
     int32_t *y_host;
-    size_t input_size = n_ranks * trans_size * sizeof(int32_t);
+    size_t input_size = n_pes * trans_size * sizeof(int32_t);
     status |= aclrtMallocHost(reinterpret_cast<void**>(&y_host), input_size);
     status |= aclrtMemcpy(y_host, input_size, ptr, input_size, ACL_MEMCPY_DEVICE_TO_HOST);
 
     const int block_size = 16;
-    for (int i = 0; i < n_ranks; i++) {
+    for (int i = 0; i < n_pes; i++) {
         for (int j = 0; j < block_size; j++) {
             if (y_host[trans_size * i + trans_size / block_size * j] != num10 + i) {
                 std::cout << y_host[trans_size * i + trans_size / block_size * j] << " != " << num10 + i << std::endl;
@@ -81,7 +81,7 @@ int test_aclshmem_team_all_gather(int rank_id, int n_ranks, uint64_t local_mem_s
             }
         }
     }
-    std::cout << "check transport result success, rank=" << rank_id << std::endl;
+    std::cout << "check transport result success, relative pe=" << pe_id << std::endl;
     // 去初始化
     status |= aclrtFreeHost(y_host);
     aclshmem_free(ptr);
@@ -96,15 +96,15 @@ int main(int argc, char *argv[])
 {
     int argIdx = 1;
     int status = 0;
-    int n_ranks = atoi(argv[argIdx++]);
-    int rank_id = atoi(argv[argIdx++]);
+    int n_pes = atoi(argv[argIdx++]);
+    int pe_id = atoi(argv[argIdx++]);
     ipport = argv[argIdx++];
     g_npus = atoi(argv[argIdx++]);
-    f_rank = atoi(argv[argIdx++]);
+    f_pe = atoi(argv[argIdx++]);
     f_npu = atoi(argv[argIdx++]);
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
-    status = test_aclshmem_team_all_gather(rank_id, n_ranks, local_mem_size);
+    status = test_aclshmem_team_all_gather(pe_id, n_pes, local_mem_size);
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in relative pe " << pe_id << std::endl;
     return 0;
 }

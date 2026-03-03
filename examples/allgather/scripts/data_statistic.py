@@ -21,7 +21,7 @@ def open_input_file(input_file):
 
 
 def get_time_data(df, test_line_num: int):
-    df = df[df['kernel_type'].astype(str).str.contains("VEC", na=False)]
+    df = df[df['kernel_type'].astype(str).str.contains("CORE", na=False)]
     df = df.reset_index(drop=True)
     time_data = []
     total_rows = len(df)

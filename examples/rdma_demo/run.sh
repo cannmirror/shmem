@@ -17,11 +17,11 @@ export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 export SHMEM_UID_SESSION_ID=127.0.0.1:8899
 cd ${PROJECT_ROOT}
 pids=()
-./build/bin/rdma_demo 2 0 tcp://127.0.0.1:8899 2 0 0 & # rank 0
+./build/bin/rdma_demo 2 0 tcp://127.0.0.1:8899 2 0 0 & # pe 0
 pid=$!
 pids+=("$pid")
 
-./build/bin/rdma_demo 2 1 tcp://127.0.0.1:8899 2 0 0 & # rank 1
+./build/bin/rdma_demo 2 1 tcp://127.0.0.1:8899 2 0 0 & # pe 1
 pid=$!
 pids+=("$pid")
 

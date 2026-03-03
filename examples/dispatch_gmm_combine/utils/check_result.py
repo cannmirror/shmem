@@ -58,20 +58,20 @@ def read_binary_file(file_path, dtype=torch.float32):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--rank_size', type=int, required=True)
+parser.add_argument('--pe_size', type=int, required=True)
 parser.add_argument('--dataType', type=int, required=True)
 parser.add_argument('--m', type=int, required=True)
 parser.add_argument('--k', type=int, required=True)
 parser.add_argument('--n', type=int, required=True)
-parser.add_argument('--expert_per_rank', type=int, required=True)
+parser.add_argument('--expert_per_pe', type=int, required=True)
 parser.add_argument('--EP', type=int, required=True)
 
 args = parser.parse_args()
-for i in range(args.rank_size):
-    print(f"================{i} rank ================")
+for i in range(args.pe_size):
+    print(f"================ pe {i} ================")
     a = read_binary_file(f"./out/output_{i}.bin", dtype=torch.float16)
     b = read_binary_file(
         f"./utils/test_data/unpermuted_token_{i}_{args.dataType}_1_{args.m}_{args.k}_{args.n}_"
-        f"{args.expert_per_rank}_{args.EP}_1.bin",
+        f"{args.expert_per_pe}_{args.EP}_1.bin",
         dtype=torch.float16)
     output_error_item(a, b)

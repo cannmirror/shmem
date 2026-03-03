@@ -26,7 +26,7 @@ def gen_golden_data():
                         help='Directory to save the data files', 
                         default="./out")
     parser.add_argument('--out_data_type', type=int)
-    parser.add_argument('--rank_size', type=int)
+    parser.add_argument('--pe_size', type=int)
     parser.add_argument('--m', type=int)
     parser.add_argument('--n', type=int)
     parser.add_argument('--k', type=int)
@@ -43,20 +43,20 @@ def gen_golden_data():
     golden = np.zeros((m, n), dtype=l0c_dtype)
     np.random.seed(42)
 
-    for i in range(args.rank_size):
+    for i in range(args.pe_size):
         # Using float16 for a and b as in the original script
         a_gm = gen_random_data((m, k), np.float16)
         b_gm = gen_random_data((k, n), np.float16)
 
-        # Save per-rank data
-        a_gm_path = os.path.join(data_dir, f"rank_{i}_a.bin")
-        b_gm_path = os.path.join(data_dir, f"rank_{i}_b.bin")
+        # Save per-pe data
+        a_gm_path = os.path.join(data_dir, f"pe_{i}_a.bin")
+        b_gm_path = os.path.join(data_dir, f"pe_{i}_b.bin")
         print(f'{a_gm_path=}')
         print(f'{b_gm_path=}')
         a_gm.tofile(a_gm_path)
         b_gm.tofile(b_gm_path)
 
-        # Calculate matmul for this rank and add to golden
+        # Calculate matmul for this pe and add to golden
         matrix_c = np.matmul(a_gm.astype(l0c_dtype), b_gm.astype(l0c_dtype))
         golden += matrix_c
 

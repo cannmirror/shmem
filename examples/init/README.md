@@ -44,9 +44,9 @@ export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
 执行 default 流程，双机，每个机器2 pe，在两台机器分别执行如下命令。
 ```bash
 # pe0所在机器
-bash run.sh -mode default -pesize 4 -frank 0 -gnpus 2 -ipport ${该机器的ip:port}
+bash run.sh -mode default -pesize 4 -fpe 0 -gnpus 2 -ipport ${该机器的ip:port}
 # 其他机器
-bash run.sh -mode default -pesize 4 -frank 2 -gnpus 2 -ipport ${pe0机器的ip:port}
+bash run.sh -mode default -pesize 4 -fpe 2 -gnpus 2 -ipport ${pe0机器的ip:port}
 ```
 
 执行 mpi/uid 流程，双机，每个机器2 pe。

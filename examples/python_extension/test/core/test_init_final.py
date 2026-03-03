@@ -19,7 +19,7 @@ g_malloc_size = 8 * 1024 * 1024
 
 
 def run_init_final_test():
-    rank = dist.get_rank()
+    pe = dist.get_pe()
     world_size = dist.get_world_size()
     ret = ash.set_conf_store_tls(False, "")
 
@@ -30,25 +30,25 @@ def run_init_final_test():
     # 1. get unique id
     uid_size = 512
     tensor = torch.zeros(uid_size, dtype=torch.uint8)
-    if rank == 0:
+    if pe == 0:
         unique_id = core.get_unique_id()
         if unique_id is None:
             raise ValueError('[ERROR] get unique id failed')
         tensor = torch.tensor(list(unique_id), dtype=torch.uint8)
     dist.broadcast(tensor, src=0)
-    if rank != 0:
+    if pe != 0:
         unique_id = bytes(tensor.tolist())
 
     # 2. init with unique id
-    core.init(rank=rank, nranks=world_size, mem_size=g_ash_size, uid=unique_id, initializer_method='uid')
+    core.init(pe=pe, npes=world_size, mem_size=g_ash_size, uid=unique_id, initializer_method='uid')
 
     # 3. finialize
     core.finalize()
 
 
 if __name__ == "__main__":
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    torch.npu.set_device(local_rank)
+    local_pe = int(os.environ.get("LOCAL_RANK", "0"))
+    torch.npu.set_device(local_pe)
 
     dist.init_process_group(backend="gloo", init_method="env://")
     run_init_final_test()

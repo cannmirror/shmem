@@ -37,16 +37,16 @@ while [[ $# -gt 0 ]]; do
             fi
             shift 2
             ;;
-        -frank)
+        -fpe)
             if [ -n "$2" ]; then
                 if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-                    echo "Error: -frank requires a numeric value."
+                    echo "Error: -fpe requires a numeric value."
                     exit 1
                 fi
                 FIRST_PE="$2"
                 shift 2
             else
-                echo "Error: -frank requires a value."
+                echo "Error: -fpe requires a value."
                 exit 1
             fi
             ;;

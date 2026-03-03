@@ -33,7 +33,7 @@ def gen_golden_data():
                                  CommType.MATMUL_REDUCE_SCATTER_PADDING,
                                  CommType.ALLGATHER_MATMUL_WITH_GATHER_RESULT])
     parser.add_argument('out_dtype', type=DataType.from_str, choices=[DataType.FLOAT16, DataType.BF16])
-    parser.add_argument('rank_size', type=int)
+    parser.add_argument('pe_size', type=int)
     parser.add_argument('m', type=int)
     parser.add_argument('n', type=int)
     parser.add_argument('k', type=int)
@@ -47,15 +47,15 @@ def gen_golden_data():
     data_dir = os.path.abspath(args.data_dir)
 
     os.makedirs(data_dir, exist_ok=True)
-    b_all_rank = gen_random_data([k, n], dtype=args.out_dtype.torch_type)
+    b_all_pe = gen_random_data([k, n], dtype=args.out_dtype.torch_type)
 
     l0c_dtype = torch.float32
     matrix_a_list = []
     matrix_c_list = []
-    for i in range(args.rank_size):
+    for i in range(args.pe_size):
         a_gm = gen_random_data([m, k], dtype=args.out_dtype.torch_type)
         matrix_a_list.append(a_gm)
-        b_gm = b_all_rank
+        b_gm = b_all_pe
         matrix_c = torch.matmul(a_gm.to(l0c_dtype), b_gm.to(l0c_dtype))
         matrix_c_list.append(matrix_c)
         if args.transA:
@@ -63,8 +63,8 @@ def gen_golden_data():
         if args.transB:
             b_gm = b_gm.transpose(0, 1).contiguous()
 
-        a_gm_path = os.path.join(data_dir, f"rank_{i}_a.bin")
-        b_gm_path = os.path.join(data_dir, f"rank_{i}_b.bin")
+        a_gm_path = os.path.join(data_dir, f"pe_{i}_a.bin")
+        b_gm_path = os.path.join(data_dir, f"pe_{i}_b.bin")
         tensor_to_file(a_gm, a_gm_path)
         tensor_to_file(b_gm, b_gm_path)
 
@@ -74,7 +74,7 @@ def gen_golden_data():
         golden = torch.cat(matrix_c_list, dim=0)
     else:
         golden = torch.zeros_like(matrix_c_list[0])
-        for i in range(args.rank_size):
+        for i in range(args.pe_size):
             golden += matrix_c_list[i]
 
     tensor_to_file(golden, os.path.join(data_dir, "golden.bin"))

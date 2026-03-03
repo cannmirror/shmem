@@ -16,13 +16,13 @@ EXAMPLE=sdma
 
 cd ${SCRIPT_DIR}
 
-RANK_SIZE="2"
+PE_SIZE="2"
 IPPORT="tcp://127.0.0.1:8766"
 GNPU_NUM="8"
 FIRST_NPU="0"
-FIRST_RANK="0"
+FIRST_PE="0"
 TEST_TYPE="int"
-RANK_TABLE=""
+PE_TABLE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -35,25 +35,25 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
-        -ranks)
+        -pes)
             if [ -n "$2" ]; then
-                RANK_SIZE="$2"
-                 if [[ "$GNPU_NUM" -gt "$RANK_SIZE" ]]; then
-                    GNPU_NUM="$RANK_SIZE"
-                    echo "Because GNPU_NUM is greater than RANK_SIZE, GNPU_NUM is assigned the value of RANK_SIZE=${RANK_SIZE}."
+                PE_SIZE="$2"
+                 if [[ "$GNPU_NUM" -gt "$PE_SIZE" ]]; then
+                    GNPU_NUM="$PE_SIZE"
+                    echo "Because GNPU_NUM is greater than PE_SIZE, GNPU_NUM is assigned the value of PE_SIZE=${PE_SIZE}."
                 fi
                 shift 2
             else
-                echo "Error: -ranks requires a value."
+                echo "Error: -pes requires a value."
                 exit 1
             fi
             ;;
-        -frank)
+        -fpe)
             if [ -n "$2" ]; then
-                FIRST_RANK="$2"
+                FIRST_PE="$2"
                 shift 2
             else
-                echo "Error: -frank requires a value."
+                echo "Error: -fpe requires a value."
                 exit 1
             fi
             ;;
@@ -84,12 +84,12 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
-        -rank_table)
+        -pe_table)
             if [ -n "$2" ]; then
-                RANK_TABLE="$2"
+                PE_TABLE="$2"
                 shift 2
             else
-                echo "Error: -rank_table requires a value."
+                echo "Error: -pe_table requires a value."
                 exit 1
             fi
             ;;
@@ -106,8 +106,8 @@ export ACLSHMEM_UID_SESSION_ID=127.0.0.1:8899
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:${ASCEND_HOME_PATH}/lib64:$LD_LIBRARY_PATH
 pids=()
 for (( idx =0; idx < ${GNPU_NUM}; idx = idx + 1 )); do
-    # msprof --application="${PROJECT_ROOT}/build/bin/${EXAMPLE} $RANK_SIZE $idx $IPPORT $GNPU_NUM $FIRST_RANK $FIRST_NPU $TEST_TYPE $RANK_TABLE" --output=${PROJECT_ROOT}/examples/${EXAMPLE}/output/ &
-    ${PROJECT_ROOT}/build/bin/${EXAMPLE} $RANK_SIZE $idx $IPPORT $GNPU_NUM $FIRST_RANK $FIRST_NPU $TEST_TYPE $RANK_TABLE &
+    # msprof --application="${PROJECT_ROOT}/build/bin/${EXAMPLE} $PE_SIZE $idx $IPPORT $GNPU_NUM $FIRST_PE $FIRST_NPU $TEST_TYPE $PE_TABLE" --output=${PROJECT_ROOT}/examples/${EXAMPLE}/output/ &
+    ${PROJECT_ROOT}/build/bin/${EXAMPLE} $PE_SIZE $idx $IPPORT $GNPU_NUM $FIRST_PE $FIRST_NPU $TEST_TYPE $PE_TABLE &
     pid=$!
     pids+=("$pid")
     echo "$pid background process recorded"

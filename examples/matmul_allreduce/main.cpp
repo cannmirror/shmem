@@ -71,8 +71,8 @@ void ShmemMatmulAllReduce(
 
     using ArchTag = Catlass::Arch::AtlasA2;
 
-    uint32_t rankIdx = aclshmem_my_pe();
-    uint32_t rankSize = aclshmem_n_pes();
+    uint32_t peIdx = aclshmem_my_pe();
+    uint32_t peSize = aclshmem_n_pes();
 
     Catlass::GemmCoord problemShape{m, n, k};
     LayoutA layoutA{m, k};
@@ -157,7 +157,7 @@ void ShmemMatmulAllReduce(
     typename BlockEpilogueAllGather::Params allGatherParams{};
 
     typename MatmulAllReduceKernel::Params params{
-        problemShape, rankIdx, rankSize,
+        problemShape, peIdx, peSize,
         COMM_INTERVAL,
         gmA, layoutA,
         gmB, layoutB,
@@ -173,10 +173,10 @@ void ShmemMatmulAllReduce(
 
 struct Options {
     static constexpr auto HELPER =
-       "Usage: matmul_allreduce rank_size rank_id ip_port m n k [device_id_list]\n";
+       "Usage: matmul_allreduce pe_size relative_pe_id ip_port m n k [device_id_list]\n";
 
-    int rankSize;
-    int rankId;
+    int peSize;
+    int peId;
     std::string ipPort;
     uint32_t m{0};
     uint32_t n{0};
@@ -187,8 +187,8 @@ struct Options {
     int Parse(int argc, char **argv)
     {
         enum ArgsIndex {
-            RANK_SIZE_INDEX = 1,
-            RANK_ID_INDEX,
+            PE_SIZE_INDEX = 1,
+            PE_ID_INDEX,
             IP_PORT_INDEX,
             M_INDEX,
             N_INDEX,
@@ -203,8 +203,8 @@ struct Options {
             return -1;
         }
 
-        rankSize = std::atoi(argv[RANK_SIZE_INDEX]);
-        rankId = std::atoi(argv[RANK_ID_INDEX]);
+        peSize = std::atoi(argv[PE_SIZE_INDEX]);
+        peId = std::atoi(argv[PE_ID_INDEX]);
         ipPort = argv[IP_PORT_INDEX];
         m = std::atoi(argv[M_INDEX]);
         n = std::atoi(argv[N_INDEX]);
@@ -216,7 +216,7 @@ struct Options {
                 deviceIdList.push_back(std::atoi(idToken));
             }
         } else {
-            for (size_t i = 0; i < rankSize; ++i) {
+            for (size_t i = 0; i < peSize; ++i) {
                 deviceIdList.push_back(i);
             }
         }
@@ -239,15 +239,15 @@ int main(int argc, char **argv)
         std::cerr << "Invalid arguments\n";
         return 1;
     }
-    int n_ranks = options.rankSize;
-    int rank_id = options.rankId;
+    int n_pes = options.peSize;
+    int pe_id = options.peId;
     std::string ipPort = options.ipPort;
     uint32_t m = options.m;
     uint32_t n = options.n;
     uint32_t k = options.k;
-    int32_t device_id = options.deviceIdList[rank_id];
+    int32_t device_id = options.deviceIdList[pe_id];
 
-    std::cout << "[TEST] input rank_size: " << n_ranks << " rank_id:" << rank_id << " input_ip: " << ipPort << "\n";
+    std::cout << "[TEST] input pe_size: " << n_pes << " pe_id:" << pe_id << " input_ip: " << ipPort << "\n";
 
     // Acl && Shmem init
     status = aclInit(nullptr);
@@ -255,7 +255,7 @@ int main(int argc, char **argv)
 
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     aclshmemx_init_attr_t attributes;
-    test_set_attr(rank_id, n_ranks, local_mem_size, ipPort.c_str(), default_flag_uid, &attributes);
+    test_set_attr(pe_id, n_pes, local_mem_size, ipPort.c_str(), default_flag_uid, &attributes);
 
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
@@ -272,14 +272,14 @@ int main(int argc, char **argv)
     ACL_CHECK(aclrtMalloc(reinterpret_cast<void**>(&aDevice), aSize, ACL_MEM_MALLOC_HUGE_FIRST));
     uint8_t *aHost;
     ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&aHost), aSize));
-    ReadFile(options.GetDataPath("rank_" + std::to_string(rank_id) + "_a.bin"), aHost, aSize);
+    ReadFile(options.GetDataPath("pe_" + std::to_string(pe_id) + "_a.bin"), aHost, aSize);
     ACL_CHECK(aclrtMemcpy(aDevice, aSize, aHost, aSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
     uint8_t *bDevice;
     ACL_CHECK(aclrtMalloc(reinterpret_cast<void**>(&bDevice), bSize, ACL_MEM_MALLOC_HUGE_FIRST));
     uint8_t *bHost;
     ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&bHost), bSize));
-    ReadFile(options.GetDataPath("rank_" + std::to_string(rank_id) + "_b.bin"), bHost, bSize);
+    ReadFile(options.GetDataPath("pe_" + std::to_string(pe_id) + "_b.bin"), bHost, bSize);
     ACL_CHECK(aclrtMemcpy(bDevice, bSize, bHost, bSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
     uint8_t *dDevice;
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 
     aclshmemx_show_prof();
 
-    if (rank_id == 0) {
+    if (pe_id == 0) {
         ACL_CHECK(aclrtMemcpy(dHost, dSize, dDevice, dSize, ACL_MEMCPY_DEVICE_TO_HOST));
         WriteFile(options.GetDataPath("aclshmem_output.bin"), dHost, dSize);
         std::printf("test finished\n");
@@ -331,6 +331,6 @@ int main(int argc, char **argv)
         std::exit(EXIT_FAILURE);
     }
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     return 0;
 }

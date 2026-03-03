@@ -38,7 +38,7 @@ using bfloat16 = op::bfloat16;
 
 int g_npus = 8;
 const char *ipport = "tcp://127.0.0.1:8998";
-int f_rank = 0;
+int f_pe = 0;
 int f_npu = 0;
 const char *data_type = "int";
 int perf_times = 50;
@@ -54,7 +54,7 @@ constexpr uint32_t BLOCK_NUM_LARGE_DATA = 16;
 aclshmemx_uniqueid_t default_flag_uid;
 
 template <class T>
-int test_aclshmem_all_gather(int rank_id, int n_ranks)
+int test_aclshmem_all_gather(int pe_id, int n_pes)
 {
     // ACLStream init
     int status = 0;
@@ -73,7 +73,11 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
 
     uint32_t BLOCK_NUM = 8;
 
-    std::ofstream outFile("./results.csv");
+    std::string exec_path = __FILE__;
+    size_t pos = exec_path.find_last_of("/\\");
+    std::string dir_path = exec_path.substr(0, pos);
+    std::string result_path = dir_path + "/results.csv";
+    std::ofstream outFile(result_path);
     if (!outFile.is_open()) {
         std::cerr << "错误：无法创建文件！" << std::endl;
         return 1;
@@ -84,7 +88,7 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
     int magic = 1;
 
     for (int i = 0; i < test_cases.size(); i++) {
-        if (rank_id == 0) {
+        if (pe_id == 0) {
             std::cout << "Case: " << test_cases[i] << " Started." << std::endl;
         }
         uint32_t trans_size = test_cases[i];
@@ -101,12 +105,12 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
         uint8_t *input_host;
         aclrtMallocHost(reinterpret_cast<void**>(&input_host), trans_size * sizeof(T));
         std::string inputFile = "../../examples/allgather/golden/allgather_" + std::to_string(trans_size) + "_" +
-                                std::to_string(n_ranks) + "/input_gm_" + std::to_string(rank_id) + ".bin";
+                                std::to_string(n_pes) + "/input_gm_" + std::to_string(pe_id) + ".bin";
         ReadFile(inputFile, input_host, trans_size * sizeof(T));
         aclrtMemcpy(input_ptr, trans_size * sizeof(T), input_host, trans_size * sizeof(T), ACL_MEMCPY_HOST_TO_DEVICE);
 
         void *output_ptr;
-        aclrtMalloc(&output_ptr, trans_size * n_ranks * sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST);
+        aclrtMalloc(&output_ptr, trans_size * n_pes * sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST);
 
         // sync Buffer + data Buffer
         int aiv_num = BLOCK_NUM;
@@ -124,20 +128,20 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
 
         // Result Check
         T *output_host;
-        size_t output_size = n_ranks * trans_size * sizeof(T);
+        size_t output_size = n_pes * trans_size * sizeof(T);
         status = aclrtMallocHost(reinterpret_cast<void**>(&output_host), output_size);
         status = aclrtMemcpy(output_host, output_size, output_ptr, output_size, ACL_MEMCPY_DEVICE_TO_HOST);
 
         T *golden_host;
         status = aclrtMallocHost(reinterpret_cast<void**>(&golden_host), output_size);
         std::string goldenFile = "../../examples/allgather/golden/allgather_" +
-            std::to_string(trans_size) + "_" + std::to_string(n_ranks) + "/golden.bin";
-        ReadFile(goldenFile, golden_host, n_ranks * trans_size * sizeof(T));
-        for (int zz = 0; zz < n_ranks * trans_size; zz++) {
+            std::to_string(trans_size) + "_" + std::to_string(n_pes) + "/golden.bin";
+        ReadFile(goldenFile, golden_host, n_pes * trans_size * sizeof(T));
+        for (int zz = 0; zz < n_pes * trans_size; zz++) {
             if (static_cast<float>(output_host[zz]) != static_cast<float>(golden_host[zz])) {
                 std::cout << static_cast<float>(output_host[zz]) << " != " << static_cast<float>(golden_host[zz])
                           << ", trans_size is : " << trans_size << ", idx is: " << zz
-                          << ", rank_id is: "<< rank_id << std::endl;
+                          << ", pe_id is: "<< pe_id << std::endl;
                 std::exit(EXIT_FAILURE);
             }
         }
@@ -153,7 +157,7 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
 
         outFile << 1 << "," << trans_size << "," << " " << "\n";
 
-        if (rank_id == 0) {
+        if (pe_id == 0) {
             std::cout << "Case: " << test_cases[i] << " Finised !! Result Correct !!" << std::endl;
         }
     }
@@ -166,33 +170,33 @@ int test_aclshmem_all_gather(int rank_id, int n_ranks)
 int main(int argc, char *argv[])
 {
     int status = 0;
-    int n_ranks = atoi(argv[INDEX1]);
-    int rank_id = atoi(argv[INDEX2]);
+    int n_pes = atoi(argv[INDEX1]);
+    int pe_id = atoi(argv[INDEX2]);
     ipport = argv[INDEX3];
     g_npus = atoi(argv[INDEX4]);
-    f_rank = atoi(argv[INDEX5]);
+    f_pe = atoi(argv[INDEX5]);
     f_npu = atoi(argv[INDEX6]);
     data_type = argv[INDEX7];
     perf_times = atoi(argv[INDEX8]);
 
     // Acl && Shmem init
-    int32_t device_id = rank_id % g_npus + f_npu;
+    int32_t device_id = pe_id % g_npus + f_npu;
     status = aclInit(nullptr);
     status = aclrtSetDevice(device_id);
 
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     aclshmemx_init_attr_t attributes;
-    test_set_attr(rank_id, n_ranks, local_mem_size, ipport, default_flag_uid, &attributes);
+    test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
     if (std::string(data_type) == "int") {
-        status = test_aclshmem_all_gather<int>(rank_id, n_ranks);
+        status = test_aclshmem_all_gather<int>(pe_id, n_pes);
     } else if (std::string(data_type) == "int32_t") {
-        status = test_aclshmem_all_gather<int32_t>(rank_id, n_ranks);
+        status = test_aclshmem_all_gather<int32_t>(pe_id, n_pes);
     } else if (std::string(data_type) == "float16_t") {
-        status = test_aclshmem_all_gather<fp16_t>(rank_id, n_ranks);
+        status = test_aclshmem_all_gather<fp16_t>(pe_id, n_pes);
     } else if (std::string(data_type) == "bfloat16_t") {
-        status = test_aclshmem_all_gather<bfloat16>(rank_id, n_ranks);
+        status = test_aclshmem_all_gather<bfloat16>(pe_id, n_pes);
     }
     status = aclshmem_finalize();
     status = aclrtResetDevice(device_id);
@@ -201,6 +205,6 @@ int main(int argc, char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     return 0;
 }

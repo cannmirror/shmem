@@ -28,48 +28,48 @@ KV_HEAD_NUM = 8
 HEAD_DIM = 128
 
 
-def get_pair_rank(sort_idx, local_rank):
-    pair_rank = 0
-    for idx, rank in enumerate(sort_idx):
-        if rank == local_rank:
+def get_pair_pe(sort_idx, local_pe):
+    pair_pe = 0
+    for idx, pe in enumerate(sort_idx):
+        if pe == local_pe:
             pair_idx = (PES - 1) - idx # notice idx can't be PES
-            pair_rank = sort_idx[pair_idx]
-    return pair_rank.item()
+            pair_pe = sort_idx[pair_idx]
+    return pair_pe.item()
 
 
 max_transfer_tokens = 16384 * 2
 
 
-def get_pair_transfer_tokens(kv_lens, kv_sum, kv_mean, pair_list, local_rank):
-    pair_rank = pair_list[local_rank][0]
-    if (kv_sum[local_rank] - kv_mean) <= 0:
+def get_pair_transfer_tokens(kv_lens, kv_sum, kv_mean, pair_list, local_pe):
+    pair_pe = pair_list[local_pe][0]
+    if (kv_sum[local_pe] - kv_mean) <= 0:
         return -1, []
-    if (kv_sum[local_rank] - kv_mean) >= 0 and (kv_sum[pair_rank] - kv_mean) >= 0:
+    if (kv_sum[local_pe] - kv_mean) >= 0 and (kv_sum[pair_pe] - kv_mean) >= 0:
         return -1, []
-    transfer_tokens = min(abs(kv_sum[local_rank] - kv_mean), abs(kv_sum[pair_rank] - kv_mean))
+    transfer_tokens = min(abs(kv_sum[local_pe] - kv_mean), abs(kv_sum[pair_pe] - kv_mean))
     transfer_tokens = min(transfer_tokens, max_transfer_tokens)
     transfer_batch_id = []
     transfer_batch_tokens = 0
-    for i in range(kv_lens[local_rank].shape[0]): # rank_loop
-        if transfer_tokens > kv_lens[local_rank][i]: # 选择哪几个batch的block要搬到pair_rank
+    for i in range(kv_lens[local_pe].shape[0]): # pe_loop
+        if transfer_tokens > kv_lens[local_pe][i]: # 选择哪几个batch的block要搬到pair_pe
             transfer_batch_id.append(i)
-            transfer_tokens -= kv_lens[local_rank][i]
-            transfer_batch_tokens += kv_lens[local_rank][i]
+            transfer_tokens -= kv_lens[local_pe][i]
+            transfer_batch_tokens += kv_lens[local_pe][i]
     return transfer_batch_tokens, transfer_batch_id
 
 
 def balance_kv(kv_lens):
-    kv_sum = torch.sum(kv_lens, dim=-1) # (rank_size, 1)
+    kv_sum = torch.sum(kv_lens, dim=-1) # (pe_size, 1)
     kv_mean = torch.mean(kv_sum.float(), dim=0).int() # int
     sort_kv_sum, sort_idx = torch.sort(kv_sum)
 
-    # Get rank to rank pair
+    # Get pe to pe pair
     pair_list = []
     for i in range(PES):
-        pair_idx = get_pair_rank(sort_idx, i)
+        pair_idx = get_pair_pe(sort_idx, i)
         pair_list.append([pair_idx])
 
-    # Get rank to rank transfer_tokens
+    # Get pe to pe transfer_tokens
     transfer_tokens_list = []
     for i in range(PES):
         transfer_tokens, transfer_batch_id = get_pair_transfer_tokens(kv_lens, kv_sum, kv_mean, pair_list, i)
@@ -93,10 +93,10 @@ class CacheData:
     v_cache_list_g: list
 
 
-def gendata(rank):
+def gendata(pe):
     torch.manual_seed(42)
     kv_lens = torch.randint(0, MAX_SEQLEN, (PES, INIT_BATCH))
-    kv_sum = torch.sum(kv_lens, dim=-1) # (rank_size, 1)
+    kv_sum = torch.sum(kv_lens, dim=-1) # (pe_size, 1)
 
     k_cache_list = []
     v_cache_list = []
@@ -138,20 +138,20 @@ def gendata(rank):
 
     # Params Prepare And Golden Calculate
     for i in range(PES):
-        local_rank = i
+        local_pe = i
         shuffle_table = pair_list
         k_cache_list_g = k_cache_list_g
         v_cache_list_g = v_cache_list_g
         src_local_table = []
         dst_local_table = []
 
-        transfer_batches = transfer_tokens_list[local_rank][1]
+        transfer_batches = transfer_tokens_list[local_pe][1]
         for batch_idx in transfer_batches:
-            src_local_table += batch_blocks_list[local_rank][batch_idx][1]
+            src_local_table += batch_blocks_list[local_pe][batch_idx][1]
 
-        pair_rank = shuffle_table[local_rank][0]
+        pair_pe = shuffle_table[local_pe][0]
         for new_block_id in range(len(src_local_table)):
-            dst_used_id = used_blocks_list[pair_rank]
+            dst_used_id = used_blocks_list[pair_pe]
             dst_local_table.append(dst_used_id + new_block_id)
 
         src_block_table.append(src_local_table)
@@ -160,24 +160,24 @@ def gendata(rank):
 
         # Start KVCache Copy
         total_data_volume = 0
-        if (shuffle_table[local_rank][1] == 0):
+        if (shuffle_table[local_pe][1] == 0):
             for idx, _ in enumerate(src_local_table):
                 src_idx = src_local_table[idx]
                 dst_idx = dst_local_table[idx]
-                k_cache_list_g[pair_rank][dst_idx] = k_cache_list_g[local_rank][src_idx]
-                v_cache_list_g[pair_rank][dst_idx] = v_cache_list_g[local_rank][src_idx]
+                k_cache_list_g[pair_pe][dst_idx] = k_cache_list_g[local_pe][src_idx]
+                v_cache_list_g[pair_pe][dst_idx] = v_cache_list_g[local_pe][src_idx]
 
                 def tensor_size_in_bytes(tensor):
                     num_elements = tensor.numel()
                     element_size = tensor.untyped_storage().element_size()
                     return num_elements * element_size
 
-                data_volume = tensor_size_in_bytes(k_cache_list_g[local_rank][src_idx])
+                data_volume = tensor_size_in_bytes(k_cache_list_g[local_pe][src_idx])
                 total_data_volume += data_volume
-                data_volume = tensor_size_in_bytes(v_cache_list_g[local_rank][src_idx])
+                data_volume = tensor_size_in_bytes(v_cache_list_g[local_pe][src_idx])
                 total_data_volume += data_volume
-            if rank == 0:
-                print(f"rank:{local_rank}, datasize{total_data_volume}!")
+            if pe == 0:
+                print(f"pe:{local_pe}, datasize{total_data_volume}!")
 
     return CacheData(pair_list, k_cache_list, v_cache_list, src_block_table,
                      dst_block_table, block_num_list, k_cache_list_g, v_cache_list_g)
@@ -192,37 +192,37 @@ def read_file(file_name):
     return file_content, num_bytes
 
 
-def worker(rank):
+def worker(pe):
     # 加载共享库
     torch.ops.load_library('../output/lib/libaclshmem_torch.so')
     aclshmem_common = torch.classes.ShmemOps.Manager()
-    torch_npu.npu.set_device(rank)
+    torch_npu.npu.set_device(pe)
     stream = torch_npu.npu.Stream(device=f'npu:{torch_npu.npu.current_device()}')
     local_mem_size = 1024 * 1024 * 1024
     ipports = "tcp://127.0.0.1:8662"
-    aclshmem_common.attr_init(rank, PES, local_mem_size, ipports)
+    aclshmem_common.attr_init(pe, PES, local_mem_size, ipports)
     kv_shuffle = torch.classes.ShmemOps.KVShuffle()
-    my_cache_data = gendata(rank)
+    my_cache_data = gendata(pe)
     
     # global_shuffle_table
     global_shuffle_table = torch.tensor(my_cache_data.pair_list, dtype=torch.int64)
     global_shuffle_tensor = global_shuffle_table.npu()
     # k_cache
-    k_cache = my_cache_data.k_cache_list[rank]
+    k_cache = my_cache_data.k_cache_list[pe]
     aclshmem_k_cache_tensor = aclshmem_common.malloc_like(k_cache)
     # v_cache
-    v_cache = my_cache_data.v_cache_list[rank]
+    v_cache = my_cache_data.v_cache_list[pe]
     aclshmem_v_cache_tensor = aclshmem_common.malloc_like(v_cache)
-    int64_data = my_cache_data.block_num_list[rank]
+    int64_data = my_cache_data.block_num_list[pe]
     
     # 检查第一个值是否为 0
     if int64_data != 0:
         # src_block_table
-        src_block_table = torch.tensor(my_cache_data.src_block_table[rank], dtype=torch.int64)
+        src_block_table = torch.tensor(my_cache_data.src_block_table[pe], dtype=torch.int64)
         src_block_tensor = src_block_table.npu()
 
         # dst_block_table
-        dst_block_table = torch.tensor(my_cache_data.dst_block_table[rank], dtype=torch.int64)
+        dst_block_table = torch.tensor(my_cache_data.dst_block_table[pe], dtype=torch.int64)
         dst_block_tensor = dst_block_table.npu()
     else:
         src_block_tensor = torch.Tensor()
@@ -271,14 +271,14 @@ def worker(rank):
                                 aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
                 stream.synchronize()
     
-    print("rank: ", rank, " kv_shuffle end !!!!")
+    print("pe: ", pe, " kv_shuffle end !!!!")
     npu_tensork = aclshmem_k_cache_tensor.cpu()
     npu_tensorv = aclshmem_v_cache_tensor.cpu()
-    print("K are equal:", torch.equal(npu_tensork, my_cache_data.k_cache_list_g[rank]))  # True
-    print("V are equal:", torch.equal(npu_tensorv, my_cache_data.v_cache_list_g[rank]))  # True
+    print("K are equal:", torch.equal(npu_tensork, my_cache_data.k_cache_list_g[pe]))  # True
+    print("V are equal:", torch.equal(npu_tensorv, my_cache_data.v_cache_list_g[pe]))  # True
 
-    print("K are equal may be False:", torch.equal(npu_tensork, my_cache_data.k_cache_list[rank]))  # may be False
-    print("V are equal may be False:", torch.equal(npu_tensorv, my_cache_data.v_cache_list[rank]))  # may be False
+    print("K are equal may be False:", torch.equal(npu_tensork, my_cache_data.k_cache_list[pe]))  # may be False
+    print("V are equal may be False:", torch.equal(npu_tensorv, my_cache_data.v_cache_list[pe]))  # may be False
 
     aclshmem_common.free(aclshmem_k_cache_tensor)
     aclshmem_common.free(aclshmem_v_cache_tensor)
@@ -305,8 +305,8 @@ if __name__ == "__main__":
 
     processes = []
 
-    for rank in range(PES):
-        p = multiprocessing.Process(target=worker, args=(rank,))
+    for pe in range(PES):
+        p = multiprocessing.Process(target=worker, args=(pe,))
         processes.append(p)
         p.start()
 

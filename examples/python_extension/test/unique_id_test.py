@@ -19,7 +19,7 @@ g_malloc_size = 8 * 1024 * 1024
 
 
 def run_init_with_unique_id_tests():
-    rank = dist.get_rank()
+    pe = dist.get_pe()
     world_size = dist.get_world_size()
     ret = ash.set_conf_store_tls(False, "")
 
@@ -30,29 +30,29 @@ def run_init_with_unique_id_tests():
     # 1. get unique id
     uid_size = 512
     tensor = torch.zeros(uid_size, dtype=torch.uint8)
-    if rank == 0:
+    if pe == 0:
         unique_id = ash.aclshmem_get_unique_id()
         if unique_id is None:
             raise ValueError('[ERROR] get unique id failed')
         tensor = torch.tensor(list(unique_id), dtype=torch.uint8)
     dist.broadcast(tensor, src=0)
-    if rank != 0:
+    if pe != 0:
         unique_id = bytes(tensor.tolist())
     # 2. init with unique id
-    ret = ash.aclshmem_init_using_unique_id(rank, world_size, g_ash_size, unique_id)
+    ret = ash.aclshmem_init_using_unique_id(pe, world_size, g_ash_size, unique_id)
     if ret != 0:
         raise ValueError('[ERROR] aclshmem_init failed')
 
     # test malloc
     aclshmem_ptr = ash.aclshmem_malloc(g_malloc_size)
-    print(f'rank[{rank}]: aclshmem_ptr: {aclshmem_ptr} with type {type(aclshmem_ptr)}')
+    print(f'pe[{pe}]: aclshmem_ptr: {aclshmem_ptr} with type {type(aclshmem_ptr)}')
     if aclshmem_ptr is None:
         raise ValueError('[ERROR] aclshmem_malloc failed')
 
     # test pe
     my_pe, pe_count = ash.my_pe(), ash.pe_count()
-    print(f'rank[{rank}]: my_pe:{my_pe} and pe_count:{pe_count}')
-    if not (my_pe == rank and pe_count == world_size):
+    print(f'pe[{pe}]: my_pe:{my_pe} and pe_count:{pe_count}')
+    if not (my_pe == pe and pe_count == world_size):
         raise ValueError('[ERROR] pe/world failed')
 
     # test free
@@ -63,8 +63,8 @@ def run_init_with_unique_id_tests():
 
 
 if __name__ == "__main__":
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    torch.npu.set_device(local_rank)
+    local_pe = int(os.environ.get("LOCAL_RANK", "0"))
+    torch.npu.set_device(local_pe)
 
     dist.init_process_group(backend="gloo", init_method="env://")
     run_init_with_unique_id_tests()

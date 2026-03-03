@@ -26,7 +26,7 @@ function run_allgather()
 
     cur_dir=${EXAMPLES_DIR}/allgather/
     cd ${cur_dir}
-    bash run.sh -ranks 2 -type int
+    bash run.sh -pes 2 -type int
     return $?
 }
 
@@ -82,7 +82,7 @@ function run_dispatch_gmm_combine()
 
     cur_dir=${EXAMPLES_DIR}/dispatch_gmm_combine/
     cd ${cur_dir}
-    bash scripts/run.sh -ranks 2 -M 64 -K 7168 -N 4096 -expertPerRank 2 -dataType 2 -weightNz 1 -transB 0
+    bash scripts/run.sh -pes 2 -M 64 -K 7168 -N 4096 -expertPerPe 2 -dataType 2 -weightNz 1 -transB 0
     return $?
 }
 

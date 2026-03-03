@@ -60,7 +60,7 @@ esac
 IFS=',' read -ra DEVICE_ID_LIST <<< "$DEVICE_ID_STR"
 RANK_SIZE=${#DEVICE_ID_LIST[@]}
 if [ $RANK_SIZE -gt 8 ]; then
-    echo "Rank size is illegal"
+    echo "PE size is illegal"
     exit 1
 fi
 

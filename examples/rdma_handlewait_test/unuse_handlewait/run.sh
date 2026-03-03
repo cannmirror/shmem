@@ -18,11 +18,11 @@ export SHMEM_UID_SESSION_ID=127.0.0.1:8899
 cd $project_root
 
 pids=()
-./build/bin/unuse_handlewait 2 0 tcp://127.0.0.1:8899 2 0 0 & # rank 0
+./build/bin/unuse_handlewait 2 0 tcp://127.0.0.1:8899 2 0 0 & # pe 0
 pid=$!
 pids+=("$pid")
 
-./build/bin/unuse_handlewait 2 1 tcp://127.0.0.1:8899 2 0 0 & # rank 1
+./build/bin/unuse_handlewait 2 1 tcp://127.0.0.1:8899 2 0 0 & # pe 1
 pid=$!
 pids+=("$pid")
 

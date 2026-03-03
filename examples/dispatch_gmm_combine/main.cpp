@@ -81,7 +81,7 @@ struct CoCTiling {
     uint32_t commDataSplit = 0;
     uint32_t lenPerLoop = 0;
     uint32_t EP = 0;
-    uint32_t expertPerRank = 0;
+    uint32_t expertPerPe = 0;
     uint32_t maxOutputSize = 0;
 
     int64_t topK;
@@ -136,7 +136,7 @@ public:
 
         int32_t ubMoveNum = cocTiling.ubMoveNum;
         uint32_t EP = cocTiling.EP;
-        uint32_t expertPerRank = cocTiling.expertPerRank;
+        uint32_t expertPerPe = cocTiling.expertPerPe;
         uint32_t maxOutputSize = cocTiling.maxOutputSize;
         int64_t activeNum = cocTiling.activeNum;
         int64_t expertCapacity = cocTiling.expertCapacity;
@@ -237,7 +237,7 @@ public:
         layout::RowMajor layoutD2{static_cast<uint32_t>(m * topK), n2};
         // Prepare params
         typename MatmulKernel::Params params{
-            problemShape, cocTiling.EP, cocTiling.expertPerRank, cocTiling.maxOutputSize,
+            problemShape, cocTiling.EP, cocTiling.expertPerPe, cocTiling.maxOutputSize,
             rank, rankSize,
             activeNum, expertCapacity, expertNum, dropPadMode, expertTokensCountOrCumsumFlag,
             expertTokensBeforeCapacityFlag, quantMode, topK, initRoutingQuantTilingKey,
@@ -315,7 +315,7 @@ int main(int argc, char **argv)
     uint32_t k = atoi(argv[6]);
     uint32_t n = atoi(argv[7]);
     uint32_t EP = n_ranks;
-    uint32_t expertPerRank = atoi(argv[8]);
+    uint32_t expertPerPe = atoi(argv[8]);
     uint32_t dataType = atoi(argv[9]);
     uint32_t weightNz = atoi(argv[10]);
     uint32_t transB = atoi(argv[11]);
@@ -329,19 +329,19 @@ int main(int argc, char **argv)
     // m, n, k
     GemmCoord problemShape{m, n, k};
     size_t aSize = static_cast<size_t>(m) * k * sizeof(float16_t);
-    size_t b1Size = static_cast<size_t>(k) * n * expertPerRank * sizeof(int8_t);
-    size_t b2Size = static_cast<size_t>(k2) * n2 * expertPerRank * sizeof(int8_t);
+    size_t b1Size = static_cast<size_t>(k) * n * expertPerPe * sizeof(int8_t);
+    size_t b2Size = static_cast<size_t>(k2) * n2 * expertPerPe * sizeof(int8_t);
     size_t cSize = static_cast<size_t>(m) * n2 * sizeof(float16_t);
-    size_t dequantScale1Size = static_cast<size_t>(expertPerRank) * n * sizeof(int64_t);
-    size_t dequantScale2Size = static_cast<size_t>(expertPerRank) * n2 * sizeof(int64_t);
+    size_t dequantScale1Size = static_cast<size_t>(expertPerPe) * n * sizeof(int64_t);
+    size_t dequantScale2Size = static_cast<size_t>(expertPerPe) * n2 * sizeof(int64_t);
     size_t perTokenScaleSize = static_cast<size_t>(maxOutputSize) * sizeof(float);
     size_t probsSize = m * topK * sizeof(float);
-    size_t lenTokenPerExpert = EP * EP * expertPerRank * sizeof(int32_t);
+    size_t lenTokenPerExpert = EP * EP * expertPerPe * sizeof(int32_t);
 
     uint32_t aivNum = 2 * BLOCK_NUM;
 
     size_t workspaceSize = m * topK * sizeof(int32_t) +
-                           EP * EP * expertPerRank * sizeof(int32_t) * 3 +
+                           EP * EP * expertPerPe * sizeof(int32_t) * 3 +
                            maxOutputSize * sizeof(float32_t) * 2 +
                            std::max(maxOutputSize * n * sizeof(float16_t), maxOutputSize * n2 * sizeof(float16_t)) +
                            std::max(maxOutputSize * k * sizeof(int8_t), maxOutputSize * k2 * sizeof(int8_t));
@@ -371,7 +371,7 @@ int main(int argc, char **argv)
     }
     std::string fileSuffix =
             "_" + std::to_string(dataType) + "_1_" + std::to_string(m) + "_" + std::to_string(k) + "_" +
-            std::to_string(n) + "_" + std::to_string(expertPerRank) + "_" + std::to_string(EP) + "_1.bin";
+            std::to_string(n) + "_" + std::to_string(expertPerPe) + "_" + std::to_string(EP) + "_1.bin";
 
     InitData(&b1Host, &b1Device, b1Size, filePrefix + "matrix_b1_" + std::to_string(rank_id) + fileSuffix);
     InitData(&b2Host, &b2Device, b2Size, filePrefix + "matrix_b2_" + std::to_string(rank_id) + fileSuffix);
@@ -392,7 +392,7 @@ int main(int argc, char **argv)
     uint8_t *expertTokensBeforeCapacity;
     int64_t activeNum = 0;
     int64_t expertCapacity = 0;
-    int64_t expertNum = expertPerRank * EP;
+    int64_t expertNum = expertPerPe * EP;
     int64_t dropPadMode = 0;
     int64_t expertTokensCountOrCumsumFlag = 2;
     bool expertTokensBeforeCapacityFlag = false;
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
     cocTiling.ubMoveNum = ubMoveNum;
     cocTiling.maxOutputSize = maxOutputSize;
     cocTiling.EP = EP;
-    cocTiling.expertPerRank = expertPerRank;
+    cocTiling.expertPerPe = expertPerPe;
     cocTiling.activeNum = activeNum;
     cocTiling.expertCapacity = expertCapacity;
     cocTiling.expertNum = expertNum;
@@ -482,6 +482,6 @@ int main(int argc, char **argv)
         std::exit(EXIT_FAILURE);
     }
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in relative_pe_id " << rank_id << std::endl;
     return 0;
 }

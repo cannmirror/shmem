@@ -56,8 +56,8 @@ const uint32_t COMM_BLOCK_M = 64;
 struct Options {
     CocCommType commType;
     CocDataType dataType;
-    int rankSize;
-    int rankId;
+    int peSize;
+    int peId;
     std::string ipPort{};
     uint32_t m{0};
     uint32_t n{0};
@@ -74,8 +74,8 @@ struct Options {
         enum ArgsIndex {
             COMM_TYPE_INDEX = 1,
             DATA_TYPE_INDEX,
-            RANK_SIZE_INDEX,
-            RANK_ID_INDEX,
+            PE_SIZE_INDEX,
+            PE_ID_INDEX,
             IP_PORT_INDEX,
             M_INDEX,
             N_INDEX,
@@ -95,8 +95,8 @@ struct Options {
 
         commType = static_cast<CocCommType>(std::atoi(argv[COMM_TYPE_INDEX]));
         dataType = static_cast<CocDataType>(std::atoi(argv[DATA_TYPE_INDEX]));
-        rankSize = std::atoi(argv[RANK_SIZE_INDEX]);
-        rankId = std::atoi(argv[RANK_ID_INDEX]);
+        peSize = std::atoi(argv[PE_SIZE_INDEX]);
+        peId = std::atoi(argv[PE_ID_INDEX]);
         ipPort = argv[IP_PORT_INDEX];
         m = std::atoi(argv[M_INDEX]);
         n = std::atoi(argv[N_INDEX]);
@@ -111,7 +111,7 @@ struct Options {
                 deviceIdList.push_back(std::atoi(idToken));
             }
         } else {
-            for (size_t i = 0; i < rankSize; ++i) {
+            for (size_t i = 0; i < peSize; ++i) {
                 deviceIdList.push_back(i);
             }
         }
@@ -203,14 +203,14 @@ int main(int argc, char **argv)
     options.Parse(argc, argv);
     CocCommType commType = options.commType;
     CocDataType dataType = options.dataType;
-    int n_ranks = options.rankSize;
-    int rank_id = options.rankId;
+    int n_pes = options.peSize;
+    int pe_id = options.peId;
     std::string ipPort = options.ipPort;
-    int32_t deviceId = options.deviceIdList[rank_id];
+    int32_t deviceId = options.deviceIdList[pe_id];
     std::string data_file = options.data_file;
     const std::vector<std::vector<uint32_t>> shapes = InitTestShapes(options);
 
-    std::cout << "[TEST] input rank_size: " << n_ranks << " rank_id: " << rank_id << " input_ip: " << ipPort << "\n";
+    std::cout << "[TEST] input pe_size: " << n_pes << " pe_id: " << pe_id << " input_ip: " << ipPort << "\n";
 
     aclrtStream stream = nullptr;
     ACL_CHECK(aclInit(nullptr));
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
     // status = aclshmemx_set_conf_store_tls(false, nullptr, 0);
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     aclshmemx_init_attr_t attributes;
-    test_set_attr(rank_id, n_ranks, local_mem_size, ipPort.c_str(), default_flag_uid, &attributes);
+    test_set_attr(pe_id, n_pes, local_mem_size, ipPort.c_str(), default_flag_uid, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
     uint64_t fftsAddr{0};
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
     std::string currentTime = GetCurrentTime();
     std::string currentDir = options.parentPath;
     std::string tilingFileName = currentDir + "/output/tiling/tilingData_" + currentTime + ".csv";
-    if (rank_id == 0) {
+    if (pe_id == 0) {
         CreateTilingFile(tilingFileName);
     }
 
@@ -254,19 +254,19 @@ int main(int argc, char **argv)
         cocTiling.commNpuSplit = COMM_NPU_SPLIT;
         cocTiling.commDataSplit = COMM_DATA_SPLIT;
         cocTiling.commBlockM = COMM_BLOCK_M;
-        cocTiling.rankSize = n_ranks;
+        cocTiling.rankSize = n_pes;
 
         size_t aSize = static_cast<size_t>(m) * k * sizeof(half);
         size_t bSize = static_cast<size_t>(k) * n * sizeof(half);
         size_t cSize = static_cast<size_t>(m) * n * sizeof(half);
-        size_t cSizePerRank;
-        size_t gatherASize = aSize * n_ranks;
+        size_t cSizePerPe;
+        size_t gatherASize = aSize * n_pes;
         size_t wASize = 0;
         size_t wBSize = 0;
         if (commType == MATMUL_REDUCE_SCATTER) {
-            cSizePerRank = cSize / n_ranks;
+            cSizePerPe = cSize / n_pes;
         } else if (commType == MATMUL_REDUCE_SCATTER_PADDING) {
-            cSizePerRank = cSize / n_ranks;
+            cSizePerPe = cSize / n_pes;
 
             bool isNeedPaddingA = IsNeedPadding(m, k, transA);
             bool isNeedPaddingB = IsNeedPadding(k, n, transB);
@@ -284,9 +284,9 @@ int main(int argc, char **argv)
                 kernelType = MATMUL_REDUCE_SCATTER;
             }
         } else if (commType == ALLGATHER_MATMUL || commType == ALLGATHER_MATMUL_WITH_GATHER_RESULT) {
-            cSizePerRank = cSize * n_ranks;
+            cSizePerPe = cSize * n_pes;
         } else if (commType == ALLGATHER_MATMUL_PADDING) {
-            cSizePerRank = cSize * n_ranks;
+            cSizePerPe = cSize * n_pes;
 
             bool isNeedPaddingB = IsNeedPadding(k, n, transB);
             if (isNeedPaddingB) {
@@ -296,7 +296,7 @@ int main(int argc, char **argv)
                 kernelType = ALLGATHER_MATMUL;
             }
         } else {
-            cSizePerRank = cSize;
+            cSizePerPe = cSize;
         }
 
         std::string opName = commTypeMap.at(kernelType);
@@ -306,7 +306,7 @@ int main(int argc, char **argv)
         uint8_t *aHost;
         if (data_file != "") {
             ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&aHost), aSize));
-            ReadFile(data_file + "/rank_" + std::to_string(rank_id) + "_a.bin", aHost, aSize);
+            ReadFile(data_file + "/pe_" + std::to_string(pe_id) + "_a.bin", aHost, aSize);
             ACL_CHECK(aclrtMemcpy(aDevice, aSize, aHost, aSize, ACL_MEMCPY_HOST_TO_DEVICE));
         } else {
             std::vector<half> matrixA(m * k, 1);
@@ -318,7 +318,7 @@ int main(int argc, char **argv)
         uint8_t *bHost;
         if (data_file != "") {
             ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&bHost), bSize));
-            ReadFile(data_file + "/rank_" + std::to_string(rank_id) + "_b.bin", bHost, bSize);
+            ReadFile(data_file + "/pe_" + std::to_string(pe_id) + "_b.bin", bHost, bSize);
             ACL_CHECK(aclrtMemcpy(bDevice, bSize, bHost, bSize, ACL_MEMCPY_HOST_TO_DEVICE));
         } else {
             std::vector<half> matrixB(k * n, 1);
@@ -326,10 +326,10 @@ int main(int argc, char **argv)
         }
 
         uint8_t *cDevice;
-        ACL_CHECK(aclrtMalloc(reinterpret_cast<void**>(&cDevice), cSizePerRank, ACL_MEM_MALLOC_HUGE_FIRST));
+        ACL_CHECK(aclrtMalloc(reinterpret_cast<void**>(&cDevice), cSizePerPe, ACL_MEM_MALLOC_HUGE_FIRST));
         if (commType == MATMUL_REDUCE_SCATTER || commType == MATMUL_REDUCE_SCATTER_PADDING) {
-            std::vector<uint8_t> matrixCInit(cSizePerRank, 0);
-            ACL_CHECK(aclrtMemcpy(cDevice, cSizePerRank, matrixCInit.data(), cSizePerRank, ACL_MEMCPY_HOST_TO_DEVICE));
+            std::vector<uint8_t> matrixCInit(cSizePerPe, 0);
+            ACL_CHECK(aclrtMemcpy(cDevice, cSizePerPe, matrixCInit.data(), cSizePerPe, ACL_MEMCPY_HOST_TO_DEVICE));
         }
 
         uint8_t *wADevice{nullptr};
@@ -368,11 +368,11 @@ int main(int argc, char **argv)
         } else {
             if (searchparams == 1) {
                 // 搜索 tiling
-                GetTilings(cocTilings, cocTiling, commType, n_ranks);
+                GetTilings(cocTilings, cocTiling, commType, n_pes);
             } else {
-                bool ok = ApplyLookupTable(info, commType, n_ranks, cocTiling);
+                bool ok = ApplyLookupTable(info, commType, n_pes, cocTiling);
                 if (!ok) {
-                    std::cerr << "[LUT] no table for (" << opName << "," << n_ranks << "), using defaults\n";
+                    std::cerr << "[LUT] no table for (" << opName << "," << n_pes << "), using defaults\n";
                 }
                 cocTilings.push_back(cocTiling);
             }
@@ -397,8 +397,8 @@ int main(int argc, char **argv)
         ACL_CHECK(aclrtSynchronizeStream(stream));
 
         uint8_t *cHost;
-        ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&cHost), cSizePerRank));
-        ACL_CHECK(aclrtMemcpy(cHost, cSizePerRank, cDevice, cSizePerRank, ACL_MEMCPY_DEVICE_TO_HOST));
+        ACL_CHECK(aclrtMallocHost(reinterpret_cast<void**>(&cHost), cSizePerPe));
+        ACL_CHECK(aclrtMemcpy(cHost, cSizePerPe, cDevice, cSizePerPe, ACL_MEMCPY_DEVICE_TO_HOST));
 
         uint8_t *gatherAHost;
         if (commType == ALLGATHER_MATMUL_WITH_GATHER_RESULT) {
@@ -408,23 +408,23 @@ int main(int argc, char **argv)
 
         if (data_file != "") {
             if (commType == MATMUL_ALLREDUCE) {
-                if (rank_id == 0) {
-                    WriteFile(data_file + "/output.bin", cHost, cSizePerRank);
+                if (pe_id == 0) {
+                    WriteFile(data_file + "/output.bin", cHost, cSizePerPe);
                 }
             } else if (commType == ALLGATHER_MATMUL || commType == ALLGATHER_MATMUL_PADDING
                        || commType == ALLGATHER_MATMUL_WITH_GATHER_RESULT) {
-                if (rank_id == 0) {
-                    WriteFile(data_file + "/output.bin", cHost, cSizePerRank);
+                if (pe_id == 0) {
+                    WriteFile(data_file + "/output.bin", cHost, cSizePerPe);
                     if (commType == ALLGATHER_MATMUL_WITH_GATHER_RESULT) {
                         WriteFile(data_file + "/output_gather_a.bin", gatherAHost, gatherASize);
                     }
                 }
             } else if (commType == MATMUL_REDUCE_SCATTER || commType == MATMUL_REDUCE_SCATTER_PADDING) {
-                WriteFile(data_file + "/output.bin", cHost, cSizePerRank, rank_id * cSizePerRank);
+                WriteFile(data_file + "/output.bin", cHost, cSizePerPe, pe_id * cSizePerPe);
             }
         }
 
-        if (rank_id == 0) {
+        if (pe_id == 0) {
             WriteTilingInfos(opName, cocTilings, tilingFileName, transA, transB);
             std::printf("M: %d, K: %d, N: %d aclrtSynchronizeStream success!\n", cocTiling.m, cocTiling.k, cocTiling.n);
         }
@@ -456,6 +456,6 @@ int main(int argc, char **argv)
         std::exit(EXIT_FAILURE);
     }
 
-    std::cout << "[SUCCESS] demo run success in rank " << rank_id << std::endl;
+    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     return 0;
 }

@@ -352,6 +352,7 @@ if [ "$BUILD_ALL" = "ON" ]; then
     fn_build
 
     # build package
+    PYEXPAND_TYPE=ON
     fn_make_run_package
     make_package
 else

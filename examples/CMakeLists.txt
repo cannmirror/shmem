@@ -12,6 +12,14 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/device/
 )
 
+set(ACLSHMEM_ALL_KERNEL_TARGETS "" CACHE INTERNAL "All collective kernel shared library targets")
+
+set(PYEXPAND_SUPPORTED_TORCH
+    kv_shuffle
+    allgather
+    allgather_matmul
+)
+
 if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
     add_compile_definitions(ENABLE_ASCENDC_DUMP)
     add_compile_definitions(ASCENDC_DUMP=1)
@@ -20,24 +28,69 @@ if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
 endif()
 
 function(aclshmem_add_fusion_example NAME)
-    add_executable(${NAME} ${ARGN})
-    
-    target_compile_options(${NAME} PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
-    target_include_directories(${NAME} PRIVATE 
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
-        ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
-        ${PROJECT_SOURCE_DIR}/examples/${NAME}
-        ${PROJECT_SOURCE_DIR}/examples/templates/include
-        ${PROJECT_SOURCE_DIR}/examples/utils
-        ${PROJECT_SOURCE_DIR}/src/device/
-        ${PROJECT_SOURCE_DIR}/src/
-        ${MPI_INCLUDE_PATH}
-    )
-    target_link_options(${NAME} PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
+    if(USE_EXAMPLES)
+        add_executable(${NAME} ${ARGN})
+        if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
+            target_compile_definitions(${NAME} PRIVATE ENABLE_ASCENDC_DUMP ASCENDC_DUMP=1 ASCENDC_DEBUG)
+        endif()
+        
+        target_compile_options(${NAME} PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
+        target_include_directories(${NAME} PRIVATE 
+            ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
+            ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
+            ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${PROJECT_SOURCE_DIR}/examples/templates/include
+            ${PROJECT_SOURCE_DIR}/examples/utils
+            ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/
+            ${MPI_INCLUDE_PATH}
+        )
+        target_link_options(${NAME} PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
 
-    target_link_libraries(${NAME} PRIVATE shmem)
-    target_compile_options(${NAME} PRIVATE ${MPI_CXX_COMPILE_FLAGS})
+        if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
+            target_link_libraries(${NAME} PRIVATE ascend_dump)
+        endif()
+        target_link_libraries(${NAME} PRIVATE shmem)
+        target_compile_options(${NAME} PRIVATE ${MPI_CXX_COMPILE_FLAGS})
+    endif()
+
+    if(PYEXPAND_EXAMPLE AND ${NAME} IN_LIST PYEXPAND_SUPPORTED_TORCH)
+        add_library(${NAME}_kernel SHARED  ${ARGN})
+        if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
+            target_compile_definitions(${NAME}_kernel PRIVATE ENABLE_ASCENDC_DUMP ASCENDC_DUMP=1 ASCENDC_DEBUG)
+        endif()
+        
+        target_compile_options(${NAME}_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220 ${SANITIZER_FLAGS})
+        target_include_directories(${NAME}_kernel PRIVATE 
+            ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
+            ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
+            ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${PROJECT_SOURCE_DIR}/examples/templates/include
+            ${PROJECT_SOURCE_DIR}/examples/utils
+            ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/
+            ${MPI_INCLUDE_PATH}
+        )
+        target_link_options(${NAME}_kernel PRIVATE --cce-fatobj-link --cce-aicore-arch=dav-c220 ${SANITIZER_FLAGS})
+
+        if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
+            target_link_libraries(${NAME}_kernel PRIVATE ascend_dump)
+        endif()
+        target_link_libraries(${NAME}_kernel PRIVATE shmem)
+        target_compile_options(${NAME}_kernel PRIVATE ${MPI_CXX_COMPILE_FLAGS})
+        
+        if(${NAME} STREQUAL "dispatch_gmm_combine")
+            target_compile_options(${NAME}_kernel PRIVATE --cce-auto-sync)
+            target_include_directories(${NAME}_kernel PRIVATE ${PROJECT_SOURCE_DIR}/examples/${NAME}/include)
+        endif()
+
+        list(APPEND ACLSHMEM_ALL_KERNEL_TARGETS ${NAME}_kernel)
+        set(ACLSHMEM_ALL_KERNEL_TARGETS ${ACLSHMEM_ALL_KERNEL_TARGETS} CACHE INTERNAL "Update kernel targets")
+        install(TARGETS ${NAME}_kernel
+                LIBRARY DESTINATION torch_binding/kernels)
+    endif()
 
 endfunction()
 
@@ -54,24 +107,32 @@ function(aclshmem_add_collective_example NAME)
         ${PROJECT_SOURCE_DIR}/src/
     )
     target_link_options(${NAME}_kernel PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH_VEC} ${SANITIZER_FLAGS})
+    if(USE_EXAMPLES)
+        add_executable(${NAME} main.cpp)
+        target_compile_options(${NAME} PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
+        target_include_directories(${NAME} PRIVATE 
+            ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
+            ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${PROJECT_SOURCE_DIR}/examples/templates/include
+            ${PROJECT_SOURCE_DIR}/examples/utils
+            ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/host
+            ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store
+            ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store/acc_links/include
+            ${PROJECT_SOURCE_DIR}/src/host/mem/heap
+            ${MPI_INCLUDE_PATH}
+        )
+        target_link_libraries(${NAME} PRIVATE shmem ${NAME}_kernel)
+        target_compile_options(${NAME} PRIVATE ${MPI_CXX_COMPILE_FLAGS})
+    endif()
 
-    add_executable(${NAME} main.cpp)
-    target_compile_options(${NAME} PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
-    target_include_directories(${NAME} PRIVATE 
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
-        ${PROJECT_SOURCE_DIR}/examples/${NAME}
-        ${PROJECT_SOURCE_DIR}/examples/templates/include
-        ${PROJECT_SOURCE_DIR}/examples/utils
-        ${PROJECT_SOURCE_DIR}/src/device/
-        ${PROJECT_SOURCE_DIR}/src/host
-        ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store
-        ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store/acc_links/include
-        ${PROJECT_SOURCE_DIR}/src/host/mem/heap
-        ${MPI_INCLUDE_PATH}
-    )
-    target_link_libraries(${NAME} PRIVATE shmem ${NAME}_kernel)
-    target_compile_options(${NAME} PRIVATE ${MPI_CXX_COMPILE_FLAGS})
+    if(PYEXPAND_EXAMPLE AND ${NAME} IN_LIST PYEXPAND_SUPPORTED_TORCH)
+        list(APPEND ACLSHMEM_ALL_KERNEL_TARGETS ${NAME}_kernel)
+        set(ACLSHMEM_ALL_KERNEL_TARGETS ${ACLSHMEM_ALL_KERNEL_TARGETS} CACHE INTERNAL "Update kernel targets")
+        install(TARGETS ${NAME}_kernel
+                LIBRARY DESTINATION torch_binding/kernels)
+    endif()
 
 endfunction()
 
@@ -102,4 +163,8 @@ if(ACLSHMEM_RDMA_SUPPORT)
     )
         add_subdirectory(${EXAMPLE})
 endforeach()
+endif()
+
+if(PYEXPAND_EXAMPLE)
+    add_subdirectory(torch_binding)
 endif()

@@ -8,6 +8,7 @@
 
 aclshmem_add_fusion_example(dispatch_gmm_combine main.cpp)
 
-target_compile_options(dispatch_gmm_combine PRIVATE --cce-auto-sync)
-
-target_include_directories(dispatch_gmm_combine PRIVATE ${PROJECT_SOURCE_DIR}/examples/dispatch_gmm_combine/include)
+if(USE_EXAMPLES)
+    target_compile_options(dispatch_gmm_combine PRIVATE --cce-auto-sync)
+    target_include_directories(dispatch_gmm_combine PRIVATE ${PROJECT_SOURCE_DIR}/examples/dispatch_gmm_combine/include)
+endif()

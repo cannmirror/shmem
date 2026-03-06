@@ -343,3 +343,16 @@ int main(int argc, char **argv)
     std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     return 0;
 }
+
+
+namespace ShmemKernel {
+
+void aclshmem_allgather_matmul(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *aDevice, void *bDevice, void *cDevice, void *gmSymmetric, uint32_t m, uint32_t n, uint32_t k)
+{
+    ShmemAllGatherMatmul<<<block_dim, nullptr, stream>>>(
+            fftsAddr,
+            (uint8_t *)aDevice, (uint8_t *)bDevice, (uint8_t *)cDevice, (uint8_t *)gmSymmetric,
+            m, n, k);
+}
+
+}

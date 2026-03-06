@@ -26,6 +26,7 @@ SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本
 - `-cann`：CANN 8.5以上版本可以使用CANN开放接口编译
 - `-uttests`：构建`tests/unittest`目录下所有ut用例
 - `-examples`：构建examples目录下所有用例
+- `-python_example`：对部分examples目录下用例提供torch接入能力
 - `-enable_rdma`：构建并启用RDMA相关能力
 - `-enable_ascendc_dump`：启用`AscendC_Dump`模式，用于对算子内核代码进行调测
 - `-package`：构建py扩展的whl包

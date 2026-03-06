@@ -320,3 +320,22 @@ template void allgather_demo<fp16_t>(uint32_t block_dim, void *stream, uint64_t 
                                      uint8_t *output, uint8_t *gva, int elements, int magic);
 template void allgather_demo<bf16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input,
                                        uint8_t *output, uint8_t *gva, int elements, int magic);
+
+namespace ShmemKernel {
+
+template <class T>
+void aclshmem_allgather(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input, void *output, void *gva,
+                    int elements, int magic)
+{
+    allgather_demo<T>(block_dim, stream, fftsAddr, (uint8_t *)input, (uint8_t *)output, (uint8_t *)gva,
+                    elements, magic);
+}
+
+template void aclshmem_allgather<int>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input, void *output,
+                                  void *gva, int elements, int magic);
+template void aclshmem_allgather<fp16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input,
+                                     void *output, void *gva, int elements, int magic);
+template void aclshmem_allgather<bf16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input,
+                                       void *output, void *gva, int elements, int magic);
+
+}

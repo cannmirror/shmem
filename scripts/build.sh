@@ -34,6 +34,8 @@ PYEXPAND_TYPE=OFF
 PACKAGE=OFF
 USE_CXX11_ABI=ON
 USE_MSSANITIZER=OFF
+ENABLE_EXAMPLES=OFF
+PYEXPAND_EXAMPLE=OFF
 BUILD_ALL=OFF
 
 COMPILE_OPTIONS=""
@@ -49,7 +51,7 @@ cd ${PROJECT_ROOT}
 function fn_build()
 {
     mkdir -p build && cd build
-    cmake $COMPILE_OPTIONS -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_CXX11_ABI=$USE_CXX11_ABI -DUSE_MSSANITIZER=$USE_MSSANITIZER -DSOC_TYPE=${SOC_TYPE} ..
+    cmake $COMPILE_OPTIONS -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_CXX11_ABI=$USE_CXX11_ABI -DUSE_MSSANITIZER=$USE_MSSANITIZER -DSOC_TYPE=${SOC_TYPE} -DPYEXPAND_EXAMPLE=$PYEXPAND_EXAMPLE ..
     make install -j17
     cd -
 }
@@ -226,26 +228,6 @@ function fn_gen_doc()
     sphinx-build -M html $PROJECT_ROOT/docs $sphinx_out_dir
 }
 
-function build_shared_lib() {
-    echo "build shared lib start"
-    cd "$PROJECT_ROOT"/examples/shared_lib || exit
-    cmake --no-warn-unused-cli -B build $COMPILE_OPTIONS -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$PROJECT_ROOT"/examples/shared_lib/output -DSOC_TYPE=${SOC_TYPE}
-    cmake --build build -j
-    cmake --install build
-    cd "$PROJECT_ROOT" || exit
-    echo "build shared lib success"
-}
-
-function build_torch_library() {
-    echo "build torch library start"
-    cd "$PROJECT_ROOT"/examples/python_extension || exit
-    cmake --no-warn-unused-cli -B build $COMPILE_OPTIONS -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_INSTALL_PREFIX="$PROJECT_ROOT"/examples/python_extension/output -DPython3_EXECUTABLE="$(which python3)" -DBUILD_TORCH_LIB=True
-    cmake --build build -j
-    cmake --install build
-    cd "$PROJECT_ROOT" || exit
-    echo "build torch library success"
-}
-
 set -e
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -267,7 +249,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         -examples)
             cd $THIRD_PARTY_DIR; [[ ! -d "catlass" ]] && git clone https://gitcode.com/cann/catlass.git; cd $PROJECT_ROOT
-            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DUSE_EXAMPLES=ON"
+            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DUSE_EXAMPLES=ON -DPython3_EXECUTABLE=$(which python3)"
+            ENABLE_EXAMPLES=ON
             shift
             ;;
         -enable_rdma)
@@ -370,11 +353,6 @@ else
     if [ ${GEN_DOC} == "ON" ]; then
         fn_gen_doc
     fi
-fi
-
-if [ "${PYEXPAND_EXAMPLE}" == "ON" ]; then
-    build_shared_lib
-    build_torch_library
 fi
 
 cd ${CURRENT_DIR}

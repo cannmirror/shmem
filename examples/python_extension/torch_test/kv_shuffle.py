@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -7,6 +7,8 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+import os
+from glob import glob
 import multiprocessing
 import argparse
 from dataclasses import dataclass
@@ -191,10 +193,24 @@ def read_file(file_name):
     num_bytes = len(file_content)
     return file_content, num_bytes
 
+def load_torch_library(lib_name):
+    lib_env = "LD_LIBRARY_PATH" if os.name == "posix" else "PATH"
+    lib_paths = os.environ.get(lib_env, "").split(os.pathsep)
+    for path in lib_paths:
+        if not os.path.isdir(path):
+            continue
+        match = glob(os.path.join(path, lib_name))
+        if match:
+            lib_path = match[0]
+            torch.ops.load_library(lib_path)
+            return
+    raise FileNotFoundError(
+        f"未在{lib_env}的路径中找到库{lib_name}，请检查环境变量或库路径"
+    )
 
 def worker(pe):
     # 加载共享库
-    torch.ops.load_library('../output/lib/libaclshmem_torch.so')
+    load_torch_library('aclshmem_torch.so')
     aclshmem_common = torch.classes.ShmemOps.Manager()
     torch_npu.npu.set_device(pe)
     stream = torch_npu.npu.Stream(device=f'npu:{torch_npu.npu.current_device()}')
@@ -280,8 +296,8 @@ def worker(pe):
     print("K are equal may be False:", torch.equal(npu_tensork, my_cache_data.k_cache_list[pe]))  # may be False
     print("V are equal may be False:", torch.equal(npu_tensorv, my_cache_data.v_cache_list[pe]))  # may be False
 
-    aclshmem_common.free(aclshmem_k_cache_tensor)
-    aclshmem_common.free(aclshmem_v_cache_tensor)
+    aclshmem_common.free_tensor(aclshmem_k_cache_tensor)
+    aclshmem_common.free_tensor(aclshmem_v_cache_tensor)
 
 
 if __name__ == "__main__":

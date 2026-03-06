@@ -11,6 +11,18 @@
 cmake_minimum_required(VERSION 3.16)
 project(SHMEM)
 
+# 配置 ccache 
+find_program(CCACHE_FOUND ccache)
+if(CCACHE_FOUND)
+    message(STATUS "ccache found: ${CCACHE_FOUND}")
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_FOUND})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_FOUND})
+    execute_process(COMMAND ${CCACHE_FOUND} --version OUTPUT_VARIABLE CCACHE_V)
+    message(STATUS "ccache version info: ${CCACHE_V}")
+else()
+    message(STATUS "ccache not found. Compilation will proceed without it.")
+endif()
+
 # 设置C++标准
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

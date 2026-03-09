@@ -12,6 +12,13 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/device/
 )
 
+# catlass 适配宏
+if(SOC_TYPE STREQUAL "Ascend950")
+    add_compile_definitions(CATLASS_ARCH=3510)
+else()
+    add_compile_definitions(CATLASS_ARCH=2201)
+endif()
+
 set(ACLSHMEM_ALL_KERNEL_TARGETS "" CACHE INTERNAL "All collective kernel shared library targets")
 
 set(PYEXPAND_SUPPORTED_TORCH

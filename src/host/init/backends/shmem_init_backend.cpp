@@ -59,6 +59,7 @@ int aclshmemi_init_backend::init_device_state()
         SHM_LOG_ERROR("init hybm failed, result: " << ret);
         return ACLSHMEM_SMEM_ERROR;
     }
+    inited_ = true;
     mstx_reg_ptr_->add_mem_regions((void *)shm::HYBM_DEVICE_META_ADDR, shm::HYBM_DEVICE_INFO_SIZE, MSTX_GROUP_FOR_STATE);
     mstx_reg_ptr_->mstx_mem_regions_register(MSTX_GROUP_FOR_STATE);
     ret = aclshmemi_control_barrier_all();  // 保证所有rank都初始化了
@@ -67,7 +68,6 @@ int aclshmemi_init_backend::init_device_state()
         return ACLSHMEM_SMEM_ERROR;
     }
 
-    inited_ = true;
     SHM_LOG_INFO("init_device_state success. world_size: " << attributes->n_pes);
     return ACLSHMEM_SUCCESS;
 }

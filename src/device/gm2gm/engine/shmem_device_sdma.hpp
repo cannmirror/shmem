@@ -322,19 +322,20 @@ ACLSHMEM_DEVICE void aclshmemi_cmo_async(__gm__ uint8_t* src,
     if (context_gm == nullptr)
         return;
 
-    const auto block_idx = AscendC::GetBlockIdx();
+    const auto cur_block_idx = AscendC::GetBlockIdx();
 
     // Calculate base channel index for the current core
     __gm__ stars_channel_info_t *batch_write_channel_base = 
         (__gm__ stars_channel_info_t *)(context_gm + sizeof(stars_channel_flag_info_t));
-    __gm__ stars_channel_info_t *batch_write_channel_info = batch_write_channel_base + block_idx;
+    __gm__ stars_channel_info_t *batch_write_channel_info = batch_write_channel_base + cur_block_idx;
 
     // Calculate base addresses of send and receive flags
     __gm__ uint8_t *workspace = context_gm + sizeof(stars_channel_flag_info_t) +
                                 ACLSHMEM_SDMA_MAX_CHAN * sizeof(stars_channel_info_t);
     workspace_layout_t workspace_layout;
     uint64_t per_core_workspace_size = ACLSHMEM_SDMA_FLAG_LENGTH;
-    __gm__ uint8_t *sdma_recv_workspace = workspace + ACLSHMEM_SDMA_FLAG_LENGTH + (block_idx * per_core_workspace_size);
+    __gm__ uint8_t *sdma_recv_workspace = workspace + ACLSHMEM_SDMA_FLAG_LENGTH +
+        (cur_block_idx * per_core_workspace_size);
     __gm__ uint8_t *cmo_recv_workspace = sdma_recv_workspace + 2 * ACLSHMEM_SDMA_MAX_CHAN * ACLSHMEM_SDMA_FLAG_LENGTH;
 
     workspace_layout.send_workspace = workspace;

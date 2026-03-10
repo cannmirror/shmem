@@ -17,8 +17,8 @@ extern "C" __global__ __aicore__ void copy_perf(GM_ADDR src, GM_ADDR res, uint32
     }
     AscendC::TPipe pipe;
 
-    uint32_t block_idx = AscendC::GetBlockIdx();
-    uint32_t block_num = AscendC::GetBlockNum();
+    uint32_t cur_block_idx = AscendC::GetBlockIdx();
+    uint32_t n_blocks = AscendC::GetBlockNum();
 
     uint32_t copy_block_step_size = copypad_size * copypad_times;
 
@@ -28,7 +28,7 @@ extern "C" __global__ __aicore__ void copy_perf(GM_ADDR src, GM_ADDR res, uint32
     ubTensor.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub);
     AscendC::GlobalTensor<uint8_t> GmTensor;
     GmTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(src));
-    GmTensor = GmTensor[copy_block_step_size * block_idx];
+    GmTensor = GmTensor[copy_block_step_size * cur_block_idx];
 
     // Define temporary UB buffer
     constexpr uint32_t ub_offset = 1024;
@@ -55,7 +55,7 @@ extern "C" __global__ __aicore__ void copy_perf(GM_ADDR src, GM_ADDR res, uint32
     ub_tensor.address_.bufferAddr = reinterpret_cast<uint64_t>(tmp_buff);
     ub_tensor.address_.dataLen = ub_size;
 
-    aclshmemi_set_value((__gm__ uint8_t *)(res + block_idx * sizeof(uint32_t)), use_cycle, ub_tensor, EVENT_ID0);
+    aclshmemi_set_value((__gm__ uint8_t *)(res + cur_block_idx * sizeof(uint32_t)), use_cycle, ub_tensor, EVENT_ID0);
     AscendC::PipeBarrier<PIPE_ALL>();
 }
 

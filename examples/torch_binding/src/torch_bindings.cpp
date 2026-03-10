@@ -206,7 +206,7 @@ public:
         int64_t elements = input_contig.numel();
         int elem_byte = input_contig.element_size();
         size_t total_bytes = (size_t)elements * elem_byte;
-        int block_num = (total_bytes < DATA_SIZE_THRESHOLD) ? BLOCK_NUM_SMALL_DATA : BLOCK_NUM_LARGE_DATA;
+        int n_blocks = (total_bytes < DATA_SIZE_THRESHOLD) ? BLOCK_NUM_SMALL_DATA : BLOCK_NUM_LARGE_DATA;
 
         void *input = const_cast<void *>(input_tensor.storage().data());
 
@@ -217,11 +217,11 @@ public:
         count_++;
         at::ScalarType dtype = input_tensor.scalar_type();
         if (dtype == at::kInt) {
-            ShmemKernel::aclshmem_allgather<int>(block_num, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
+            ShmemKernel::aclshmem_allgather<int>(n_blocks, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
         } else if (dtype == at::kHalf) {
-            ShmemKernel::aclshmem_allgather<fp16_t>(block_num, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
+            ShmemKernel::aclshmem_allgather<fp16_t>(n_blocks, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
         } else if (dtype == at::kBFloat16) {
-            ShmemKernel::aclshmem_allgather<bfloat16>(block_num, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
+            ShmemKernel::aclshmem_allgather<bfloat16>(n_blocks, stream, fftsAddr_, input, output, sync_ptr_, elements, count_ * MAGIC_MULTIPLIER);
         } else {
             TORCH_CHECK(false, "Unsupported tensor dtype for test_aclshmem_all_gather! ",
                         "Current dtype: ", input_tensor.dtype().name(),
@@ -306,13 +306,13 @@ public:
         int64_t a_elements = a_contig.numel();
         int elem_byte = a_contig.element_size();
         size_t total_bytes = (size_t)a_elements * elem_byte;
-        int block_num = BLOCK_NUM;
+        int n_blocks = BLOCK_NUM;
 
         aclrtStream stream = c10_npu::getCurrentNPUStream().stream(false);
         count_++;
 
         ShmemKernel::aclshmem_allgather_matmul(
-            block_num, 
+            n_blocks, 
             stream, 
             fftsAddr_, 
             aDevice, 

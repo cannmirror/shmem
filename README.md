@@ -269,12 +269,13 @@ A：检查网卡是否开启 RDMA、防火墙是否放行通信端口（默认 8
 A：确认已安装 wheel 包，且 ```source``` 了 install 目录下的 ```set_env.sh```，环境变量 ```PYTHONPATH``` 包含 shmem 路径。
 ### Q4：关闭 TLS 后仍提示加密失败？
 A：需在 ```aclshmemx_init_attr``` 前调用 ```aclshmemx_set_conf_store_tls```，初始化后无法修改 TLS 配置。
-
-> 更多故障排查见：[Troubleshooting](docs/debug/Troubleshooting_FAQs.md)
-### Q5：googletest、catlass、这两个插件执行huild.sh时提示git失败？
+### Q5：googletest、catlass、这两个插件执行build.sh时提示git失败？
 A:确认git配置与是否可以访问网站，如果环境不能连接网站可以尝试手动下载文件到3rdparty目录下
 ### Q6：CANN包安装失败？可访问常见问题地址，查看是否有解决的方案
 [常见问题]（https://www.hiascend.com/document/detail/zh/AscendFAQ/CommuFunc/resdl/rdl_011.html）
+
+> 更多故障排查见：[Troubleshooting](docs/debug/Troubleshooting_FAQs.md)
+
 ## 九、测试框架
 - **单元测试：** 覆盖核心接口（初始化、内存操作、同步等），位于tests/unittest/
 - **算子泛化性测试：** 针对matmul_allreduce等样例，支持动态生成测试数据与精度校验

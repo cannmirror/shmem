@@ -91,7 +91,7 @@ __global__ __aicore__ void copy_perftest(GM_ADDR trash_gm,
 #endif
     AscendC::TPipe pipe;
     uint32_t block_id = AscendC::GetBlockIdx();
-    uint32_t block_num = AscendC::GetBlockNum();
+    uint32_t n_blocks = AscendC::GetBlockNum();
 
     uint32_t copy_setp_size = copypad_size > gm_align_size ? copypad_size : gm_align_size;
     uint32_t copy_block_step_size = copy_setp_size * copypad_times;
@@ -212,7 +212,7 @@ void cmo_pretech_kernel(uint8_t* src, uint32_t size, void* stream)
 
 template <class T>
 int copy_test(aclrtStream stream,
-                uint32_t block_num,
+                uint32_t n_blocks,
                 uint32_t copypad_size,
                 uint32_t copypad_times,
                 CMOEXAMPLE prefetch_type,
@@ -220,7 +220,7 @@ int copy_test(aclrtStream stream,
 {
     uint32_t copy_setp_size = copypad_size > gm_align_size ? copypad_size : gm_align_size;
     uint32_t copy_block_size = copy_setp_size * copypad_times;
-    size_t cache_gm_size = block_num * 2 * copy_block_size;
+    size_t cache_gm_size = n_blocks * 2 * copy_block_size;
 
     void *cache_gm_ptr;
     CHECK_RET(aclrtMalloc((void **) &(cache_gm_ptr), cache_gm_size, ACL_MEM_MALLOC_HUGE_FIRST));
@@ -252,7 +252,7 @@ int copy_test(aclrtStream stream,
         CHECK_RET(aclrtCmoAsync(cache_gm_ptr, cache_gm_size, ACL_RT_CMO_TYPE_PREFETCH, stream));
     }
 
-    copy_perftest_kernel<T>(block_num, stream, 
+    copy_perftest_kernel<T>(n_blocks, stream, 
         reinterpret_cast<uint8_t *>(trash_gm_ptr), 
         reinterpret_cast<uint8_t *>(cache_gm_ptr), 
         reinterpret_cast<uint8_t *>(device_dump), 
@@ -267,16 +267,16 @@ int copy_test(aclrtStream stream,
     float total_cmo_flag_us = 0;
     float total_copy_us = 0;
     float total_band = 0;
-    for(int32_t i = 0; i < block_num * 2; i++)
+    for(int32_t i = 0; i < n_blocks * 2; i++)
     {
         total_cmo_send_us += float_res[i * 10 + 0];
         total_cmo_flag_us += float_res[i * 10 + 1];
         total_copy_us += float_res[i * 10 + 2];
         total_band += float_res[i * 10 + 3];
     }
-    res.avg_cmo_send_us = total_cmo_send_us / (block_num * 2);
-    res.avg_cmo_flag_us = total_cmo_flag_us / (block_num * 2);
-    res.avg_copy_us = total_copy_us / (block_num * 2);
+    res.avg_cmo_send_us = total_cmo_send_us / (n_blocks * 2);
+    res.avg_cmo_flag_us = total_cmo_flag_us / (n_blocks * 2);
+    res.avg_copy_us = total_copy_us / (n_blocks * 2);
     res.total_band = total_band;
 #if defined(ENABLE_ASCENDC_DUMP)
     Adx::AdumpPrintWorkSpace(device_dump, ALL_DUMPSIZE, stream, "cmo");
@@ -372,8 +372,8 @@ int test_copy_perf(int my_pe, int n_pes)
         "device_block_prefetch_time/us", "device_block_prefetch_band/Gbps"},
     };
 
-    for (uint32_t block_num = 20; block_num <= max_block_nums; block_num++) {
-        uint32_t aiv_num = block_num * 2;
+    for (uint32_t n_blocks = 20; n_blocks <= max_block_nums; n_blocks++) {
+        uint32_t aiv_num = n_blocks * 2;
         for (uint32_t copypad_size : copypad_size_vector) {
             
             uint32_t copypad_setp_size = copypad_size > gm_align_size ? copypad_size : gm_align_size;
@@ -382,15 +382,15 @@ int test_copy_perf(int my_pe, int n_pes)
             size_t cache_gm_size = aiv_num * copy_block_size;
             
             res_csv_t res_csv = {};
-            std::vector<std::string> sub_data = {intToString(loop_times), formatSize(copy_size_per_loop), intToString(block_num), formatSize(copypad_size)};
+            std::vector<std::string> sub_data = {intToString(loop_times), formatSize(copy_size_per_loop), intToString(n_blocks), formatSize(copypad_size)};
 
             res_t res = {};
             // cmo warmup
-            copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
+            copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
 
             // no prefetch
             for (uint32_t loop_i = 0; loop_i < loop_times; loop_i++) {
-                copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
+                copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
                 res_csv.no_prefetch_bands.push_back(res.total_band);
                 res_csv.no_prefetch_us.push_back(res.avg_copy_us);
             }
@@ -399,7 +399,7 @@ int test_copy_perf(int my_pe, int n_pes)
 
             // host prefetch
             for (uint32_t loop_i = 0; loop_i < loop_times; loop_i++) {
-                copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::HOST_PREFETCH, res);
+                copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::HOST_PREFETCH, res);
                 res_csv.host_prefetch_bands.push_back(res.total_band);
                 res_csv.host_prefetch_us.push_back(res.avg_copy_us);
             }
@@ -408,7 +408,7 @@ int test_copy_perf(int my_pe, int n_pes)
 
             // device block prefetch
             for (uint32_t loop_i = 0; loop_i < loop_times; loop_i++) {
-                copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::DEVICE_BLOCK_PREFETCH, res);
+                copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::DEVICE_BLOCK_PREFETCH, res);
                 res_csv.device_block_prefetch_bands.push_back(res.total_band);
                 res_csv.device_block_prefetch_us.push_back(res.avg_copy_us);
             }
@@ -434,22 +434,22 @@ int test_copy_perf(int my_pe, int n_pes)
     }
     cmo_size_vector.push_back(96 * 1024 * 1024);
 
-    for (uint32_t block_num = 1; block_num <= 1; block_num++) {
-        uint32_t aiv_num = block_num * 2;
+    for (uint32_t n_blocks = 1; n_blocks <= 1; n_blocks++) {
+        uint32_t aiv_num = n_blocks * 2;
         uint32_t copypad_size = 512;
         for (uint32_t cmo_size : cmo_size_vector) {
             uint32_t copypad_times = cmo_size / copypad_size;
     
             res_csv_t res_csv = {};
-            std::vector<std::string> sub_data = {intToString(loop_times), intToString(block_num), formatSize(cmo_size)};
+            std::vector<std::string> sub_data = {intToString(loop_times), intToString(n_blocks), formatSize(cmo_size)};
 
             res_t res = {};
             // cmo warmup
-            copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
+            copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::NO_PREFETCH, res);
 
             // device block prefetch cmo
             for (uint32_t loop_i = 0; loop_i < loop_times; loop_i++) {
-                copy_test<T>(stream, block_num, copypad_size, copypad_times, CMOEXAMPLE::DEVICE_BLOCK_PREFETCH, res);
+                copy_test<T>(stream, n_blocks, copypad_size, copypad_times, CMOEXAMPLE::DEVICE_BLOCK_PREFETCH, res);
                 res_csv.device_block_prefetch_cmo_us.push_back(res.avg_cmo_send_us);
                 res_csv.device_block_prefetch_cmo_flag_us.push_back(res.avg_cmo_flag_us);
             }

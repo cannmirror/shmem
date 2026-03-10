@@ -28,8 +28,8 @@ extern void cmo_pretech_kernel(uint8_t* src, uint32_t size, void* stream);
 
 static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
 {
-    uint32_t block_num = 20;
-    uint32_t aiv_num = block_num * 2;
+    uint32_t n_blocks = 20;
+    uint32_t aiv_num = n_blocks * 2;
     uint32_t copypad_size = 64 * 1024;
     uint32_t copypad_times = 32;
 
@@ -48,7 +48,7 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     ASSERT_EQ(aclrtMalloc((void **) &(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
     ASSERT_EQ(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
     aclrtMallocHost((void **)(&res_host), res_size);
-    copy_perf_kernel(block_num, stream, 
+    copy_perf_kernel(n_blocks, stream, 
                         (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);
@@ -66,7 +66,7 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     ASSERT_EQ(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
     aclrtMallocHost((void **)(&res_host), res_size);
     ASSERT_EQ(aclrtCmoAsync(src_ptr, src_size, ACL_RT_CMO_TYPE_PREFETCH, stream), 0);   // aclrtCmoAsync
-    copy_perf_kernel(block_num, stream, 
+    copy_perf_kernel(n_blocks, stream, 
                         (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);
@@ -85,7 +85,7 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     aclrtMallocHost((void **)(&res_host), res_size);
     cmo_pretech_kernel((uint8_t *)src_ptr, src_size, stream);   // cmo_pretech_kernel
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
-    copy_perf_kernel(block_num, stream, 
+    copy_perf_kernel(n_blocks, stream, 
                         (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);

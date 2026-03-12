@@ -132,7 +132,7 @@ source /usr/local/Ascend/shmem/latest/set_env.sh
    注意: 此处`-example`参数非必选项，仅提供[使用参考](./docs/debug/Troubleshooting_FAQs.md#SHMEM-常见问题)。
 
 ### Python接口使用
-注意：python接口API列表可参考：[python接口API列表](./docs/pythonAPI.md)。
+注意：python接口API列表可参考：[python接口API列表](./docs/api/pythonAPI.md)。
 
 1. 在scripts目录下编译的时候，带上build python的选项
 

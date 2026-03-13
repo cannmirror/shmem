@@ -127,7 +127,7 @@ __global__ __aicore__ void copy_perftest(GM_ADDR trash_gm,
                             ACLSHMEMCMOTYPE::CMO_TYPE_PREFETCH, tmp_buff, ub_size, EVENT_ID0);
     }
     send_cmo_cycle = AscendC::GetSystemCycle();
-    aclshmemi_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
+    aclshmemx_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
     end_cmo_cycle = AscendC::GetSystemCycle();
 
     AscendC::PipeBarrier<PIPE_ALL>();
@@ -202,7 +202,7 @@ __global__ __aicore__ void cmo_pretech(GM_ADDR src, uint32_t size)
 
     aclshmemx_cmo_nbi(reinterpret_cast<__gm__  uint8_t *>(src), size,
                     ACLSHMEMCMOTYPE::CMO_TYPE_PREFETCH, tmp_buff, ub_size, EVENT_ID0);
-    aclshmemi_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
+    aclshmemx_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
 }
 
 void cmo_pretech_kernel(uint8_t* src, uint32_t size, void* stream)

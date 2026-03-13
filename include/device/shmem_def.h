@@ -21,6 +21,7 @@ extern "C" {
 
 constexpr uint64_t ACLSHMEM_INTERNAL_UB_BUF_START_ADDR = 188 * 1024;
 constexpr uint32_t UB_ALIGN_SIZE = 32;
+constexpr uint32_t UB_ALIGN_SIZE_64 = 64;
 constexpr uint32_t ACLSHMEM_NUM_CQE_PER_POLL_CQ = 100;
 
 /**

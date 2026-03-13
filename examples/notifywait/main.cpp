@@ -12,19 +12,9 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <cstdio>
-#include <iomanip>
-#include <sys/file.h>
 #include <cstring>
-#include <cerrno>
 #include <algorithm>
-#include <random>
-#include <cmath>
-#include <type_traits>
 
 #include "acl/acl.h"
 #include "kernel_operator.h"
@@ -54,24 +44,7 @@ int f_npu = 0;
 const char *data_type = "int";
 static char g_ipport[ACLSHMEM_MAX_IP_PORT_LEN] = {0};
 aclshmemx_uniqueid_t default_flag_uid;
-
-constexpr float FLOAT_EPS = 1e-5f;
-constexpr double DOUBLE_EPS = 1e-8;
-constexpr int INT_EPS = 0;
-
-template <typename T>
-bool check_accuracy(T actual, T expected)
-{
-    if constexpr (std::is_integral_v<T>) {
-        return actual == expected;
-    } else if constexpr (std::is_same_v<T, half>) {
-        return std::fabs(actual - expected) < FLOAT_EPS;
-    } else if constexpr (std::is_same_v<T, double>) {
-        return std::fabs(actual - expected) < DOUBLE_EPS;
-    } else {
-        return actual == expected;
-    }
-}
+extern aclshmem_host_state_t g_state_host;
 
 template <typename T>
 __global__ __aicore__ void allgather_sdma(GM_ADDR gva, int elem_size, GM_ADDR dump, bool is_put)
@@ -123,7 +96,7 @@ __global__ __aicore__ void allgather_sdma(GM_ADDR gva, int elem_size, GM_ADDR du
                     tmp_buff, ub_size, base_per_core, i, EVENT_ID0);
             }
         }
-        aclshmemx_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
+        aclshmemx_sdma_notify_record(tmp_buff, ub_size, EVENT_ID0);
     }
 }
 
@@ -187,8 +160,29 @@ __global__ __aicore__ void allgather_sdma_tensor(GM_ADDR gva, int elem_size, GM_
                 aclshmemx_sdma_get_nbi(dst_tensor, src_tensor, tmp_local, base_per_core, i, EVENT_ID0);
             }
         }
-        aclshmemx_sdma_quiet(tmp_local, EVENT_ID0);
+        aclshmemx_sdma_notify_record(tmp_local, EVENT_ID0);
     }
+}
+
+template <typename T>
+__global__ __aicore__ void device_copy(GM_ADDR src, GM_ADDR dst, int message_length)
+{
+    __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+
+    uint64_t copy_ub = device_state->mte_config.aclshmem_ub;
+    uint32_t copy_ub_size = device_state->mte_config.ub_size;
+    int64_t my_pe = aclshmem_my_pe();
+    AscendC::TEventID copy_event_id = (AscendC::TEventID)device_state->mte_config.sync_id;
+    aclshmemx_mte_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
+                          reinterpret_cast<__ubuf__ char *>(copy_ub),
+                          copy_ub_size, message_length, my_pe, copy_event_id);
+    aclshmem_quiet();
+}
+
+template <class T>
+void copy_demo(uint32_t block_dim, void* stream, uint8_t* src, uint8_t* dst, int elements)
+{
+    device_copy<T><<<block_dim, nullptr, stream>>>(src, dst, elements);
 }
 
 template <class T>
@@ -236,9 +230,9 @@ int test_allgather_sdma(int my_pe, int n_pes)
     aclrtStream stream = nullptr;
     CHECK_RET(aclrtCreateStream(&stream));
 
-    constexpr uint32_t n_blocks = 20;
+    constexpr uint32_t block_num = 20;
     constexpr int num10 = 10;
-
+    constexpr int sub_block_num = 2;
     uint8_t *device_dump = nullptr;
 #if defined(ENABLE_ASCENDC_DUMP)
     CHECK_RET(aclrtMalloc(reinterpret_cast<void **>(&device_dump), ALL_DUMPSIZE, ACL_MEM_MALLOC_HUGE_FIRST));
@@ -253,39 +247,45 @@ int test_allgather_sdma(int my_pe, int n_pes)
         input[i] = (T)(my_pe + num10);
     }
 
-    CHECK_RET(aclrtMemcpy(reinterpret_cast<uint8_t *>(gva) + aclshmem_my_pe() * trans_size * sizeof(T),
+    CHECK_RET(aclrtMemcpy(reinterpret_cast<uint8_t *>(gva) + my_pe * trans_size * sizeof(T),
         trans_size * sizeof(T), input.data(), trans_size * sizeof(T), ACL_MEMCPY_HOST_TO_DEVICE));
+    uint8_t *ptr = reinterpret_cast<uint8_t *>(gva);
+    uint8_t *ptr_A = ptr + n_pes * trans_size * sizeof(T);
+    allgather_kernel<T>(block_num, stream, ptr, trans_size, device_dump, false, true);
 
-    allgather_kernel<T>(n_blocks, stream, reinterpret_cast<uint8_t *>(gva), trans_size, device_dump, false, true);
-
-    CHECK_RET(aclrtSynchronizeStream(stream));
+    for(int i = 0; i < block_num * sub_block_num; i++) {
+        CHECK_RET(aclrtWaitAndResetNotify(g_state_host.notify_arr[i], g_state_host.default_stream, 0));
+    }
     aclshmem_barrier_all();
+    copy_demo<T>(1, g_state_host.default_stream, ptr, ptr_A, n_pes * trans_size * sizeof(T));
+
+    CHECK_RET(aclrtSynchronizeStream(g_state_host.default_stream));
 
 #if defined(ENABLE_ASCENDC_DUMP)
     Adx::AdumpPrintWorkSpace(device_dump, ALL_DUMPSIZE, stream, "test");
 #endif
 
-    // 结果校验
-    T* y_host;
+    // 操作结果校验
+    T *y_host;
     size_t input_size = n_pes * trans_size * sizeof(T);
-    CHECK_RET(aclrtMallocHost(reinterpret_cast<void**>(&y_host), input_size));
-    CHECK_RET(aclrtMemcpy(y_host, input_size, gva, input_size, ACL_MEMCPY_DEVICE_TO_HOST));
-
-    const int check_step = 1; // 数据校验的步长
+    uint32_t pe_id = aclshmem_my_pe();
+    // 校验 ptr_A 中的内容
+    uint32_t status = aclrtMallocHost(reinterpret_cast<void **>(&y_host), input_size);
+    status = aclrtMemcpy(y_host, input_size, ptr_A, input_size, ACL_MEMCPY_DEVICE_TO_HOST);
+    std::cout << "Pe " << pe_id << " AllGather result in ptr_A after notify_wait:" << std::endl;
+    int unexpected_count = 0;
     for (int i = 0; i < n_pes; i++) {
-        for (int j = 0; j < trans_size; j+= check_step) {
+        for (int j = 0; j < trans_size; j++) {
             int y = (int)(y_host[trans_size * i + j]);
-            if (y != i + num10) {
-                printf("ERROR in pe%d:%d %d != %d\n", i, j, y, i + num10);
-                break;
+            if (y != num10 + i) {
+                unexpected_count++;
             }
         }
     }
+    std::cout << "Pe " << pe_id << " has " << unexpected_count << " unexpected values." << std::endl;
 
     CHECK_RET(aclrtFreeHost(y_host));
     aclshmem_free(gva);
-
-    std::cout << " Pe " << my_pe << "Finised !! Result Correct !!" << std::endl;
 
     CHECK_RET(aclrtDestroyStream(stream));
     return 0;

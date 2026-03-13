@@ -69,7 +69,7 @@ constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
     }
 
 aclshmem_device_host_state_t g_state = ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER;
-aclshmem_host_state_t g_state_host = {nullptr, DEFAULT_TEVENT, DEFAULT_BLOCK_NUM};
+aclshmem_host_state_t g_state_host = {nullptr, DEFAULT_TEVENT, DEFAULT_BLOCK_NUM, 0};
 aclshmem_prof_pe_t g_host_profs;
 
 aclshmemi_init_backend* init_manager = nullptr;

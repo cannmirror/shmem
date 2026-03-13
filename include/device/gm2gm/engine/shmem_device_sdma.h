@@ -122,4 +122,42 @@ template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_cmo_nbi(AscendC::GlobalTensor<T> &src, uint32_t elem_size, ACLSHMEMCMOTYPE cmo_type,
                                             AscendC::LocalTensor<T> &buf, uint32_t sync_id);
 
+/**
+ * @brief SDMA Quiet function. This synchronous function ensures all previous SDMA SQEs are completed.
+ *
+ * @param buf                       [in] temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                   [in] ID used to sync pipeline.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_sdma_quiet(AscendC::LocalTensor<T> &buf, uint32_t sync_id);
+
+/**
+ * @brief SDMA Quiet function. This synchronous function ensures all previous SDMA SQEs are completed.
+ *
+ * @param buf                       [in] Pointer on local UB.
+ * @param ub_size                   [in] The size of temp Buffer on UB. (In Bytes)
+ * @param sync_id                   [in] ID used to sync pipeline.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_sdma_quiet(__ubuf__ T *buf, uint32_t ub_size, uint32_t sync_id);
+
+/**
+ * @brief AIV direct STARS helper function for notify record.
+ *
+ * @param buf                       [in] temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                   [in] ID used to sync pipeline.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_sdma_notify_record(AscendC::LocalTensor<T> &buf, uint32_t sync_id);
+
+/**
+ * @brief AIV direct STARS helper function for notify record.
+ *
+ * @param buf                       [in] Pointer on local UB.
+ * @param ub_size                   [in] The size of temp Buffer on UB. (In Bytes)
+ * @param sync_id                   [in] ID used to sync pipeline.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_sdma_notify_record(__ubuf__ T *buf, uint32_t ub_size, uint32_t sync_id);
+
 #endif

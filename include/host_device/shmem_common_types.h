@@ -12,6 +12,7 @@
 #ifndef SHMEM_TYPES_H
 #define SHMEM_TYPES_H
 
+#include "acl/acl_rt.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -178,6 +179,10 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// \def ACLSHMEM_SDMA_MAX_CHAN
 /// \brief Max number of SDMA channels
 #define ACLSHMEM_SDMA_MAX_CHAN 40
+
+/// \def ACLSHMEM_STARS_NOTIFY_ADDR_OFFSET
+/// \brief notify_addr offset (14KB)
+#define ACLSHMEM_STARS_NOTIFY_ADDR_OFFSET (14 * 1024)
 
 /// \def ACLSHMEM_SDMA_FLAG_LENGTH
 /// \brief SDMA flag data length
@@ -415,6 +420,7 @@ typedef struct {
     void *default_stream;       ///< Default ACL runtime stream (aclrtStream type) on the host, used for asynchronous task scheduling
     int8_t default_event_id;    ///< Default event ID on the host, used for stream synchronization
     uint32_t default_block_num; ///< Default block count on the host, used for memory/task block management
+    aclrtNotify notify_arr[ACLSHMEM_SDMA_MAX_CHAN];
 } aclshmem_host_state_t;
 
 /**@} */ // end of group_structs

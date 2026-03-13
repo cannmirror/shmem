@@ -156,6 +156,7 @@ foreach(EXAMPLE
     dynamic_tiling
     rma_d2h_demo
     sdma
+    notifywait
     cmo
 )
     add_subdirectory(${EXAMPLE})

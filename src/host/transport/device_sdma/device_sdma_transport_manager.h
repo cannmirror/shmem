@@ -65,6 +65,7 @@ public:
     }
 
 private:
+    Result CreateNotifyIds();
     Result CreateStarsStreams(int32_t channel_num);
     Result MallocSdmaWorkspace(size_t workspace_size);
     Result CopyHostOpResToDevice();

@@ -52,8 +52,8 @@ extern "C" __global__ __aicore__ void SDMAPutTest(GM_ADDR gva, uint64_t config)
             }
             aclshmemx_sdma_put_nbi(gva + my_pe * MESSAGE_SIZE + data_offset, gva + my_pe * MESSAGE_SIZE + data_offset,
                                 tmp_buff, ub_size, base_per_core, peer, EVENT_ID0);
-            aclshmemi_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
         }
+        aclshmemx_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
     }
 }
 
@@ -102,8 +102,8 @@ extern "C" __global__ __aicore__ void SDMAGetTest(GM_ADDR gva, uint64_t config)
             }
             aclshmemx_sdma_get_nbi(gva + peer * MESSAGE_SIZE + data_offset, gva + peer * MESSAGE_SIZE + data_offset,
                                 tmp_buff, ub_size, base_per_core, peer, EVENT_ID0);
-            aclshmemi_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
         }
+        aclshmemx_sdma_quiet(tmp_buff, ub_size, EVENT_ID0);
     }
 }
 
@@ -159,8 +159,8 @@ extern "C" __global__ __aicore__ void SDMAPutTestTensor(GM_ADDR gva, uint64_t co
                 continue;
             }
             aclshmemx_sdma_put_nbi(dst_tensor, src_tensor, tmp_local, base_per_core, peer, EVENT_ID0);
-            aclshmemi_sdma_quiet(tmp_local, EVENT_ID0);
         }
+        aclshmemx_sdma_quiet(tmp_local, EVENT_ID0);
     }
 }
 
@@ -216,8 +216,8 @@ extern "C" __global__ __aicore__ void SDMAGetTestTensor(GM_ADDR gva, uint64_t co
             AscendC::GlobalTensor<uint8_t> dst_tensor;
             dst_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(data_addr), base_per_core);
             aclshmemx_sdma_get_nbi(dst_tensor, src_tensor, tmp_local, base_per_core, peer, EVENT_ID0);
-            aclshmemi_sdma_quiet(tmp_local, EVENT_ID0);
         }
+        aclshmemx_sdma_quiet(tmp_local, EVENT_ID0);
     }
 }
 

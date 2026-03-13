@@ -48,12 +48,16 @@ struct stars_channel_info_t {
     uint8_t reserved[4]; // 对齐到64字节
 };
 
-struct stars_sdma_sqe_t {
+struct stars_sqe_header_t {
     uint8_t type : 6;
     uint16_t res1 : 10;
-    uint16_t blockDim;
-    uint16_t rtStreamId;
-    uint16_t taskId;
+    uint16_t block_dim;
+    uint16_t rt_streamid;
+    uint16_t task_id;
+};
+
+struct stars_sdma_sqe_t {
+    stars_sqe_header_t header;
     /**** 8 bytpes ****/
 
     uint32_t res3;
@@ -88,15 +92,32 @@ struct stars_sdma_sqe_t {
     uint32_t length;
     /**** 32 bytpes ****/
 
-    uint32_t srcAddrLow;
-    uint32_t srcAddrHigh;
-    uint32_t dstAddrLow;
-    uint32_t dstAddrHigh;
+    uint32_t src_addr_low;
+    uint32_t src_addr_high;
+    uint32_t dst_addr_low;
+    uint32_t dst_addr_high;
     /**** 48 bytpes ****/
 
-    uint8_t linkType;
+    uint8_t link_type;
     uint8_t resvered[3];
     uint32_t reslast[3];
+    /**** 64 bytpes ****/
+};
+
+struct stars_notify_sqe_t {
+    stars_sqe_header_t header;
+    /**** 8 bytpes ****/
+
+    uint32_t notify_id : 13;
+    uint32_t res2 : 19;
+
+    uint16_t res3;
+    uint8_t kernel_credit;
+    uint8_t res4;
+    /**** 16 bytpes ****/
+
+    uint32_t timeout;
+    uint32_t res5[11];
     /**** 64 bytpes ****/
 };
 
@@ -121,7 +142,7 @@ struct stars_sdma_cmo_sqe_t {
 
     uint16_t block_dim;
 
-    uint16_t rt_stream_id;
+    uint16_t rt_streamid;
     uint16_t task_id;
 
     uint32_t res3;
@@ -148,10 +169,10 @@ struct stars_sdma_cmo_sqe_t {
     uint32_t res6 : 3;
     /********20 bytes**********/
 
-    uint16_t src_stream_id;
-    uint16_t src_sub_stream_id;
-    uint16_t dst_stream_id;
-    uint16_t dst_sub_stream_id;
+    uint16_t src_streamid;
+    uint16_t src_sub_streamid;
+    uint16_t dst_streamid;
+    uint16_t dst_sub_streamid;
     /********28 bytes**********/
 
     uint32_t length;
@@ -168,6 +189,9 @@ struct stars_sdma_cmo_sqe_t {
     /********64 bytes**********/
 };
 
+ACLSHMEM_DEVICE void aclshmemi_stars_submit_notify_record(AscendC::LocalTensor<uint32_t> &tmp_local,
+                                                        AscendC::TEventID sync_id);
+
 ACLSHMEM_DEVICE void aclshmemi_sdma_submit_data_sqes(__gm__ stars_channel_info_t *batch_write_channel_info,
                                                      __gm__ uint8_t *send_buffer, __gm__ uint8_t *recv_buffer,
                                                      const sdma_config_t &config, uint32_t *sq_tail);
@@ -176,10 +200,11 @@ ACLSHMEM_DEVICE void aclshmemi_cmo_submit_data_sqes(__gm__ stars_channel_info_t 
                                                     __gm__ uint8_t *src, uint32_t size, ACLSHMEMCMOTYPE cmo_type, uint32_t *sq_tail);
 
 ACLSHMEM_DEVICE void aclshmemi_sdma_submit_flag_sqes(__gm__ stars_channel_info_t *batch_write_channel_info,
-                                                     const workspace_layout_t &layout, const sdma_config_t &config,
-                                                     uint32_t *sq_tail);
+                                                     const workspace_layout_t &layout, 
+                                                     AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
 
-ACLSHMEM_DEVICE void aclshmemi_sdma_poll_for_completion(AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_sdma_poll_for_completion(const workspace_layout_t &layout, 
+                                                        AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
 
 /**
  * @brief AIV direct STARS helper function for post send, prepare SQE and ring doorbell.
@@ -209,22 +234,12 @@ ACLSHMEM_DEVICE void aclshmemi_cmo_async(__gm__ uint8_t* src,
                                 AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
 
 /**
- * @brief SDMA Quiet function. This synchronous function ensures all previous SDMA SQEs are completed.
+ * @brief Calculate the base address of batch write channel info from device state.
+ *        This function retrieves the device state and calculates the base address
+ *        by adding the offset of stars_channel_flag_info_t to the SDMA workspace address.
  *
- * @param buf                       [in] temporary UB local tensor of uint32_t used as workspace
- * @param sync_id                   [in] ID used to sync pipeline.
+ * @return                          Pointer to the base of batch write channel info.
  */
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_sdma_quiet(AscendC::LocalTensor<T> &buf, uint32_t sync_id);
-
-/**
- * @brief SDMA Quiet function. This synchronous function ensures all previous SDMA SQEs are completed.
- *
- * @param buf                       [in] Pointer on local UB.
- * @param ub_size                   [in] The size of temp Buffer on UB. (In Bytes)
- * @param sync_id                   [in] ID used to sync pipeline.
- */
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_sdma_quiet(__ubuf__ T *buf, uint32_t ub_size, uint32_t sync_id);
+ACLSHMEM_DEVICE __gm__ uint8_t* aclshmemi_sdma_get_channel_base();
 
 #endif

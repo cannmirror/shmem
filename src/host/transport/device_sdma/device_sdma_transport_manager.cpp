@@ -48,6 +48,9 @@ Result SdmaTransportManager::OpenDevice(const TransportOptions &options)
     constexpr size_t workspace_size = 16 * 1024; // 16KB
     ACLSHMEM_CHECK_RET(MallocSdmaWorkspace(workspace_size));
 
+    // 创建Notify并保存id到共享内存
+    CreateNotifyIds();
+
     // 申请的资源H2D
     ACLSHMEM_CHECK_RET(CopyHostOpResToDevice());
 
@@ -58,6 +61,22 @@ Result SdmaTransportManager::OpenDevice(const TransportOptions &options)
     SHM_LOG_DEBUG(mype_ << " init sdma success.");
     inited_ = true;
     return ACLSHMEM_SUCCESS;
+}
+
+Result SdmaTransportManager::CreateNotifyIds(){
+    uint32_t notify_ids[ACLSHMEM_SDMA_MAX_CHAN] = {0};
+
+    // 获取NotifyId存储区的起始地址 
+    uint32_t* notify_id_base = reinterpret_cast<uint32_t*>(
+        reinterpret_cast<uint8_t*>(g_state.sdma_workspace_addr) + ACLSHMEM_STARS_NOTIFY_ADDR_OFFSET
+    );
+    for (size_t i = 0; i < ACLSHMEM_SDMA_MAX_CHAN; i++) {
+        g_state_host.notify_arr[i] = nullptr;
+        ACLSHMEM_CHECK_RET(aclrtCreateNotify(&g_state_host.notify_arr[i], 0));
+        ACLSHMEM_CHECK_RET(aclrtGetNotifyId(g_state_host.notify_arr[i], &notify_ids[i]));
+    }
+    ACLSHMEM_CHECK_RET(aclrtMemcpy(notify_id_base, ACLSHMEM_SDMA_MAX_CHAN * sizeof(uint32_t), notify_ids, 
+                ACLSHMEM_SDMA_MAX_CHAN * sizeof(uint32_t), ACL_MEMCPY_HOST_TO_DEVICE));
 }
 
 Result SdmaTransportManager::CreateStarsStreams(int32_t channel_num)
@@ -232,6 +251,9 @@ Result SdmaTransportManager::CloseDevice()
     for (size_t i = 0; i < ACLSHMEM_SDMA_MAX_CHAN; i++) {
         if (op_res_info_.streams[i].stream_) {
             (void)aclrtDestroyStream(reinterpret_cast<void *>(op_res_info_.streams[i].stream_));
+        }
+        if(g_state_host.notify_arr[i]){
+            (void)aclrtDestroyNotify(g_state_host.notify_arr[i]);
         }
     }
     op_res_info_ = {};

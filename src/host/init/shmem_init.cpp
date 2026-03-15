@@ -65,7 +65,8 @@ constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
             {DEFAULT_RDMA_UB_OFFSET, DEFAULT_RDMA_UB_SIZE, 0},  /* aclshmem_rdma_config */             \
             0,                                                  /* qp_info */                          \
             0,                                                  /* sdma_workspace_addr */              \
-            NULL,                                               /* aclshmem_prof_pe_t */             \
+            NULL,                                               /* aclshmem_prof_pe_t */               \
+            0,                                                  /* signal_addr */                      \
     }
 
 aclshmem_device_host_state_t g_state = ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER;
@@ -97,13 +98,7 @@ int32_t aclshmemi_state_init_attr(aclshmemx_init_attr_t *attributes)
 
 bool is_valid_data_op_engine_type(data_op_engine_type_t value)
 {
-    static const std::unordered_set<int> valid_values = {
-        ACLSHMEM_DATA_OP_MTE,
-        ACLSHMEM_DATA_OP_SDMA,
-        ACLSHMEM_DATA_OP_ROCE
-    };
-
-    return valid_values.find(static_cast<int>(value)) != valid_values.end();
+    return value > 0 && value < (ACLSHMEM_DATA_OP_MAX << 1);
 }
 
 int32_t check_attr(aclshmemx_init_attr_t *attributes)
@@ -187,6 +182,31 @@ bool check_support_d2h()
     return true;
 }
 
+int32_t aclshmemi_signal_finalize()
+{
+    if (g_state.signal_addr != 0) {
+        aclshmem_free(reinterpret_cast<void *>(g_state.signal_addr));
+        g_state.signal_addr = 0;
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
+int32_t aclshmemi_signal_init()
+{
+    g_state.signal_addr = (uint64_t)aclshmem_malloc(ACLSHMEM_SIGNAL_SIZE);
+    if (g_state.signal_addr == 0) {
+        SHM_LOG_ERROR("malloc signal failed.");
+        return ACLSHMEM_INNER_ERROR;
+    }
+    auto ret = aclrtMemset((void *)g_state.signal_addr, ACLSHMEM_SIGNAL_SIZE, 0, ACLSHMEM_SIGNAL_SIZE);
+    if (ret != 0) {
+        aclshmemi_signal_finalize();
+        SHM_LOG_ERROR("memset signal failed. ret=" << ret);
+        return ACLSHMEM_INNER_ERROR;
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
 int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_init_attr_t *attributes)
 {
     int32_t ret;
@@ -216,7 +236,7 @@ int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_ini
         ACLSHMEM_CHECK_RET(init_manager->reserve_heap(HOST_SIDE));
     }
 #endif
-
+    ACLSHMEM_CHECK_RET(aclshmemi_signal_init());
     ACLSHMEM_CHECK_RET(aclshmemi_team_init(g_state.mype, g_state.npes));
     ACLSHMEM_CHECK_RET(aclshmemi_sync_init());	
     g_state.is_aclshmem_initialized = true;
@@ -231,6 +251,7 @@ int32_t aclshmem_finalize()
 {
     SHM_LOG_INFO("The pe: " << aclshmem_my_pe() << " begins to finalize.");
     // shmem submodules finalize
+    ACLSHMEM_CHECK_RET(aclshmemi_signal_finalize());
     ACLSHMEM_CHECK_RET(aclshmemi_team_finalize());
     if (init_manager == nullptr) {
         SHM_LOG_INFO("init_manager is null finalize success.");

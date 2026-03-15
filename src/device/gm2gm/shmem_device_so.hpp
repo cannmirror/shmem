@@ -262,43 +262,50 @@ ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int32_t val)
 
 ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int pe, int32_t val)
 {
-    aclshmemi_signal_set((__gm__ int32_t *)aclshmem_ptr(addr, pe), val);
+    __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+    if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
+        aclshmemi_signal_set((__gm__ int32_t *)aclshmem_ptr(addr, pe), val);
+    } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {
+        __gm__ int32_t *sig_addr_int32 = reinterpret_cast<__gm__ int32_t *>(device_state->signal_addr);
+        aclshmemi_store(sig_addr_int32, val);
+        // flush data cache to GM after signal to ensure it is visiable to other ranks
+        dcci_cachelines((__gm__ uint8_t *)sig_addr_int32, sizeof(int32_t));
+        aclshmemi_highlevel_signal_set(addr, sig_addr_int32, pe);
+    }
 }
 
 ACLSHMEM_DEVICE void aclshmemi_highlevel_signal_set(__gm__ int32_t *dst, __gm__ int32_t *src, int pe)
 {
+    __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+    uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;
+    uint32_t sync_id = device_state->rdma_config.sync_id;
     AscendC::LocalTensor<uint32_t> ub_tensor_32;
     ub_tensor_32.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
-    ub_tensor_32.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR);
+    ub_tensor_32.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub);
     ub_tensor_32.address_.dataLen = UB_ALIGN_SIZE;
     AscendC::LocalTensor<uint64_t> ub_tensor_64;
     ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
-    ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR
-                                                                        + UB_ALIGN_SIZE);
+    ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub + UB_ALIGN_SIZE);
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
     aclshmemi_roce_write((__gm__ uint8_t*)aclshmem_roce_ptr(dst, pe), (__gm__ uint8_t*)src, pe, 0, sizeof(int32_t),
-        ub_tensor_64, ub_tensor_32, 0);
-    aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, 0);
+        ub_tensor_64, ub_tensor_32, sync_id);
+    aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, sync_id);
 }
 
 ACLSHMEM_DEVICE void aclshmemi_signal_add(__gm__ int32_t *addr, int pe, int32_t val)
 {
-    if (AscendC::GetBlockIdx() == 0){
-        auto ptr = aclshmem_ptr(addr, pe);
-        if (ptr == nullptr) return;
-        AscendC::SetAtomicNone();
-        __gm__ int32_t* remote_ptr = reinterpret_cast<__gm__ int32_t*>(ptr);
+    AscendC::SetAtomicNone();
+    __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+    __gm__ int32_t* remote_ptr = reinterpret_cast<__gm__ int32_t*>(aclshmem_ptr(addr, pe));
+    __ubuf__ int32_t* buf =(__ubuf__ int32_t*)(device_state->mte_config.aclshmem_ub);
+    uint32_t sync_id = device_state->mte_config.sync_id;
+    *buf = val;
 
-        __ubuf__ int32_t* buf =(__ubuf__ int32_t*)(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR);
-        *buf = val;
-
-        AscendC::SetAtomicAdd<int32_t>();
-        aclshmemi_copy_ub2gm(remote_ptr, buf, sizeof(int32_t));
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(0);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(0);
-
-        AscendC::SetAtomicNone();
-    }
+    AscendC::SetAtomicAdd<int32_t>();
+    aclshmemi_copy_ub2gm(remote_ptr, buf, sizeof(int32_t));
+    AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(sync_id);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(sync_id);
+    AscendC::SetAtomicNone();
 }
 
 ACLSHMEM_DEVICE int32_t aclshmemi_signal_wait_until_eq_for_barrier(__gm__ int32_t *sig_addr, int32_t cmp_val)

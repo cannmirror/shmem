@@ -16,14 +16,9 @@
 #include "shmem.h"
 #include "shmemi_host_common.h"
 #include "func_type.h"
+#include "unittest_main_test.h"
 
 using namespace std;
-
-extern int test_gnpu_num;
-extern int test_first_npu;
-extern void test_mutil_task(std::function<void(int, int, uint64_t)> func, uint64_t local_mem_size, int process_count);
-extern void test_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtStream *st);
-extern void test_finalize(aclrtStream stream, int device_id);
 
 class HostPutMemTest {
 public:
@@ -111,8 +106,7 @@ static void host_test_put_get_stream(int rank_id, int rank_size, uint64_t local_
         input[i] = (rank_id + stage_offset);
     }
 
-    void *dev_ptr;
-    ASSERT_EQ(aclrtMalloc(&dev_ptr, input_size, ACL_MEM_MALLOC_NORMAL_ONLY), 0);
+    void *dev_ptr = aclshmem_malloc(input_size);
 
     ASSERT_EQ(aclrtMemcpy(dev_ptr, input_size, input.data(), input_size, ACL_MEMCPY_HOST_TO_DEVICE), 0);
 
@@ -136,8 +130,11 @@ static void host_test_put_get_stream(int rank_id, int rank_size, uint64_t local_
     std::cout << std::endl;
     size_t ele_size = 16;
     host_test_getmem_stream((uint8_t *)ptr, (uint8_t *)dev_ptr, rank_size, ele_size, stream);
-    ASSERT_EQ(aclrtSynchronizeStream(g_state_host.default_stream), 0);
-    sleep(sleep_time);
+    aclshmem_handle_t handle;
+    handle.team_id = ACLSHMEM_TEAM_WORLD;
+    aclshmemx_handle_wait(handle, stream);
+    ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
+
     ASSERT_EQ(aclrtMemcpy(input.data(), input_size, dev_ptr, input_size, ACL_MEMCPY_DEVICE_TO_HOST), 0);
 
     std::cout << "After getmemstream:" << p_name;
@@ -160,7 +157,7 @@ void test_host_aclshmem_putmem_and_getmemstream(int rank_id, int n_ranks, uint64
 {
     int32_t device_id = rank_id % test_gnpu_num + test_first_npu;
     aclrtStream stream;
-    test_init(rank_id, n_ranks, local_mem_size, &stream);
+    test_cross_init(rank_id, n_ranks, local_mem_size, &stream);
     ASSERT_NE(stream, nullptr);
 
     host_test_put_get_stream(rank_id, n_ranks, local_mem_size, stream);

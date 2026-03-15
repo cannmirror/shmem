@@ -93,6 +93,7 @@ enum data_op_engine_type_t {
     ACLSHMEM_DATA_OP_MTE = 0x01,
     ACLSHMEM_DATA_OP_SDMA = 0x02,
     ACLSHMEM_DATA_OP_ROCE = 0x04,
+    ACLSHMEM_DATA_OP_MAX = 0x04,
 };
 
 /**
@@ -154,6 +155,10 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// \def ACLSHMEM_MAX_TEAMS
 /// \brief Maximum number of teams supported by ACLSHMEM (2048)
 #define ACLSHMEM_MAX_TEAMS 2048
+
+/// \def ACLSHMEM_SIGNAL_SIZE
+/// \brief Size of the signal structure (8 bytes)
+#define ACLSHMEM_SIGNAL_SIZE 8
 
 /// \def ACLSHMEM_MAX_LOCAL_SIZE
 /// \brief Maximum capacity of ACLSHMEM local memory (40GB)
@@ -407,6 +412,7 @@ typedef struct {
 
     uint64_t sdma_workspace_addr;  /// sdma aicpu和aiv的共享内存
     aclshmem_prof_pe_t *profs;     ///< for profiling
+    uint64_t signal_addr; ///< Address of the signal counter for put and get
 } aclshmem_device_host_state_t;
 
 // host only state

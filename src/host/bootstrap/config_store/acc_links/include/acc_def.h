@@ -11,7 +11,6 @@
 #define ACC_LINKS_ACC_DEF_H
 
 #include <atomic>
-#include <cstdint>
 #include <set>
 #include <string>
 #include <sstream>

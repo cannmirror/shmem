@@ -15,8 +15,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <memory>
-#include <mutex>
-#include <functional>
 
 #include "store_op.h"
 #include "store_tcp_config_server.h"

@@ -12,7 +12,6 @@
 
 #include "shmem.h"
 #include "host_device/shmem_common_types.h"
-#include "shmemi_device_cc.h"
 #include "shmemi_device_common.h"
 #include "device/gm2gm/engine/shmem_device_rdma.h"
 

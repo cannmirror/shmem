@@ -11,7 +11,6 @@
 #ifndef MF_HYBM_CORE_DL_HCCP_API_H
 #define MF_HYBM_CORE_DL_HCCP_API_H
 
-#include <mutex>
 #include "dl_hccp_def.h"
 
 namespace shm {

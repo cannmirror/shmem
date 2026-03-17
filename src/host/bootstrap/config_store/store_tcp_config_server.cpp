@@ -13,8 +13,8 @@
 #include "shmemi_logger.h"
 #include "store_message_packer.h"
 #include "store_op.h"
-#include "store_tcp_config_server.h"
 #include "store_net_common.h"
+#include "store_tcp_config_server.h"
 
 namespace shm {
 namespace store {

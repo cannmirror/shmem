@@ -13,14 +13,11 @@
 #define SMEM_SMEM_STORE_FACTORY_H
 
 #include <set>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <chrono>
 #include <unordered_map>
 #include <functional>
-#include <condition_variable>
-#include <atomic>
 #include <condition_variable>
 #include <atomic>
 #include "store_op.h"

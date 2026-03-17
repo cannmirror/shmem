@@ -12,8 +12,6 @@
 #define STORE_OBJ_REF_H
 
 #include <cstdint>
-#include <utility>
-#include <string.h>
 
 namespace shm {
 namespace store {

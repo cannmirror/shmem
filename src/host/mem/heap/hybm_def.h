@@ -11,7 +11,6 @@
 #define MEM_FABRIC_HYBRID_HYBRID_BIG_MEM_DL_H
 
 #include <stdint.h>
-#include <stdbool.h>
 
 typedef void *hybm_entity_t;
 typedef void *hybm_mem_slice_t;

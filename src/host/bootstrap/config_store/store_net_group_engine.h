@@ -12,7 +12,6 @@
 #define STORE_NET_GROUP_ENGINE_H
 
 #include <functional>
-#include <thread>
 #include "store_op.h"
 #include "store_timedwait.h"
 

@@ -10,9 +10,6 @@
 #ifndef MF_HYBRID_DYNAMIC_RANKS_QP_DEF_H
 #define MF_HYBRID_DYNAMIC_RANKS_QP_DEF_H
 
-#include <netinet/in.h>
-#include <cstdint>
-#include <mutex>
 #include <unordered_set>
 #include <unordered_map>
 

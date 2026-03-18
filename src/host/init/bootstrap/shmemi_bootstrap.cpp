@@ -9,9 +9,11 @@
  */
 #include "shmemi_host_common.h"
 #include "dlfcn.h"
+#include <limits.h>
+#include <cstdio>
+#include <cstring>
 
 #define BOOTSTRAP_MODULE_MPI "aclshmem_bootstrap_mpi.so"
-#define BOOTSTRAP_MODULE_UID "aclshmem_bootstrap_uid.so"
 #define BOOTSTRAP_MODULE_CONFIG_STORE "aclshmem_bootstrap_config_store.so"
 
 #define BOOTSTRAP_PLUGIN_INIT_FUNC "aclshmemi_bootstrap_plugin_init"
@@ -19,8 +21,72 @@
 
 aclshmemi_bootstrap_handle_t g_boot_handle;
 
-static void *plugin_hdl = nullptr;
-static char *plugin_name = nullptr;
+void *plugin_hdl = nullptr;
+const char *plugin_name = nullptr;
+
+static bool get_current_so_dir(char *dir_buf, size_t buf_len)
+{
+    if (dir_buf == nullptr || buf_len == 0) {
+        return false;
+    }
+
+    Dl_info info;
+    if (dladdr((void *)&get_current_so_dir, &info) == 0 || info.dli_fname == nullptr) {
+        return false;
+    }
+
+    const char *so_path = info.dli_fname;
+    const char *slash = strrchr(so_path, '/');
+    if (slash == nullptr) {
+        return false;
+    }
+
+    size_t dir_len = static_cast<size_t>(slash - so_path);
+    if (dir_len + 1 > buf_len) {
+        return false;
+    }
+
+    memcpy(dir_buf, so_path, dir_len);
+    dir_buf[dir_len] = '\0';
+    return true;
+}
+
+static void *safe_dlopen(const char *so_name)
+{
+    if (so_name == nullptr || so_name[0] == '\0') {
+        SHM_LOG_ERROR("Failed to load SO: invalid so_name");
+        return nullptr;
+    }
+
+    char so_dir[PATH_MAX] = {0};
+    if (get_current_so_dir(so_dir, sizeof(so_dir))) {
+        char full_path[PATH_MAX] = {0};
+        int ret = snprintf(full_path, sizeof(full_path), "%s/%s", so_dir, so_name);
+        if (ret > 0 && static_cast<size_t>(ret) < sizeof(full_path)) {
+            dlerror();
+            void *handle_by_full_path = dlopen(full_path, RTLD_NOW);
+            if (handle_by_full_path != nullptr) {
+                return handle_by_full_path;
+            }
+        }
+    }
+
+    dlerror();
+    void *handle = dlopen(so_name, RTLD_NOW);
+    const char *err = dlerror();
+    if (!handle) {
+        SHM_LOG_ERROR("Failed to load SO: " << so_name << ", dlerror: " << (err ? err : "unknown error"));
+    }
+    return handle;
+}
+
+static void safe_dlclose(void **handle)
+{
+    if (handle && *handle) {
+        dlclose(*handle);
+        *handle = nullptr;
+    }
+}
 
 int bootstrap_loader_finalize(aclshmemi_bootstrap_handle_t *handle)
 {
@@ -37,30 +103,19 @@ int bootstrap_loader_finalize(aclshmemi_bootstrap_handle_t *handle)
 
 void aclshmemi_bootstrap_loader()
 {
-    dlerror();
-    if (plugin_hdl == nullptr) {
-
-        plugin_hdl = dlopen(plugin_name, RTLD_NOW);
-    }
-    const char* dl_err = dlerror();
-    if (dl_err != nullptr) {
-        SHM_LOG_ERROR("aclshmemi_bootstrap_loader: load bootstrap so (" << plugin_name << ") failed: " << dl_err);
-        plugin_hdl = nullptr;
+    safe_dlclose(&plugin_hdl);
+    if (plugin_name) {
+        plugin_hdl = safe_dlopen(plugin_name);
     }
 }
 
 void aclshmemi_bootstrap_free()
 {
-    if (plugin_hdl != nullptr) {
-        dlclose(plugin_hdl);
-        plugin_hdl = nullptr;
-    }
+    safe_dlclose(&plugin_hdl);
 }
 
-// rank0 requires preloading uid.so to obtain the getuid capability
 int32_t aclshmemi_bootstrap_pre_init(int flags, aclshmemi_bootstrap_handle_t *handle) {
     int32_t status = ACLSHMEM_SUCCESS;
-
     if (flags & ACLSHMEMX_INIT_WITH_MPI) {
         SHM_LOG_ERROR("Unsupport Type for bootstrap preinit.");
         return ACLSHMEM_INVALID_PARAM;
@@ -73,16 +128,18 @@ int32_t aclshmemi_bootstrap_pre_init(int flags, aclshmemi_bootstrap_handle_t *ha
         status = ACLSHMEM_INVALID_PARAM;
     }
     aclshmemi_bootstrap_loader();
-   
     if (!plugin_hdl) {
-        SHM_LOG_ERROR("Bootstrap unable to load " << plugin_name << ", err is: " << stderr);
+        SHM_LOG_ERROR("Bootstrap unable to load " << plugin_name
+            << ", please ensure the SO file is in the same directory as aclshmem.so.");
         aclshmemi_bootstrap_free();
         return ACLSHMEM_INVALID_VALUE;
     }
     int (*plugin_pre_init)(aclshmemi_bootstrap_handle_t *);
+    dlerror();
     *((void **)&plugin_pre_init) = dlsym(plugin_hdl, BOOTSTRAP_PLUGIN_PREINIT_FUNC);
-    if (!plugin_pre_init) {
-        SHM_LOG_ERROR("Bootstrap plugin init func dlsym failed");
+    const char *dlsym_err = dlerror();
+    if (!plugin_pre_init || dlsym_err) {
+        SHM_LOG_ERROR("Bootstrap plugin pre_init func dlsym failed: " << (dlsym_err ? dlsym_err : "unknown error"));
         aclshmemi_bootstrap_free();
         return ACLSHMEM_INNER_ERROR;
     }
@@ -123,17 +180,13 @@ void remove_tcp_prefix_and_copy(const char* input, char* output, size_t output_l
 int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
     int32_t status = ACLSHMEM_SUCCESS;
     void *arg;
-    g_boot_handle.use_attr_ipport= false;
-    if (flags & ACLSHMEMX_INIT_WITH_UNIQUEID){
+    g_boot_handle.use_attr_ipport = false;
+    if (flags & ACLSHMEMX_INIT_WITH_UNIQUEID) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_UNIQUEID");
         plugin_name = BOOTSTRAP_MODULE_CONFIG_STORE;
         arg = (attr != NULL) ? attr->comm_args : NULL;
-
-        /* Set bootstrap necessary params. */
         g_boot_handle.mype = attr->my_pe;
         g_boot_handle.npes = attr->n_pes;
-
-        // Check UID Exist
         if (arg == nullptr) {
             SHM_LOG_ERROR("BootStrap UID Mode Must Have UID !");
             return ACLSHMEM_INVALID_PARAM;
@@ -146,21 +199,16 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_DEFAULT");
         plugin_name = BOOTSTRAP_MODULE_CONFIG_STORE;
         arg = (attr != NULL) ? attr->comm_args : NULL;
-
-        /* Set bootstrap necessary params. */
         g_boot_handle.use_attr_ipport = true;
         g_boot_handle.mype = attr->my_pe;
         g_boot_handle.npes = attr->n_pes;
-
         if (attr->ip_port[0] == '\0') {
             SHM_LOG_ERROR("BootStrap Default Mode Must Set Ipport !");
             return ACLSHMEM_INVALID_PARAM;
         } else {
-            // Use explicit ip_port provided in attr.
             g_boot_handle.sockFd = attr->option_attr.sockFd;
             g_boot_handle.timeOut = attr->option_attr.shm_init_timeout;
             g_boot_handle.timeControlOut = attr->option_attr.control_operation_timeout;
-
             strncpy(g_boot_handle.ipport, attr->ip_port, sizeof(g_boot_handle.ipport) - 1);
             g_boot_handle.ipport[sizeof(g_boot_handle.ipport) - 1] = '\0';
         }
@@ -169,17 +217,18 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         return ACLSHMEM_INVALID_PARAM;
     }
     aclshmemi_bootstrap_loader();
-   
     if (!plugin_hdl) {
-        SHM_LOG_ERROR("Bootstrap unable to load " << plugin_name << ", err is: " << stderr);
+        SHM_LOG_ERROR("Bootstrap unable to load " << plugin_name
+            << ", please ensure the SO file is in the same directory as aclshmem.so.");
         aclshmemi_bootstrap_free();
         return ACLSHMEM_INVALID_VALUE;
     }
-
     int (*plugin_init)(void *, aclshmemi_bootstrap_handle_t *);
+    dlerror();
     *((void **)&plugin_init) = dlsym(plugin_hdl, BOOTSTRAP_PLUGIN_INIT_FUNC);
-    if (!plugin_init) {
-        SHM_LOG_ERROR("Bootstrap plugin init func dlsym failed");
+    const char *dlsym_err = dlerror();
+    if (!plugin_init || dlsym_err) {
+        SHM_LOG_ERROR("Bootstrap plugin init func dlsym failed: " << (dlsym_err ? dlsym_err : "unknown error"));
         aclshmemi_bootstrap_free();
         return ACLSHMEM_INNER_ERROR;
     }
@@ -200,8 +249,5 @@ void aclshmemi_bootstrap_finalize() {
     }
     g_boot_handle.finalize(&g_boot_handle);
     g_boot_handle.is_bootstraped = false;
-    if (plugin_hdl != nullptr) {
-        dlclose(plugin_hdl);
-        plugin_hdl = nullptr;
-    }
+    safe_dlclose(&plugin_hdl);
 }

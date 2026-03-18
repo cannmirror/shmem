@@ -77,9 +77,6 @@ void call_aclshmemi_signal_wait_until_on_stream_kernel(int32_t *sig_addr, int cm
 
 ACLSHMEM_GLOBAL void k_aclshmem_signal_op(__gm__ int32_t *sig_addr, int32_t signal, int sig_op, int pe)
 {
-    if (AscendC::GetBlockIdx() != 0) {
-        return;
-    }
     aclshmemx_signal_op(sig_addr, signal, sig_op, pe);
 }
 

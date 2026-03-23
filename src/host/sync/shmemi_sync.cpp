@@ -65,6 +65,23 @@ ACLSHMEM_HOST_API void aclshmem_signal_wait_until(int32_t *sig_addr, int cmp, in
     aclrtSynchronizeStream(g_state_host.default_stream);
 }
 
+// The same macro names are used in public headers for declarations.
+// Undefine them here before redefining for implementation generation.
+#undef ACLSHMEM_WAIT_UNTIL
+#undef ACLSHMEM_WAIT
+#undef ACLSHMEM_WAIT_UNTIL_ALL
+#undef ACLSHMEM_WAIT_UNTIL_ANY
+#undef ACLSHMEM_WAIT_UNTIL_SOME
+#undef ACLSHMEM_WAIT_UNTIL_ALL_VECTOR
+#undef ACLSHMEM_WAIT_UNTIL_ANY_VECTOR
+#undef ACLSHMEM_WAIT_UNTIL_SOME_VECTOR
+#undef ACLSHMEM_TEST
+#undef ACLSHMEM_TEST_ANY
+#undef ACLSHMEM_TEST_SOME
+#undef ACLSHMEM_TEST_ALL_VECTOR
+#undef ACLSHMEM_TEST_ANY_VECTOR
+#undef ACLSHMEM_TEST_SOME_VECTOR
+
 #define ACLSHMEM_WAIT_UNTIL(NAME, TYPE)                                                                                \
     ACLSHMEM_HOST_API void aclshmem_##NAME##_wait_until(TYPE *ivar, int cmp, TYPE cmp_value)                           \
     {                                                                                                                  \

@@ -34,7 +34,7 @@ set(CMAKE_CXX_COMPILER ${CMAKE_COMPILER})
 
 add_compile_options(
     -O2 -std=c++17
-    -Wno-macro-redefined -Wno-ignored-attributes
+    -Wno-ignored-attributes
     # avoid ascendc interference
     -DL2_CACHE_HINT
     -DTILING_KEY_VAR

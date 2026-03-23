@@ -18,17 +18,6 @@
 #include "socket/uid_socket.h"
 #include "socket/uid_utils.h"
 
-
-
-#define ACLSHMEM_UNIQUEID_INITIALIZER                      \
-    {                                                   \
-        ACLSHMEM_UNIQUEID_VERSION,                         \
-        {                                               \
-            0                                           \
-        }                                               \
-    }                                                   \
-
-
 #define MAX_ATTEMPTS 500
 #define MAX_IFCONFIG_LENGTH 23
 #define MAX_IP 48
@@ -666,7 +655,11 @@ static int aclshmemi_bootstrap_uid_barrier_v2(aclshmemi_bootstrap_handle_t *hand
 
 static int aclshmemi_bootstrap_uid_alltoall(const void *sendbuf, void *recvbuf, int length,
                                   aclshmemi_bootstrap_handle_t *handle) {
-
+    (void)sendbuf;
+    (void)recvbuf;
+    (void)length;
+    (void)handle;
+    return ACLSHMEM_NOT_SUPPORTED;
 }
 
 static void aclshmemi_bootstrap_uid_global_exit(int status) {
@@ -860,7 +853,8 @@ static int aclshmemi_bootstrap_net_init(aclshmemi_bootstrap_uid_state_t* uid_arg
 
     if (priv_info.bootstrap_netinitdone) {
         // Initialized, printing currently saved information
-        SHM_LOG_INFO(" priv_info already inited: " << " bootstrap_netifname: " << (priv_info.bootstrap_netifname ? priv_info.bootstrap_netifname : "nullptr"));
+        SHM_LOG_INFO(" priv_info already inited: " << " bootstrap_netifname: "
+            << (priv_info.bootstrap_netifname[0] != '\0' ? priv_info.bootstrap_netifname : "nullptr"));
         if (priv_info.bootstrap_netifaddr.type == ADDR_IPv4) {
             char ip_str[INET_ADDRSTRLEN] = {0};
             ACLSHMEM_CHECK_RET(inet_ntop(AF_INET, &priv_info.bootstrap_netifaddr.addr.addr4.sin_addr, ip_str, sizeof(ip_str)) == nullptr, "convert bootstrap_netifaddr ipv4 to string failed. ", ACLSHMEM_BOOTSTRAP_ERROR);
@@ -1246,7 +1240,7 @@ int aclshmemi_bootstrap_plugin_init(void* comm, aclshmemi_bootstrap_handle_t* ha
     int rank = uid_args->my_pe;
     int nranks = uid_args->n_pes;
     
-    if (handle->use_attr_ipport && handle->ipport != nullptr) {
+    if (handle->use_attr_ipport && handle->ipport[0] != '\0') {
         SHM_LOG_DEBUG("aclshmemi_bootstrap_get_unique_id_by_ipport start. ipport: " << handle->ipport);
         aclshmemi_bootstrap_get_unique_id_by_ipport(comm, handle->ipport);
     }

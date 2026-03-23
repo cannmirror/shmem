@@ -332,7 +332,9 @@ inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &soc
 {
     // init default uid
     SHM_ASSERT_RETURN(uid != nullptr, ACLSHMEM_INVALID_PARAM);
-    *uid = ACLSHMEM_UNIQUEID_INITIALIZER;
+    aclshmemx_uniqueid_t default_uid{};
+    default_uid.version = ACLSHMEM_UNIQUEID_VERSION;
+    *uid = default_uid;
     shmemx_bootstrap_uid_state_t *innerUID = reinterpret_cast<shmemx_bootstrap_uid_state_t *>(uid);
     if (sock_type == AF_INET) {
         innerUID->addr.addr.addr4.sin_family = AF_INET;

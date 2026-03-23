@@ -78,6 +78,8 @@ Result SdmaTransportManager::CreateNotifyIds(){
     }
     ACLSHMEM_CHECK_RET(aclrtMemcpy(notify_id_base, ACLSHMEM_MAX_AIV_PER_NPU * sizeof(uint32_t), notify_ids, 
         ACLSHMEM_MAX_AIV_PER_NPU * sizeof(uint32_t), ACL_MEMCPY_HOST_TO_DEVICE));
+
+    return ACLSHMEM_SUCCESS;
 }
 
 Result SdmaTransportManager::CreateStarsStreams(int32_t channel_num)

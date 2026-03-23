@@ -225,17 +225,21 @@ static inline void VirtListDel(struct DVirtListHead *entry)
 
 static inline uint32_t HeapSubTypeToMemVal(uint32_t type)
 {
-    static uint32_t memVal[SUB_MAX_TYPE] = {
-        [SUB_SVM_TYPE] = MEM_SVM_VAL,
-        [SUB_DEVICE_TYPE] = MEM_DEV_VAL,
-        [SUB_HOST_TYPE] = MEM_HOST_VAL,
-        [SUB_DVPP_TYPE] = MEM_DEV_VAL,
-        [SUB_READ_ONLY_TYPE] = MEM_DEV_VAL,
-        [SUB_RESERVE_TYPE] = MEM_RESERVE_VAL,
-        [SUB_DEV_READ_ONLY_TYPE]= MEM_DEV_VAL
+    static const std::map<uint32_t, uint32_t> type_to_mem_val = {
+        {SUB_SVM_TYPE, MEM_SVM_VAL},
+        {SUB_DEVICE_TYPE, MEM_DEV_VAL},
+        {SUB_HOST_TYPE, MEM_HOST_VAL},
+        {SUB_DVPP_TYPE, MEM_DEV_VAL},
+        {SUB_READ_ONLY_TYPE, MEM_DEV_VAL},
+        {SUB_RESERVE_TYPE, MEM_RESERVE_VAL},
+        {SUB_DEV_READ_ONLY_TYPE, MEM_DEV_VAL},
     };
 
-    return memVal[type];
+    auto iter = type_to_mem_val.find(type);
+    if (iter != type_to_mem_val.end()) {
+        return iter->second;
+    }
+    return MEM_DEV_VAL;
 }
 
 static void PrimaryHeapModuleMemStatsInc(struct DevVirtComHeap *heap,

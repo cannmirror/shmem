@@ -10,6 +10,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 project(SHMEM)
+include(CheckCXXCompilerFlag)
 
 # 配置 ccache 
 find_program(CCACHE_FOUND ccache)
@@ -103,12 +104,22 @@ endif()
 add_compile_options(
     -D_FORTIFY_SOURCE=2
     -O2 -std=c++17
-    -Wno-macro-redefined -Wno-ignored-attributes
+    -Werror
     # avoid ascendc interference
     -DL2_CACHE_HINT
     -DTILING_KEY_VAR
     -fstack-protector-strong
 )
+
+check_cxx_compiler_flag("-Wno-macro-redefined" HAS_WNO_MACRO_REDEFINED)
+if(HAS_WNO_MACRO_REDEFINED)
+    add_compile_options(-Wno-macro-redefined)
+endif()
+
+check_cxx_compiler_flag("-Wno-ignored-attributes" HAS_WNO_IGNORED_ATTRIBUTES)
+if(HAS_WNO_IGNORED_ATTRIBUTES)
+    add_compile_options(-Wno-ignored-attributes)
+endif()
 
 add_link_options(
     -s

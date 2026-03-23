@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include <unistd.h>
+#include <cstring>
 
 #include "shmemi_string_util.h"
 #include "acc_includes.h"
@@ -151,7 +152,7 @@ bool AccCommonUtil::IsAllDigits(const std::string &str)
 #define CHECK_DIR_PATH(key, required)                                                                               \
     do {                                                                                                            \
         if (!tlsOption.key.empty()) {                                                                               \
-            std::string path = (#key == "tlsTopPath") ? tlsOption.key : tlsOption.tlsTopPath + "/" + tlsOption.key; \
+            std::string path = (std::strcmp(#key, "tlsTopPath") == 0) ? tlsOption.key : tlsOption.tlsTopPath + "/" + tlsOption.key; \
             CHECK_DIR_PATH_TLS(key, path);                                                                          \
         } else if (required) {                                                                                      \
             LOG_ERROR("TLS check failed, " #key " is required");                                                    \

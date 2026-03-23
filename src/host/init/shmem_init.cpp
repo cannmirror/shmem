@@ -98,7 +98,9 @@ int32_t aclshmemi_state_init_attr(aclshmemx_init_attr_t *attributes)
 
 bool is_valid_data_op_engine_type(data_op_engine_type_t value)
 {
-    return value > 0 && value < (ACLSHMEM_DATA_OP_MAX << 1);
+    constexpr int32_t valid_mask = (static_cast<int32_t>(ACLSHMEM_DATA_OP_MAX) << 1) - 1;
+    int32_t int_value = static_cast<int32_t>(value);
+    return int_value > 0 && (int_value & ~valid_mask) == 0;
 }
 
 int32_t check_attr(aclshmemx_init_attr_t *attributes)
@@ -309,7 +311,9 @@ int32_t aclshmemx_get_uniqueid(aclshmemx_uniqueid_t *uid)
 
     ACLSHMEM_CHECK_RET(aclshmemi_bootstrap_pre_init(ACLSHMEMX_INIT_WITH_UNIQUEID, &g_boot_handle), "Get uniqueid failed during the bootstrap preloading step.");
 
-    *uid = ACLSHMEM_UNIQUEID_INITIALIZER;
+    aclshmemx_uniqueid_t default_uid{};
+    default_uid.version = ACLSHMEM_UNIQUEID_VERSION;
+    *uid = default_uid;
     if (g_boot_handle.pre_init_ops) {
         ACLSHMEM_CHECK_RET(g_boot_handle.pre_init_ops->get_unique_id((void *)uid), "Get uniqueid failed during the get uniqueid step.");
     } else {

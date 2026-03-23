@@ -449,6 +449,8 @@ int32_t MemEntityDefault::RemoveImported(const std::vector<uint32_t> &ranks) noe
             return ret;
         }
     }
+
+    return ACLSHMEM_SUCCESS;
 }
 
 bool MemEntityDefault::CheckAddressInEntity(const void *ptr, uint64_t length) const noexcept

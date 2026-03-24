@@ -26,7 +26,7 @@ ACLSHMEM_GLOBAL void barrier_on_stream_kernel(aclshmem_team_t team, uint64_t fft
 int32_t aclshmemi_call_barrier_on_stream_kernel(aclshmem_team_t team, aclrtStream stream)
 {
     barrier_on_stream_kernel<<<1, nullptr, stream>>>(team, util_get_ffts_config());
-    return aclrtSynchronizeStream(stream);
+    return ACLSHMEM_SUCCESS;
 }
 
 // kernels

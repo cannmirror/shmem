@@ -23,7 +23,6 @@ int aclshmemi_barrier_on_stream(aclshmem_team_t team, aclrtStream stream)
     }
     // ACLSHMEM_CHECK_RET(aclshmemx_init_status(), "aclshmemx_init_status failed.");
     aclshmemx_init_status();
-    ACLSHMEM_CHECK_RET(aclrtSynchronizeStream(stream), "aclrtSynchronizeStream failed.");
     ACLSHMEM_CHECK_RET(aclshmemi_call_barrier_on_stream_kernel(team, stream),
         "aclshmemi_call_barrier_on_stream_kernel failed.");
     return ACLSHMEM_SUCCESS;

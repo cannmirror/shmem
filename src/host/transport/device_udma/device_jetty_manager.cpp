@@ -434,11 +434,11 @@ Result DeviceJettyManager::FillUdmaInfo() noexcept
 
     for (size_t rank = 0; rank < rankCount_; rank++) {
         ubMemInfoList_[rank].tpn = tpnList_[rank];
-        FillUdmaWq(wqInfoList_[rank], ((ACLSHMEMUDMAWQCtx *)copyInfo->sqPtr)[rank]);
-        FillUdmaWq(wqInfoList_[rank], ((ACLSHMEMUDMAWQCtx *)copyInfo->rqPtr)[rank]);
+        FillUdmaWq(wqInfoList_[rankId_], ((ACLSHMEMUDMAWQCtx *)copyInfo->sqPtr)[rank]);
+        FillUdmaWq(wqInfoList_[rankId_], ((ACLSHMEMUDMAWQCtx *)copyInfo->rqPtr)[rank]);
 
-        FillUdmaCq(cqInfoList_[rank], ((ACLSHMEMUDMACqCtx *)copyInfo->scqPtr)[rank]);
-        FillUdmaCq(cqInfoList_[rank], ((ACLSHMEMUDMACqCtx *)copyInfo->rcqPtr)[rank]);
+        FillUdmaCq(cqInfoList_[rankId_], ((ACLSHMEMUDMACqCtx *)copyInfo->scqPtr)[rank]);
+        FillUdmaCq(cqInfoList_[rankId_], ((ACLSHMEMUDMACqCtx *)copyInfo->rcqPtr)[rank]);
 
         FillUdmaMem(ubMemInfoList_[rank], ((ACLSHMEMUBmemInfo *)copyInfo->memPtr)[rank]);
         ((ACLSHMEMUBmemInfo *)(copyInfo->memPtr))[rank].eidAddr = (uint64_t)((HccpEid *)hccpEidDevice_ + rank);

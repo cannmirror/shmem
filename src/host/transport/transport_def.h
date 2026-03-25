@@ -61,12 +61,18 @@ struct TransportMemoryRegion {
     uint64_t addr = 0;  /* virtual address of memory could be hbm or host dram */
     uint64_t size = 0;  /* size of memory to be registered */
     int32_t access = REG_MR_ACCESS_FLAG_BOTH_READ_WRITE; /* access right by local and remote */
-    uint32_t flags = 0; /* optional flags: 加一个flag标识是DRAM还是HBM */
+    uint32_t flags = 0;                                          /* optional flags: 加一个flag标识是DRAM还是HBM */
 
-    friend std::ostream &operator<<(std::ostream &output, const TransportMemoryRegion &mr)
+    uint32_t cacheable = 0;
+    uint32_t tokenValue = 0;
+    uint64_t targetSegHandle = 0;
+    uint32_t tokenIdValid = 1;
+
+    friend inline std::ostream &operator<<(std::ostream &output, const TransportMemoryRegion &mr)
     {
-        output << "MemoryRegion address size=" << mr.size << ", access=" << mr.access
-            << ", flags=" << mr.flags << ")";
+        output << "TransportMemoryRegion(addr=" << mr.addr << ", size=" << mr.size << ", access=" << mr.access
+               << ", flags=" << mr.flags << ", cacheable=" << mr.cacheable << ", tokenValue=" << mr.tokenValue
+               << ", targetSegHandle=" << mr.targetSegHandle << ", tokenIdValid=" << mr.tokenIdValid << ")";
         return output;
     }
 };

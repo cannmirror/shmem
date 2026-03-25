@@ -19,6 +19,7 @@
 #include <net/if.h>
 #include <ifaddrs.h>
 #include <iostream>
+#include <map>
 #include "dl_hccp_def.h"
 
 namespace shm {
@@ -805,7 +806,7 @@ enum MemSegAccessFlags {
     MEM_SEG_ACCESS_READ = (1 << 1),
     MEM_SEG_ACCESS_WRITE = (1 << 2),
     MEM_SEG_ACCESS_ATOMIC = (1 << 3),
-    MEM_SEG_ACCESS_DEFAULT = MEM_SEG_ACCESS_READ | MEM_SEG_ACCESS_WRITE,
+    MEM_SEG_ACCESS_DEFAULT = MEM_SEG_ACCESS_READ | MEM_SEG_ACCESS_WRITE | MEM_SEG_ACCESS_ATOMIC,
 };
 
 struct RegMemResultInfo {
@@ -870,6 +871,8 @@ struct RegMemResultInfo {
         return output;
     }
 };
+
+using MemoryRegionMap = std::map<uint64_t, RegMemResultInfo, std::greater<uint64_t>>;
 
 } // namespace shm
 

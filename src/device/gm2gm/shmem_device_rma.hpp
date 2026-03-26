@@ -15,6 +15,7 @@
 #include "device/gm2gm/engine/shmem_device_sdma.h"
 #include "device/shmem_def.h"
 #include "gm2gm/engine/shmemi_device_rdma.h"
+#include "gm2gm/engine/shmemi_device_udma.h"
 #include "host/shmem_host_def.h"
 #include "shmemi_device_rma.h"
 
@@ -104,6 +105,9 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
         ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub + UB_ALIGN_SIZE);
         ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
         aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, sync_id);
+    } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
+        /* UDMA */
+        aclshmemi_udma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src), elem_size, pe);
     }
 }
 
@@ -135,6 +139,9 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub + UB_ALIGN_SIZE);                  \
             ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;                                                           \
             aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, sync_id);                                        \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                          \
+            /* UDMA */                                                                                               \
+            aclshmemi_udma_get_nbi(dst, src, elem_size, pe);                                                         \
         }                                                                                                            \
     }
 
@@ -320,6 +327,9 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
         ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub + UB_ALIGN_SIZE);
         ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
         aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, sync_id);
+    } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
+        /* UDMA */
+        aclshmemi_udma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src), elem_size, pe);
     } 
 }
 
@@ -351,6 +361,9 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
             ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(copy_ub + UB_ALIGN_SIZE);                     \
             ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;                                                              \
             aclshmemi_roce_quiet(pe, 0, ub_tensor_64, ub_tensor_32, sync_id);                                           \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                             \
+            /* UDMA */                                                                                                  \
+            aclshmemi_udma_put_nbi(dst, src, elem_size, pe);                                                            \
         }                                                                                                               \
     }
 
@@ -561,6 +574,9 @@ ACLSHMEM_DEVICE void aclshmem_getmem_nbi(__gm__ void *dst, __gm__ void *src, uin
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                           \
             aclshmemi_roce_read((__gm__ uint8_t*)dst, (__gm__ uint8_t*)ptr, pe, 0, elem_size * sizeof(TYPE),                \
                                 ub_tensor_64, ub_tensor_32, sync_id);                                                       \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                                 \
+            /* UDMA */                                                                                                      \
+            aclshmemi_udma_get_nbi(dst, src, elem_size, pe);                                                                \
         }                                                                                                                   \
     }
 
@@ -642,6 +658,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_DETAILED_NBI);
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                        \
             aclshmemi_roce_read((__gm__ uint8_t*)(dst.GetPhyAddr()), (__gm__ uint8_t*)ptr, pe, 0,                        \
                                 elem_size * sizeof(TYPE), ub_tensor_64, ub_tensor_32, sync_id);                          \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                              \
+            /* UDMA */                                                                                                   \
+            aclshmemi_udma_get_nbi((__gm__ TYPE*)dst.GetPhyAddr(), (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);       \
         }                                                                                                                \
     }
 
@@ -707,6 +726,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_TENSOR_DETAILED_NBI);
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                           \
             aclshmemi_roce_write((__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(TYPE),               \
                                     ub_tensor_64, ub_tensor_32, sync_id);                                                   \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                                 \
+            /* UDMA */                                                                                                      \
+            aclshmemi_udma_put_nbi(dst, src, elem_size, pe);                                                                \
         }                                                                                                                   \
     }
 
@@ -788,6 +810,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_PUT_TYPENAME_MEM_DETAILED_NBI);
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                        \
             aclshmemi_roce_write((__gm__ uint8_t*)ptr, (__gm__ uint8_t*)(src.GetPhyAddr()), pe, 0,                       \
                                                     elem_size * sizeof(TYPE), ub_tensor_64, ub_tensor_32, sync_id);      \
+        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                              \
+            /* UDMA */                                                                                                   \
+            aclshmemi_udma_put_nbi((__gm__ TYPE*)dst.GetPhyAddr(), (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);       \
         }                                                                                                                \
     }
 

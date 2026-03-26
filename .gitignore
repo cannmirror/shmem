@@ -53,3 +53,5 @@ dist/
 package/
 src/python/shmem.egg-info/
 src/python/shmem/VERSION
+
+.arts/

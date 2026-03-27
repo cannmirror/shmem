@@ -27,7 +27,7 @@ namespace device {
 
 class DeviceJettyManager {
 public:
-    DeviceJettyManager(uint32_t deviceId, uint32_t rankId, uint32_t rankSize) noexcept;
+    DeviceJettyManager(uint32_t deviceId, uint32_t rankId, uint32_t rankCount) noexcept;
     ~DeviceJettyManager() noexcept;
 
     Result SetLocalMemInfo(const ACLSHMEMUBmemInfo &localMemInfo) noexcept;
@@ -45,11 +45,11 @@ private:
     Result JettyBind() noexcept;
     bool ReserveUdmaInfoSpace() noexcept;
 
-    void FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx &dstWq);
-    void FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx &dstCq);
-    void FillUdmaMem(ACLSHMEMUBmemInfo &srcMem, ACLSHMEMUBmemInfo &dstMem);
+    void FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx &dstWq) const;
+    void FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx &dstCq) const;
+    void FillUdmaMem(ACLSHMEMUBmemInfo &srcMem, ACLSHMEMUBmemInfo &dstMem) const;
     Result FillUdmaInfo() noexcept;
-    void PrintHostInfo(ACLSHMEMAIVUDMAInfo &hostInfo);
+    void PrintHostInfo(ACLSHMEMAIVUDMAInfo &hostInfo) const;
 
     const uint32_t deviceId_;
     const uint32_t rankId_;

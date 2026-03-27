@@ -155,7 +155,7 @@ inline int32_t test_set_attr(int32_t my_pe, int32_t n_pes, uint64_t local_mem_si
     return ACLSHMEM_SUCCESS;
 }
 
-static bool make_dir(const std::string& path) {
+inline bool make_dir(const std::string& path) {
     if (path.empty()) return true;
 
     // 尝试创建目录，0755 权限
@@ -183,7 +183,7 @@ static bool make_dir(const std::string& path) {
     return false;
 }
 
-static std::string get_dir(const std::string& filename) {
+inline std::string get_dir(const std::string& filename) {
     size_t pos = filename.find_last_of("/");
     if (pos == std::string::npos) return "";
     return filename.substr(0, pos);

@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
+#include <algorithm>
 #include "socket/uid_socket.h"
 #include "socket/uid_utils.h"
 
@@ -215,7 +216,9 @@ int32_t aclshmemi_traverse_ifa(
         }
 
         if (ifa->ifa_addr->sa_family == AF_INET && (sockType == AF_UNSPEC || sockType == AF_INET)) {
-            memset(&uid_args->addr.addr.addr4, 0, sizeof(struct sockaddr_in));
+            std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4), 
+                      reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in), 
+                      0);
             uid_args->addr.type = ADDR_IPv4;
             uid_args->addr.addr.addr4 = *(struct sockaddr_in *)ifa->ifa_addr;
             uid_args->addr.addr.addr4.sin_port = 0;
@@ -225,7 +228,9 @@ int32_t aclshmemi_traverse_ifa(
         }
 
         if (ifa->ifa_addr->sa_family == AF_INET6 && (sockType == AF_UNSPEC || sockType == AF_INET6)) {
-            memset(&uid_args->addr.addr.addr6, 0, sizeof(struct sockaddr_in6));
+            std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr6), 
+                      reinterpret_cast<char*>(&uid_args->addr.addr.addr6) + sizeof(struct sockaddr_in6), 
+                      0);
             uid_args->addr.type = ADDR_IPv6;
             uid_args->addr.addr.addr6 = *(struct sockaddr_in6 *)ifa->ifa_addr;
             uid_args->addr.addr.addr6.sin6_port = 0;
@@ -261,7 +266,9 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
         std::string ipStr;
         std::string if_name;
 
-        memset(&uid_args->addr.addr.addr6, 0, sizeof(struct sockaddr_in6));
+        std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr6), 
+                  reinterpret_cast<char*>(&uid_args->addr.addr.addr6) + sizeof(struct sockaddr_in6), 
+                  0);
         uid_args->addr.type = ADDR_IPv6;
         uid_args->addr.addr.addr6.sin6_family = AF_INET6;
 
@@ -300,7 +307,9 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
         std::string ipStr = ipPortStr.substr(0, colon_pos);
         std::string portStr = ipPortStr.substr(colon_pos + 1);
 
-        memset(&uid_args->addr.addr.addr4, 0, sizeof(struct sockaddr_in));
+        std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4), 
+                  reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in), 
+                  0);
         uid_args->addr.type = ADDR_IPv4;
         uid_args->addr.addr.addr4.sin_family = AF_INET;
 
@@ -471,7 +480,7 @@ static int aclshmemi_bootstrap_uid_allgather(const void *in, void *out, int len,
     }
 
     if (in != BOOTSTRAP_IN_PLACE) {
-        memcpy((char*)out + (rank % nranks) * len, send_buf, len);
+        std::copy_n(send_buf, len, (char*)out + (rank % nranks) * len);
     }
 
     for (int i = 0; i < nranks - 1; i++) {
@@ -533,7 +542,9 @@ static int unexpected_dequeue(uid_bootstrap_state* state, int peer, int tag, soc
                 prev->next = elem->next;
             }
 
-            memcpy(sock, &elem->sock, sizeof(socket_t));
+            std::copy_n(reinterpret_cast<const char*>(&elem->sock), 
+                        sizeof(socket_t), 
+                        reinterpret_cast<char*>(sock));
             ACLSHMEM_BOOTSTRAP_PTR_FREE(elem);
             *found = 1;
             return ACLSHMEM_SUCCESS;
@@ -559,7 +570,9 @@ static int unexpected_enqueue(uid_bootstrap_state* state, int peer, int tag, soc
 
     new_conn->peer = peer;
     new_conn->tag = tag;
-    memcpy(&new_conn->sock, sock, sizeof(socket_t));
+    std::copy_n(reinterpret_cast<const char*>(sock), 
+                sizeof(socket_t), 
+                reinterpret_cast<char*>(&new_conn->sock));
     new_conn->next = NULL;
     if (state->unexpected_conns == NULL) {
         state->unexpected_conns = new_conn;
@@ -758,10 +771,14 @@ static int find_interface_match_subnet(char* ifNames, sockaddr_t* localAddrs, so
             if (matchSubnet(*interface, remoteAddr)) {
                 if (family == AF_INET) {
                     localAddrs->type = ADDR_IPv4;
-                    memcpy(&localAddrs->addr.addr4, interface->ifa_addr, sizeof(struct sockaddr_in));
+                    std::copy_n(reinterpret_cast<const char*>(interface->ifa_addr), 
+                                sizeof(struct sockaddr_in), 
+                                reinterpret_cast<char*>(&localAddrs->addr.addr4));
                 } else {
                     localAddrs->type = ADDR_IPv6;
-                    memcpy(&localAddrs->addr.addr6, interface->ifa_addr, sizeof(struct sockaddr_in6));
+                    std::copy_n(reinterpret_cast<const char*>(interface->ifa_addr), 
+                                sizeof(struct sockaddr_in6), 
+                                reinterpret_cast<char*>(&localAddrs->addr.addr6));
                 }
                 strncpy(ifNames, interface->ifa_name, MAX_IF_NAME_SIZE);
                 ifNames[MAX_IF_NAME_SIZE] = '\0';
@@ -783,10 +800,14 @@ static int find_interface_match_subnet(char* ifNames, sockaddr_t* localAddrs, so
             if (matchSubnet(*interface, remoteAddr)) {
                 if (family == AF_INET) {
                     localAddrs->type = ADDR_IPv4;
-                    memcpy(&localAddrs->addr.addr4, interface->ifa_addr, sizeof(struct sockaddr_in));
+                    std::copy_n(reinterpret_cast<const char*>(interface->ifa_addr), 
+                                sizeof(struct sockaddr_in), 
+                                reinterpret_cast<char*>(&localAddrs->addr.addr4));
                 } else {
                     localAddrs->type = ADDR_IPv6;
-                    memcpy(&localAddrs->addr.addr6, interface->ifa_addr, sizeof(struct sockaddr_in6));
+                    std::copy_n(reinterpret_cast<const char*>(interface->ifa_addr), 
+                                sizeof(struct sockaddr_in6), 
+                                reinterpret_cast<char*>(&localAddrs->addr.addr6));
                 }
                 strncpy(ifNames, interface->ifa_name, MAX_IF_NAME_SIZE);
                 ifNames[MAX_IF_NAME_SIZE] = '\0';
@@ -803,7 +824,9 @@ static int find_interface_match_subnet(char* ifNames, sockaddr_t* localAddrs, so
 static int bootstrap_get_sock_addr(socket_t* sock, sockaddr_t* addr) {
     if (sock == NULL) return ACLSHMEM_BOOTSTRAP_ERROR;
     struct sockaddr_storage temp_storage;
-    memset(&temp_storage, 0, sizeof(temp_storage));
+    std::fill(reinterpret_cast<char*>(&temp_storage), 
+              reinterpret_cast<char*>(&temp_storage) + sizeof(temp_storage), 
+              0);
     struct sockaddr* temp_addr = reinterpret_cast<struct sockaddr*>(&temp_storage);
     socklen_t addr_len = 0;
     int ret = socket_get_sainfo(sock, temp_addr, &addr_len);
@@ -814,11 +837,15 @@ static int bootstrap_get_sock_addr(socket_t* sock, sockaddr_t* addr) {
     if (temp_storage.ss_family == AF_INET) {
         addr->type = ADDR_IPv4;
         const struct sockaddr_in* ipv4_src = reinterpret_cast<const struct sockaddr_in*>(&temp_storage);
-        memcpy(&addr->addr.addr4, ipv4_src, sizeof(struct sockaddr_in));
+        std::copy_n(reinterpret_cast<const char*>(ipv4_src), 
+                    sizeof(struct sockaddr_in), 
+                    reinterpret_cast<char*>(&addr->addr.addr4));
     } else if (temp_storage.ss_family == AF_INET6) {
         addr->type = ADDR_IPv6;
         const struct sockaddr_in6* ipv6_src = reinterpret_cast<const struct sockaddr_in6*>(&temp_storage);
-        memcpy(&addr->addr.addr6, ipv6_src, sizeof(struct sockaddr_in6));
+        std::copy_n(reinterpret_cast<const char*>(ipv6_src), 
+                    sizeof(struct sockaddr_in6), 
+                    reinterpret_cast<char*>(&addr->addr.addr6));
     } else {
         SHM_LOG_ERROR("Unknown address type is not within IPv4 or IPv6.");
         return ACLSHMEM_BOOTSTRAP_ERROR;
@@ -1033,8 +1060,12 @@ static void* bootstrap_root(void* rargs) {
             break;
         }
 
-        memcpy(&rank_addrs_root[info.rank], &info.ext_address_listen_root, sizeof(sockaddr_t));
-        memcpy(&rank_addrs[info.rank], &info.ext_addr_listen, sizeof(sockaddr_t));
+        std::copy_n(reinterpret_cast<const char*>(&info.ext_address_listen_root), 
+                    sizeof(sockaddr_t), 
+                    reinterpret_cast<char*>(&rank_addrs_root[info.rank]));
+        std::copy_n(reinterpret_cast<const char*>(&info.ext_addr_listen), 
+                    sizeof(sockaddr_t), 
+                    reinterpret_cast<char*>(&rank_addrs[info.rank]));
         c++;
 
         if (c >= nranks) {
@@ -1097,7 +1128,9 @@ static int bootstrap_create_root(aclshmemi_bootstrap_uid_state_t* uid_args) {
     ACLSHMEM_CHECK_RET_CLOSE_SOCK(socket_listen(listen_sock_root), "Listen_sock_root failed while executing listen. fd=" << listen_sock_root->fd, *listen_sock_root);
 
     // 3. Write the root node's listening address into uid_args (for slave nodes to connect to).
-    memcpy(&uid_args->addr, &listen_sock_root->addr, sizeof(sockaddr_t));
+    std::copy_n(reinterpret_cast<const char*>(&listen_sock_root->addr), 
+                sizeof(sockaddr_t), 
+                reinterpret_cast<char*>(&uid_args->addr));
 
     // 4. Prepare thread parameters
     struct bootstrap_root_args* args = nullptr;

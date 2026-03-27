@@ -335,7 +335,7 @@ uint64_t DeviceJettyManager::GetJFCInfoAddress() const noexcept
     return cqVa_;
 }
 
-void DeviceJettyManager::FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx &dstWq)
+void DeviceJettyManager::FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx &dstWq) const
 {
     dstWq.wqn = srcWq.wqn;
     dstWq.bufAddr = srcWq.bufAddr;
@@ -348,7 +348,7 @@ void DeviceJettyManager::FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx 
     dstWq.sl = srcWq.sl;
 }
 
-void DeviceJettyManager::FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx &dstCq)
+void DeviceJettyManager::FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx &dstCq) const
 {
     dstCq.cqn = srcCq.cqn;
     dstCq.bufAddr = srcCq.bufAddr;
@@ -360,7 +360,7 @@ void DeviceJettyManager::FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx 
     dstCq.dbAddr = srcCq.dbAddr;
 }
 
-void DeviceJettyManager::FillUdmaMem(ACLSHMEMUBmemInfo &srcMem, ACLSHMEMUBmemInfo &dstMem)
+void DeviceJettyManager::FillUdmaMem(ACLSHMEMUBmemInfo &srcMem, ACLSHMEMUBmemInfo &dstMem) const
 {
     dstMem.token_value_valid = srcMem.token_value_valid;
     dstMem.rmt_jetty_type = srcMem.rmt_jetty_type;
@@ -372,7 +372,7 @@ void DeviceJettyManager::FillUdmaMem(ACLSHMEMUBmemInfo &srcMem, ACLSHMEMUBmemInf
     dstMem.addr = srcMem.addr;
 }
 
-void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo &hostInfo)
+void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo &hostInfo) const
 {
     SHM_LOG_DEBUG("=======================rank [" << rankId_ << "] host info====================");
     auto tempWQCtx = ((ACLSHMEMUDMAWQCtx *)hostInfo.sqPtr)[rankId_];

@@ -10,6 +10,9 @@
 
 #ifndef MF_HYBRID_DEVICE_UDMA_DEF_H
 #define MF_HYBRID_DEVICE_UDMA_DEF_H
+
+#include <cstdint>
+
 namespace shm {
 namespace transport {
 namespace device {

@@ -368,7 +368,15 @@ void MemSegmentDevice::FreeMemory() noexcept
         auto slice = slices_.begin()->second.slice;
         ReleaseSliceMemory(slice);
     }
-    aclrtFreePhysical(local_handle_);
+
+    if (local_handle_ != nullptr) {
+        auto ret = aclrtFreePhysical(local_handle_);
+        if (ret != 0) {
+            SHM_LOG_ERROR("aclrtFreePhysical failed. ret: " << ret);
+            return;
+        }
+    }
+    
     allocatedSize_ = 0;
     sliceCount_ = 0;
     if (globalVirtualAddress_ != nullptr) {

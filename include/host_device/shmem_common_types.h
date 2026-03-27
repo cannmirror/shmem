@@ -93,7 +93,8 @@ enum data_op_engine_type_t {
     ACLSHMEM_DATA_OP_MTE = 0x01,
     ACLSHMEM_DATA_OP_SDMA = 0x02,
     ACLSHMEM_DATA_OP_ROCE = 0x04,
-    ACLSHMEM_DATA_OP_MAX = 0x04,
+    ACLSHMEM_DATA_OP_UDMA = 0x08,
+    ACLSHMEM_DATA_OP_MAX = 0x08,
 };
 
 /**

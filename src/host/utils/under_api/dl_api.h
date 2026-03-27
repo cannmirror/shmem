@@ -19,6 +19,7 @@ namespace shm {
 enum DlApiExtendLibraryType {
     DL_EXT_LIB_DEVICE_RDMA,
     DL_EXT_LIB_DEVICE_SDMA,
+    DL_EXT_LIB_DEVICE_UDMA,
 };
 
 class DlApi {

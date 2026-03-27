@@ -13,6 +13,7 @@
 #include "transport_def.h"
 #include "device_rdma_transport_manager.h"
 #include "device_sdma_transport_manager.h"
+#include "device_udma_transport_manager.h"
 
 using namespace shm;
 using namespace shm::transport;
@@ -24,6 +25,8 @@ std::shared_ptr<TransportManager> TransportManager::Create(TransportType type)
             return std::make_shared<device::RdmaTransportManager>();
         case TT_SDMA:
             return std::make_shared<device::SdmaTransportManager>();
+        case TT_UDMA:
+            return std::make_shared<device::UdmaTransportManager>();
         default:
             SHM_LOG_ERROR("Invalid trans type: " << type);
             return nullptr;

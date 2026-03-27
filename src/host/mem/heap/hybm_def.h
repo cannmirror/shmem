@@ -41,6 +41,7 @@ typedef enum {
     HYBM_DOP_TYPE_MTE = 1U << 0,
     HYBM_DOP_TYPE_DEVICE_RDMA = 1U << 1,
     HYBM_DOP_TYPE_DEVICE_SDMA = 1U << 2,
+    HYBM_DOP_TYPE_DEVICE_UDMA = 1U << 3,
     HYBM_DOP_TYPE_BUTT
 } hybm_data_op_type;
 

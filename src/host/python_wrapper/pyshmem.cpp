@@ -135,7 +135,8 @@ void DefineShmemAttr(py::module_ &m)
     py::enum_<data_op_engine_type_t>(m, "OpEngineType")
         .value("MTE", ACLSHMEM_DATA_OP_MTE)
         .value("SDMA", ACLSHMEM_DATA_OP_SDMA)
-        .value("ROCE", ACLSHMEM_DATA_OP_ROCE);
+        .value("ROCE", ACLSHMEM_DATA_OP_ROCE)
+        .value("UDMA", ACLSHMEM_DATA_OP_UDMA);
 
     py::class_<aclshmem_init_optional_attr_t>(m, "OptionalAttr")
         .def(py::init([]() {

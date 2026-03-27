@@ -11,6 +11,7 @@
 #include "dl_acl_api.h"
 #include "dl_hal_api.h"
 #include "dl_hccp_api.h"
+#include "dl_hccp_v2_api.h"
 #include "dl_rt_api.h"
 #include "dl_opapi_api.h"
 #include "utils/shmemi_logger.h"
@@ -55,6 +56,9 @@ Result DlApi::LoadExtendLibrary(DlApiExtendLibraryType libraryType)
             DlRtApi::CleanupLibrary();
             return result;
         }
+    }
+    if (libraryType == DL_EXT_LIB_DEVICE_UDMA) {
+        return DlHccpV2Api::LoadLibrary();
     }
 
     return ACLSHMEM_SUCCESS;

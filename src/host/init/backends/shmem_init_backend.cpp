@@ -86,6 +86,10 @@ int aclshmemi_init_backend::create_entity(aclshmem_mem_type_t mem_type)
         auto temp = static_cast<uint32_t>(options.bmDataOpType) | HYBM_DOP_TYPE_DEVICE_SDMA;
         options.bmDataOpType = static_cast<hybm_data_op_type>(temp);
     }
+    if (attributes->option_attr.data_op_engine_type & ACLSHMEM_DATA_OP_UDMA) {
+        auto temp = static_cast<uint32_t>(options.bmDataOpType) | HYBM_DOP_TYPE_DEVICE_UDMA;
+        options.bmDataOpType = static_cast<hybm_data_op_type>(temp);
+    }
     options.bmScope = HYBM_SCOPE_CROSS_NODE;
     options.rankCount = attributes->n_pes;
     options.rankId = attributes->my_pe;
@@ -221,6 +225,9 @@ int aclshmemi_init_backend::reach_info_init(void *&gva)
         }
         if (reaches_types & HYBM_DOP_TYPE_DEVICE_SDMA) {
             host_state_->topo_list[i] |= ACLSHMEM_TRANSPORT_SDMA;
+        }
+        if (reaches_types & HYBM_DOP_TYPE_DEVICE_UDMA) {
+            host_state_->topo_list[i] |= ACLSHMEM_TRANSPORT_UDMA;
         }
         host_state_->sdma_device_heap_base[i] = nullptr;
     }

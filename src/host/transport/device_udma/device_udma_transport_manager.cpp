@@ -432,35 +432,6 @@ void UdmaTransportManager::CleanupResources()
         tokenIdHandle_ = nullptr;
         SHM_LOG_INFO("RaCtxTokenIdFree success.");
     }
-
-    if (ctxHandle_ != nullptr) {
-        auto ret = shm::DlHccpV2Api::RaCtxDeinit(ctxHandle_);
-        if (ret != 0) {
-            SHM_LOG_ERROR("RaCtxDeinit failed, ret = " << ret);
-            return;
-        }
-        ctxHandle_ = nullptr;
-        SHM_LOG_INFO("RaCtxDeinit success.");
-    }
-
-    RaInitConfig config{};
-    config.phyId = deviceId_;
-    config.nicPosition = NETWORK_OFFLINE;
-    config.hdcType = HDC_SERVICE_TYPE_RDMA_V2;
-    config.enableHdcAsync = 1;
-    auto ret = shm::DlHccpV2Api::RaDeinit(&config);
-    if (ret != 0) {
-        SHM_LOG_ERROR("Hccp Deinit RA failed, ret = " << ret);
-        return;
-    }
-    SHM_LOG_INFO("RaDeinit success.");
-
-    ret = shm::DlHccpV2Api::TsdProcessClose(deviceId_, subPid_);
-    if (ret != 0) {
-        SHM_LOG_ERROR("TsdClose for deviceId = " << deviceId_ << " failed, ret = " << ret);
-        return;
-    }
-    SHM_LOG_INFO("TsdProcessClose success.");
 }
 
 } // namespace device

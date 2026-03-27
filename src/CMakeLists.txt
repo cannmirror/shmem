@@ -60,6 +60,7 @@ target_include_directories(aclshmem_host
     ${PROJECT_SOURCE_DIR}/src/host/transport
     ${PROJECT_SOURCE_DIR}/src/host/transport/device_rdma
     ${PROJECT_SOURCE_DIR}/src/host/transport/device_sdma
+    ${PROJECT_SOURCE_DIR}/src/host/transport/device_udma
     ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store
     ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store/acc_links/include
     ${PROJECT_SOURCE_DIR}/src/host/mem/heap/driver

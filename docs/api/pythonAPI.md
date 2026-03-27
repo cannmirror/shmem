@@ -954,6 +954,7 @@
         MTE
         SDMA
         ROCE
+        UDMA
     ```
 
 1. OptionalAttr类

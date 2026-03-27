@@ -297,7 +297,6 @@ ACLSHMEM_DEVICE void aclshmemi_signal_add(__gm__ int32_t *addr, int pe, int32_t 
     if (AscendC::GetBlockIdx() != 0) {
         return;
     }
-    AscendC::SetAtomicNone();
     __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
     __gm__ int32_t* remote_ptr = reinterpret_cast<__gm__ int32_t*>(aclshmem_ptr(addr, pe));
     __ubuf__ int32_t* buf =(__ubuf__ int32_t*)(device_state->mte_config.aclshmem_ub);

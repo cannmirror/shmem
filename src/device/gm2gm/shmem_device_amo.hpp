@@ -19,7 +19,6 @@
         auto ptr = aclshmem_ptr(dst, pe);                                                                                \
         __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();                                       \
         AscendC::TEventID my_sync_id = (AscendC::TEventID)device_state->mte_config.sync_id;                              \
-        AscendC::SetAtomicNone();                                                                                        \
         __gm__ TYPE *remote_ptr = reinterpret_cast<__gm__ TYPE *>(ptr);                                                  \
         __ubuf__ TYPE *buf = reinterpret_cast<__ubuf__ TYPE *>(device_state->mte_config.aclshmem_ub);                    \
         *buf = value;                                                                                                    \

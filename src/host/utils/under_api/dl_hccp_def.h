@@ -15,14 +15,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <cstdint>
+#include <netinet/in.h>
 #include <string>
 #include <ostream>
 #include <iomanip>
 #include <sstream>
-#include <ifaddrs.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/in.h>
 
 namespace shm {
 

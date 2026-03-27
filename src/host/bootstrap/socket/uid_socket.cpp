@@ -12,6 +12,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <algorithm>
 #include "uid_socket.h"
 
 static int socket_poll_fd(int fd, int events, int timeout_ms) {
@@ -156,11 +157,15 @@ int socket_get_sainfo(socket_t* sock, sockaddr* sa, socklen_t* addr_len) {
     
     if (sock->addr.type == ADDR_IPv4) {
         SHM_LOG_DEBUG("socket_get_sainfo memcpy addr4");
-        memcpy(sa, &sock->addr.addr.addr4, sizeof(struct sockaddr_in));
+        std::copy_n(reinterpret_cast<const char*>(&sock->addr.addr.addr4), 
+                    sizeof(struct sockaddr_in), 
+                    reinterpret_cast<char*>(sa));
         *addr_len = sizeof(struct sockaddr_in);
     } else {
         SHM_LOG_DEBUG("socket_get_sainfo memcpy addr6");
-        memcpy(sa, &sock->addr.addr.addr6, sizeof(struct sockaddr_in6));
+        std::copy_n(reinterpret_cast<const char*>(&sock->addr.addr.addr6), 
+                    sizeof(struct sockaddr_in6), 
+                    reinterpret_cast<char*>(sa));
         *addr_len = sizeof(struct sockaddr_in6);
     }
 
@@ -183,7 +188,9 @@ int socket_listen(socket_t* sock) {
     if (sock->state == SOCKET_STATE_CREATED) {
         SHM_LOG_DEBUG("socket_listen State is CREATED, starting bind process");
         struct sockaddr_storage sa_storage;
-        memset(&sa_storage, 0, sizeof(sa_storage));
+        std::fill(reinterpret_cast<char*>(&sa_storage), 
+                  reinterpret_cast<char*>(&sa_storage) + sizeof(sa_storage), 
+                  0);
         struct sockaddr* sa = reinterpret_cast<struct sockaddr*>(&sa_storage);
         socklen_t addr_len;
 
@@ -290,10 +297,14 @@ static int socket_try_accept(socket_t* sock) {
     if (sock->fd != -1) {
         if (sa.sa_family == AF_INET) {
             sock->addr.type = ADDR_IPv4;
-            memcpy(&sock->addr.addr.addr4, &sa, sizeof(struct sockaddr_in));
+            std::copy_n(reinterpret_cast<const char*>(&sa), 
+                        sizeof(struct sockaddr_in), 
+                        reinterpret_cast<char*>(&sock->addr.addr.addr4));
         } else {
             sock->addr.type = ADDR_IPv6;
-            memcpy(&sock->addr.addr.addr6, &sa, sizeof(struct sockaddr_in6));
+            std::copy_n(reinterpret_cast<const char*>(&sa), 
+                        sizeof(struct sockaddr_in6), 
+                        reinterpret_cast<char*>(&sock->addr.addr.addr6));
         }
         sock->state = SOCKET_STATE_ACCEPTED;
     } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -362,7 +373,9 @@ static int socket_start_connect(socket_t* sock) {
     }
 
     struct sockaddr_storage sa_storage;
-    memset(&sa_storage, 0, sizeof(sa_storage));
+    std::fill(reinterpret_cast<char*>(&sa_storage), 
+              reinterpret_cast<char*>(&sa_storage) + sizeof(sa_storage), 
+              0);
     struct sockaddr* sa = reinterpret_cast<struct sockaddr*>(&sa_storage);
     socklen_t addr_len;
     if (socket_get_sainfo(sock, sa, &addr_len) != 0) {
@@ -537,7 +550,9 @@ int socket_init(socket_t* sock, socket_type_t type, uint64_t magic, const sockad
         return ACLSHMEM_BOOTSTRAP_ERROR;
     }
     SHM_LOG_DEBUG("socket_init: start");
-    memset(sock, 0, sizeof(socket_t));
+    std::fill(reinterpret_cast<char*>(sock), 
+              reinterpret_cast<char*>(sock) + sizeof(socket_t), 
+              0);
     sock->fd = -1;
     sock->accept_fd = -1;
     sock->state = SOCKET_STATE_CREATED;
@@ -550,10 +565,14 @@ int socket_init(socket_t* sock, socket_type_t type, uint64_t magic, const sockad
         int family;
         if (init_addr->type == ADDR_IPv4) {
             family = AF_INET;
-            memcpy(&sock->addr.addr.addr4, &init_addr->addr.addr4, sizeof(struct sockaddr_in));
+            std::copy_n(reinterpret_cast<const char*>(&init_addr->addr.addr4), 
+                        sizeof(struct sockaddr_in), 
+                        reinterpret_cast<char*>(&sock->addr.addr.addr4));
         } else if (init_addr->type == ADDR_IPv6) {
             family = AF_INET6;
-            memcpy(&sock->addr.addr.addr6, &init_addr->addr.addr6, sizeof(struct sockaddr_in6));
+            std::copy_n(reinterpret_cast<const char*>(&init_addr->addr.addr6), 
+                        sizeof(struct sockaddr_in6), 
+                        reinterpret_cast<char*>(&sock->addr.addr.addr6));
         } else {
             SHM_LOG_ERROR("socket_init: unsupported address type " << init_addr->type);
             return ACLSHMEM_BOOTSTRAP_ERROR;
@@ -567,7 +586,9 @@ int socket_init(socket_t* sock, socket_type_t type, uint64_t magic, const sockad
         }
     } else {
         SHM_LOG_DEBUG("socket_init: init_addr is null");
-        memset(&sock->addr, 0, sizeof(sock->addr));
+        std::fill(reinterpret_cast<char*>(&sock->addr), 
+                  reinterpret_cast<char*>(&sock->addr) + sizeof(sock->addr), 
+                  0);
         sock->addr.type = ADDR_IPv4;
     }
 

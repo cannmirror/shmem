@@ -98,8 +98,8 @@ int32_t aclshmemi_state_init_attr(aclshmemx_init_attr_t *attributes)
 
 bool is_valid_data_op_engine_type(data_op_engine_type_t value)
 {
-    constexpr int32_t valid_mask = (static_cast<int32_t>(ACLSHMEM_DATA_OP_MAX) << 1) - 1;
-    int32_t int_value = static_cast<int32_t>(value);
+    constexpr uint32_t valid_mask = (static_cast<uint32_t>(ACLSHMEM_DATA_OP_MAX) << 1) - 1;
+    uint32_t int_value = static_cast<uint32_t>(value);
     return int_value > 0 && (int_value & ~valid_mask) == 0;
 }
 

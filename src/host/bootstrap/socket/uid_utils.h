@@ -13,7 +13,7 @@
 
 
 #include <stdlib.h>   // malloc, free
-#include <string.h>   // memset
+#include <algorithm>
 #include "utils/shmemi_logger.h"
 
 template <typename T>
@@ -31,7 +31,7 @@ inline int bootstrap_calloc(T** ptr, size_t nelem, const char* file, int line) {
         return ACLSHMEM_BOOTSTRAP_ERROR;
     }
 
-    memset(p, 0, total_size);  // 内存清零
+    std::fill(static_cast<char*>(p), static_cast<char*>(p) + total_size, 0);  // 内存清零
     *ptr = static_cast<T*>(p);  // 类型转换，赋值给输出指针
 
     // 调试日志：输出分配信息

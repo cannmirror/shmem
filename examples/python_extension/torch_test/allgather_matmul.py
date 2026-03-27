@@ -64,7 +64,7 @@ def gen_allgather_matmul_golden(pe):
     for r in range(PES):
         torch.manual_seed(42 + r)
         pe_a = torch.randn(A_SHAPE, dtype=DTYPE)
-        pe_matmul = torch.matmul(pe_a, tensor_b)  # (1024, 64)
+        pe_matmul = torch.matmul(pe_a.to(torch.float32), tensor_b.to(torch.float32))  # (1024, 64)
         all_pes_matmul.append(pe_matmul)
     
     golden_c = torch.cat(all_pes_matmul, dim=0)  # (8192, 64)
@@ -127,7 +127,7 @@ def worker(pe):
     print(f"PE {pe} start ALLGATHER_MATMUL golden check...")
     tensor_c_cpu = tensor_c_npu.cpu()
     
-    is_correct = torch.allclose(tensor_c_cpu, data.golden_c, rtol=1e-2, atol=1e-2)
+    is_correct = torch.allclose(tensor_c_cpu.to(torch.float32), data.golden_c.to(torch.float32), rtol=1e-2, atol=1e-2)
     
     if not is_correct:
         print(f"[PE {pe}] golden_c sample:{data.golden_c.flatten()[:10]}")

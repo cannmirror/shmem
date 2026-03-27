@@ -15,7 +15,31 @@ fi
 export ASCEND_TOOLKIT_HOME=${_ASCEND_INSTALL_PATH}
 export ASCEND_HOME_PATH=${_ASCEND_INSTALL_PATH}
 
-source "$(dirname "$_ASCEND_INSTALL_PATH")/set_env.sh"
+ascend_dir=$(dirname "$_ASCEND_INSTALL_PATH")
+env_script_path_old="${ascend_dir}/set_env.sh"
+env_script_path_new="${ascend_dir}/ascend-toolkit/set_env.sh"
+
+if [ -n "$_ASCEND_INSTALL_PATH" ] && [ -f "$env_script_path_old" ] && [ -x "$env_script_path_old" ] && \
+   [ -f "$env_script_path_new" ] && [ -x "$env_script_path_new" ]; then
+    echo "[WARNING] Both old and new set_env.sh files are detected!"
+    echo "          Old path: $env_script_path_old"
+    echo "          New path: $env_script_path_new"
+    echo "          The new path file will be used by priority!"
+fi
+
+if [ -n "$_ASCEND_INSTALL_PATH" ] && [ -f "$env_script_path_new" ] && [ -x "$env_script_path_new" ]; then
+    source "$env_script_path_new"
+elif [ -n "$_ASCEND_INSTALL_PATH" ] && [ -f "$env_script_path_old" ] && [ -x "$env_script_path_old" ]; then
+    source "$env_script_path_old"
+else
+    if [ -z "$_ASCEND_INSTALL_PATH" ]; then
+        echo "[WARNING] Environment variable _ASCEND_INSTALL_PATH is not set, cannot find set_env.sh script" >&2
+    else
+        echo "[WARNING] Valid set_env.sh script not found!" >&2
+        echo "       Check path 1: $env_script_path_old (does not exist or is not executable)" >&2
+        echo "       Check path 2: $env_script_path_new (does not exist or is not executable)" >&2
+    fi
+fi
 
 CURRENT_DIR=$(pwd)
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)

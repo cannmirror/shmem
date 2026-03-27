@@ -228,11 +228,11 @@ function run_all()
     run_allgather_matmul_padding || return 3
     run_allgather_matmul_with_gather_result || return 4
     #run_dispatch_gmm_combine || return 5
-    #run_dynamic_tiling || return 6
+    run_dynamic_tiling || return 6
     run_kv_shuffle || return 7
-    #run_matmul_allreduce || return 8
-    #run_matmul_reduce_scatter || return 9
-    #run_matmul_reduce_scatter_padding || return 10
+    run_matmul_allreduce || return 8
+    run_matmul_reduce_scatter || return 9
+    run_matmul_reduce_scatter_padding || return 10
     # run_rdma_demo || return 11
     # run_unuse_handlewait || return 12
     # run_use_handlewait || return 13

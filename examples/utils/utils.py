@@ -45,14 +45,14 @@ class DataType(IntEnum):
 
 def tensor_to_file(tensor: torch.Tensor, file_name: str) -> None:
     if tensor.dtype == torch.bfloat16:
-        tensor.view(torch.uint16).numpy().tofile(file_name)
+        tensor.to(torch.float32).numpy().tofile(file_name)
     else:
         tensor.numpy().tofile(file_name)
 
 
 def tensor_from_file(file_name: str, dtype: torch.dtype) -> torch.Tensor:
     if dtype == torch.bfloat16:
-        return torch.from_numpy(np.fromfile(file_name, dtype=np.float16)).view(torch.bfloat16)
+        return torch.from_numpy(np.fromfile(file_name, dtype=np.float32)).to(torch.bfloat16)
     else:
         numpy_dtype = torch.empty(0, dtype=dtype).numpy().dtype
         return torch.from_numpy(np.fromfile(file_name, numpy_dtype))

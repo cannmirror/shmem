@@ -22,6 +22,15 @@ cd examples/init
 bash run.sh -mode default -pesize 2
 ```
 
+**mpi，uid流程执行前需要自行安装并导入MPI环境变量**[安装参考](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/hccltool/HCCLpertest_16_0002.html)
+该用例基于mpich实现，安装Open MPI或其他MPI如果遇到报错可能需要自行调整脚本中mpi相关参数。
+
+```bash
+# mpich安装在默认路径时可参考，需根据实际情况替换。
+export PATH=/usr/local/mpich/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
+```
+
 执行 mpi 流程，2 pe
 ```bash
 bash run.sh -mode mpi -pesize 2
@@ -30,14 +39,6 @@ bash run.sh -mode mpi -pesize 2
 执行 uid 流程，2 pe
 ```bash
 bash run.sh -mode uid -pesize 2
-```
-
-2，3流程执行前需要自行安装并导入MPI环境变量
-
-```bash
-# mpich安装在默认路径时可参考，需根据实际情况替换。
-export PATH=/usr/local/mpich/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
 ```
 
 ##### 3. 跨机运行

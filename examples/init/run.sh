@@ -162,22 +162,33 @@ case "$MODE" in
             mpirun -f hostfile ./build/bin/"${EXECUTABLE_NAME}" "$GNPU_NUM"
         else
             echo "No hostfile found, run mpirun without hostfile"
-            mpirun -np "$NUM_PROCESSES" ./build/bin/"${EXECUTABLE_NAME}" "NUM_PROCESSES"
+            mpirun -np "$NUM_PROCESSES" ./build/bin/"${EXECUTABLE_NAME}" "$NUM_PROCESSES"
+        fi
+        if [ $? -ne 0 ]; then
+            echo "=== Execution failed (mode: ${MODE}, pesize: ${NUM_PROCESSES})! ==="
+            exit 1
         fi
         ;;
     default)
+        pids=()
         for (( idx=0; idx < GNPU_NUM; idx++ )); do
             echo "Starting process $idx/$NUM_PROCESSES..."
             ./build/bin/"${EXECUTABLE_NAME}" "$idx" "$NUM_PROCESSES" "${IPPORT}" "$GNPU_NUM" "$FIRST_PE" "$FIRST_NPU" &
+            pids+=($!)
         done
-        wait
+        all_success=true
+        for pid in "${pids[@]}"; do
+            wait "$pid"
+            if [ $? -ne 0 ]; then
+                all_success=false
+            fi
+        done
         echo "=== All processes completed ==="
+        if [ "$all_success" = false ]; then
+            echo "=== Execution failed (mode: ${MODE}, pesize: ${NUM_PROCESSES})! ==="
+            exit 1
+        fi
         ;;
 esac
 
-if [ $? -eq 0 ]; then
-    echo "=== Execution succeeded (mode: ${MODE}, pesize: ${NUM_PROCESSES})! ==="
-else
-    echo "=== Execution failed (mode: ${MODE}, pesize: ${NUM_PROCESSES})! ==="
-    exit 1
-fi
+echo "=== Execution succeeded (mode: ${MODE}, pesize: ${NUM_PROCESSES})! ==="

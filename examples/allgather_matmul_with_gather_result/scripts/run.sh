@@ -49,7 +49,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r M K N; do
     wait
 
     # Verify output
-    python3 ${UTILS_PATH}/verify_result.py ${DATA_DIR}/aclshmem_output.bin ${DATA_DIR}/golden.bin 1 ${M} ${N} ${K}
+    python3 ${UTILS_PATH}/verify_result.py ${DATA_DIR}/aclshmem_output.bin ${DATA_DIR}/golden.bin 1 ${M} ${N} ${K} ${DATA_DIR}/torch_output.bin
     if [[ $? -ne 0 ]]; then
         exit 1
     fi

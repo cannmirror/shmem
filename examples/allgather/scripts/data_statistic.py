@@ -63,10 +63,12 @@ def get_pref_path(path):
 
 
 def process_kernel_data():
-    tiling_df = open_input_file(os.path.join(os.getcwd(), "./results.csv"))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    tiling_df = open_input_file(os.path.join(parent_dir, "results.csv"))
     print(tiling_df)
 
-    pref_file_list = get_pref_path("./output")
+    pref_file_list = get_pref_path(os.path.join(parent_dir, "output"))
     print(pref_file_list)
 
     case_num = len(tiling_df)
@@ -80,7 +82,7 @@ def process_kernel_data():
 
     perf_output = perf_output / len(pref_file_list)
     tiling_df['Time(us)'] = perf_output
-    tiling_df.to_csv("./result.csv", index=False)
+    tiling_df.to_csv(os.path.join(parent_dir, "result.csv"), index=False)
 
 if __name__ == '__main__':
     process_kernel_data()

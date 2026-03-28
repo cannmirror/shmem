@@ -22,7 +22,7 @@ from setuptools.command.build_py import build_py
 
 # 消除whl压缩包的时间戳差异
 os.environ['SOURCE_DATE_EPOCH'] = '0'
-current_version = os.getenv('VERSION', '1.0.0')
+current_version = os.getenv('VERSION', '1.3.0')
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):

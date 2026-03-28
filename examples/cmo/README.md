@@ -87,7 +87,7 @@ ACLSHMEM_DEVICE void aclshmemx_sdma_quiet(AscendC::LocalTensor<T> &buf, uint32_t
 ```bash
 cd shmem/
 bash scripts/build.sh -package
-./install/*/SHMEM_1.0.0_linux-*.run --install
+./install/*/SHMEM_1.3.0_linux-*.run --install
 source install/set_env.sh
 ```
 

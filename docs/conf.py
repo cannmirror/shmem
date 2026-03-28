@@ -28,7 +28,7 @@ except subprocess.CalledProcessError:
 PROJECT = "SHMEM Guidebook"
 AUTHOR = "Ascend"
 COPYRIGHT_INFO = " 2025 Huawei Technologies Co., Ltd."
-RELEASE = "1.0.0"
+RELEASE = "1.3.0"
 HTML_SHOW_SPHINX = False
 
 project = PROJECT 

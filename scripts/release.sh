@@ -62,7 +62,7 @@ set -e
 CURRENT_DIR=$(pwd)
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
-VERSION="1.0.0"
+VERSION="1.3.0"
 OUTPUT_DIR=$PROJECT_ROOT/install
 THIRD_PARTY_DIR=$PROJECT_ROOT/3rdparty
 RELEASE_DIR=$PROJECT_ROOT/ci/release

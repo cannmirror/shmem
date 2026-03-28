@@ -109,11 +109,11 @@ source install/set_env.sh
 软件包格式：```SHMEM_{version}_linux-{arch}.run```
 ```bash
 # 权限配置与校验
-chmod +x SHMEM_1.0.0_linux-aarch64.run
-./SHMEM_1.0.0_linux-aarch64.run --check
+chmod +x SHMEM_1.3.0_linux-aarch64.run
+./SHMEM_1.3.0_linux-aarch64.run --check
 
 # 安装（默认路径：/usr/local/Ascend/shmem）
-./SHMEM_1.0.0_linux-aarch64.run --install
+./SHMEM_1.3.0_linux-aarch64.run --install
 
 # 配置环境变量
 source /usr/local/Ascend/shmem/latest/set_env.sh

@@ -237,7 +237,7 @@ int copy_test(aclrtStream stream,
     size_t res_size = sizeof(float) * 2048;
     CHECK_RET(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST));
     void *res_host;
-    aclrtMallocHost((void **)(&res_host), res_size);
+    CHECK_RET(aclrtMallocHost((void **)(&res_host), res_size));
 
     uint32_t is_device_block_prefetch = 0;
     if (prefetch_type == CMOEXAMPLE::NO_PREFETCH) {
@@ -281,13 +281,13 @@ int copy_test(aclrtStream stream,
 #if defined(ENABLE_ASCENDC_DUMP)
     Adx::AdumpPrintWorkSpace(device_dump, ALL_DUMPSIZE, stream, "cmo");
 #endif
-    CHECK_RET(aclrtFree(trash_gm_ptr));
-    CHECK_RET(aclrtFree(cache_gm_ptr));
+    CHECK_RET(aclrtFreeWithDevSync(trash_gm_ptr));
+    CHECK_RET(aclrtFreeWithDevSync(cache_gm_ptr));
 #if defined(ENABLE_ASCENDC_DUMP)
-    CHECK_RET(aclrtFree(device_dump));
+    CHECK_RET(aclrtFreeWithDevSync(device_dump));
 #endif
-    CHECK_RET(aclrtFree(res_ptr));
-    CHECK_RET(aclrtFree(res_host));
+    CHECK_RET(aclrtFreeWithDevSync(res_ptr));
+    CHECK_RET(aclrtFreeHost(res_host));
 
     return 0;
 }

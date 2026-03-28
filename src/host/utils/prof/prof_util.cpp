@@ -71,7 +71,7 @@ void prof_data_print(aclshmem_prof_pe_t *host_profs, aclshmem_device_host_state_
                      aclshmem_prof_pe_t **out_profs, bool verbose)
 {
     if (host_profs->pe_id != global_state->mype) {
-        SHM_LOG_INFO("not collect profoling data on this rank, skip print.");
+        SHM_LOG_INFO("not collect profiling data on this rank, skip print.");
         return;
     }
     

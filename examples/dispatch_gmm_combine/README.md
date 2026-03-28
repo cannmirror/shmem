@@ -20,10 +20,16 @@
    - `transB` 权重矩阵是否转置，默认为0。
 
    2.2 - **执行生成脚本**:
+   
+   该步骤会在scripts/run.sh中自动执行，无需单独执行。
    ```bash
    cd examples/dispatch_gmm_combine
+   # 基于cpu实现
    python3 utils/gen_data.py
+   # 基于torch-npu实现（默认用gen_data.py生成的输入）
+   python3 utils/gen_data_by_torch_npu.py
    ```
+   注：运行用例需安装torch-npu
 
 3. **运行Dispatch-Gmm-Combine示例程序**
    进入示例目录并执行运行脚本，参数同config中的保持一致：
@@ -41,9 +47,6 @@
 4. **运行示例**
    ```bash
    # 先将配置写入config.ini
-   cd examples/dispatch_gmm_combine
-   python3 utils/gen_data.py
-
    cd examples/dispatch_gmm_combine
    bash ./scripts/run.sh -pes 2 -M 64 -K 7168 -N 4096 -expertPerPe 2 -dataType 2 -weightNz 1 -transB 0
    ```

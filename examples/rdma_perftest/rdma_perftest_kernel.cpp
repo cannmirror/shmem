@@ -119,8 +119,7 @@ extern "C" __global__ __aicore__ void rdma_highlevel_put_bw(uint64_t fftsConfig,
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
     pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint32_t> ubLocal32 = buf.GetWithOffset<uint32_t>(UB_ALIGN_SIZE / sizeof(uint32_t), 0);
-    AscendC::LocalTensor<uint64_t> ubLocal64 = buf.GetWithOffset<uint64_t>(UB_ALIGN_SIZE / sizeof(uint64_t), UB_ALIGN_SIZE);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64, 0);
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();
@@ -134,7 +133,7 @@ extern "C" __global__ __aicore__ void rdma_highlevel_put_bw(uint64_t fftsConfig,
         for (int i = 0; i < 10000; i++) {
             aclshmem_uint8_put_nbi(src_addr, src_addr, message_length, peer);
         }
-        aclshmemi_roce_quiet(peer, 0, ubLocal64, ubLocal32, 0);
+        aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
         aclshmem_uint8_put_nbi(gva + rank_size * message_length + 8, src_addr, sizeof(uint32_t), peer);
         while (*(__gm__ uint32_t*)(gva + message_length * rank_size + 16) != peer + MAGIC_VAL) {
             dcci_cachelines(gva + message_length * rank_size + 16, 8);
@@ -160,14 +159,10 @@ void rdma_highlevel_put_bw_do(uint32_t block_dim, void* stream, uint64_t fftsCon
 
 extern "C" __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length, int64_t iter) {
     util_set_ffts_config(fftsConfig);
-    AscendC::LocalTensor<uint32_t> ubLocal32;
-    ubLocal32.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
-    ubLocal32.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR);
-    ubLocal32.address_.dataLen = UB_ALIGN_SIZE;
-    AscendC::LocalTensor<uint64_t> ubLocal64;
-    ubLocal64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
-    ubLocal64.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR + UB_ALIGN_SIZE);
-    ubLocal64.address_.dataLen = UB_ALIGN_SIZE;
+    AscendC::LocalTensor<uint32_t> ubLocal;
+    ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
+    ubLocal.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR);
+    ubLocal.address_.dataLen = UB_ALIGN_SIZE_64;
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();
@@ -180,10 +175,10 @@ extern "C" __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_AD
             peer = 1;
             int64_t start = AscendC::GetSystemCycle();
             for (int i = 0; i < 10000; i++) {
-                aclshmemi_roce_write((GM_ADDR)aclshmem_roce_ptr(src_addr, peer), src_addr, peer, 0, message_length, ubLocal64, ubLocal32, 0);
+                aclshmemx_roce_put_nbi(src_addr, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), message_length, peer, 0);
             }
-            aclshmemi_roce_quiet(peer, 0, ubLocal64, ubLocal32, 0);
-            aclshmemi_roce_write((GM_ADDR)aclshmem_roce_ptr(gva + rank_size * message_length * 2 + 8, peer), src_addr, peer, 0, sizeof(int64_t), ubLocal64, ubLocal32, 0);
+            aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
+            aclshmemx_roce_put_nbi(gva + rank_size * message_length * 2 + 8, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), sizeof(int64_t), peer, 0);
             while (*(__gm__ int64_t*)(gva + message_length * rank_size * 2 + 16) != peer + MAGIC_VAL + iter) {
                 dcci_cachelines(gva + message_length * rank_size * 2 + 16, 8);
                 AscendC::GetSystemCycle();
@@ -198,7 +193,7 @@ extern "C" __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_AD
                 AscendC::GetSystemCycle();
             }
             AscendC::PipeBarrier<PIPE_ALL>();
-            aclshmemi_roce_write((GM_ADDR)aclshmem_roce_ptr(gva + rank_size * message_length * 2 + 16, peer), src_addr, peer, 0, sizeof(int64_t), ubLocal64, ubLocal32, 0);
+            aclshmemx_roce_put_nbi(gva + rank_size * message_length * 2 + 16, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), sizeof(int64_t), peer, 0);
         }
     } else { // core 1, MTE
         GM_ADDR src_addr = gva + (rank + rank_size) * message_length;

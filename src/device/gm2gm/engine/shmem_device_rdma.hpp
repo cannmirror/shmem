@@ -526,4 +526,28 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(AscendC::GlobalTensor<T> dst, Ascend
         elem_size * sizeof(T), ub_tensor_64, ub_tensor_32, sync_id);
 }
 
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_roce_quiet(uint32_t pe, __ubuf__ T* buf, uint32_t sync_id) {
+    __gm__ ACLSHMEMAIVRDMAInfo* RDMAInfo = aclshmemi_qp_info_fetch();
+    uint32_t qpNum = RDMAInfo->qpNum;
+
+    AscendC::LocalTensor<uint32_t> ub_tensor_32;
+    ub_tensor_32.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
+    ub_tensor_32.address_.bufferAddr = reinterpret_cast<uint64_t>(buf);
+    ub_tensor_32.address_.dataLen = UB_ALIGN_SIZE;
+    AscendC::LocalTensor<uint64_t> ub_tensor_64;
+    ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
+    ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf) + UB_ALIGN_SIZE;
+    ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
+
+    for (uint32_t qpIdx = 0; qpIdx < qpNum; qpIdx++) {
+        __gm__ ACLSHMEMWQCtx* qpCtxEntry = (__gm__ ACLSHMEMWQCtx*)(RDMAInfo->sqPtr
+            + (pe * qpNum + qpIdx) * sizeof(ACLSHMEMWQCtx));
+        auto curHardwareHeadAddr = qpCtxEntry->headAddr;
+        dcci_cachelines((__gm__ uint8_t*)curHardwareHeadAddr, 8);
+        uint32_t curHead = *(__gm__ uint32_t*)(curHardwareHeadAddr);
+        aclshmemi_roce_poll_cq(pe, qpIdx, curHead, ub_tensor_64, ub_tensor_32, sync_id);
+    }
+}
+
 #endif

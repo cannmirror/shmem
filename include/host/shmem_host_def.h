@@ -104,9 +104,9 @@ enum aclshmem_error_code_t : int {
  * @brief init flags
 */
 enum aclshmemx_bootstrap_t : int {
-    ACLSHMEMX_INIT_WITH_DEFAULT = 1 << 0,
-    ACLSHMEMX_INIT_WITH_MPI = 1 << 1,
-    ACLSHMEMX_INIT_WITH_UNIQUEID = 1 << 3,
+    ACLSHMEMX_INIT_WITH_DEFAULT = 1 << 0,  ///< Default mode: Priority is ipport > uid (comm_args), if neither provided returns error
+    ACLSHMEMX_INIT_WITH_MPI = 1 << 1,      ///< MPI mode
+    ACLSHMEMX_INIT_WITH_UNIQUEID = 1 << 3,   ///< Unique ID mode
     ACLSHMEMX_INIT_MAX = 1 << 31
     
 };

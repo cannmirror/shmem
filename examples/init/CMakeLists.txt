@@ -94,8 +94,16 @@ elseif(RUN_MODE STREQUAL "3")
     set(EXECUTABLE_NAME "init_examples")
     set(COMPILE_DEF "RUN_WITH_UNIQUEID")
     set(NEED_MPI "ON")
+elseif(RUN_MODE STREQUAL "5")
+    find_package(MPI REQUIRED)
+    include_directories(
+        ${MPI_INCLUDE_PATH}
+    )
+    set(EXECUTABLE_NAME "init_examples")
+    set(COMPILE_DEF "RUN_UNIQUEID_WITH_DEFAULT")
+    set(NEED_MPI "ON")
 else()
-    message(FATAL_ERROR "Invalid RUN_MODE! Only 1/2/3 are allowed.")
+    message(FATAL_ERROR "Invalid RUN_MODE! Only 1/2/3/5 are allowed.")
 endif()
 
 add_executable(init_examples main.cpp)

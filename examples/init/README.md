@@ -2,6 +2,15 @@
 
 #### 1. 编译项目
 
+**default以外的流程执行需要自行安装并导入MPI环境变量**[安装参考](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/hccltool/HCCLpertest_16_0002.html)
+该用例基于mpich实现，安装Open MPI或其他MPI如果遇到报错可能需要自行调整脚本中mpi相关参数。
+
+```bash
+# mpich安装在默认路径时可参考，需根据实际情况替换。
+export PATH=/usr/local/mpich/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
+```
+
 在 `shmem/` 根目录下执行编译脚本：
 
 ```bash
@@ -38,6 +47,11 @@ bash run.sh -mode uid -pesize 2
 # mpich安装在默认路径时可参考，需根据实际情况替换。
 export PATH=/usr/local/mpich/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
+```
+
+执行 uid_default 流程，2 pe
+```bash
+bash run.sh -mode uid_default -pesize 2
 ```
 
 ##### 3. 跨机运行

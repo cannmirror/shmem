@@ -113,9 +113,12 @@ case "$MODE" in
     uid)
         MODE_ID=3
         ;;
+    uid_default)
+        MODE_ID=5
+        ;;
     *)
-        echo "Error: Invalid mode '$MODE'! Only 'default'/'mpi'/'uid' are allowed"
-        echo "Usage: $0 [-mode <default|mpi|uid>] [-pesize <num>]"
+        echo "Error: Invalid mode '$MODE'! Only 'default'/'mpi'/'uid'/'uid_default' are allowed"
+        echo "Usage: $0 [-mode <default|mpi|uid|uid_default>] [-pesize <num>]"
         exit 1
         ;;
 esac
@@ -156,7 +159,7 @@ echo "=== Launch executable (mode: ${MODE}, pesize: ${NUM_PROCESSES}) ==="
 
 
 case "$MODE" in
-    mpi|uid)
+    mpi|uid|uid_default)
         if [ -f "hostfile" ]; then
             echo "Found hostfile, run mpirun with -f hostfile"
             mpirun -f hostfile ./build/bin/"${EXECUTABLE_NAME}" "$GNPU_NUM"

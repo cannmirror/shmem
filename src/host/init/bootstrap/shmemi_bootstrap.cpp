@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include "shmemi_host_common.h"
+#include "shmemi_host_def.h"
 #include "dlfcn.h"
 #include <limits.h>
 #include <cstdio>
@@ -177,9 +178,21 @@ void remove_tcp_prefix_and_copy(const char* input, char* output, size_t output_l
     output[output_len - 1] = '\0';
 }
 
+static bool is_uid_args_valid(void *arg)
+{
+    if (arg == nullptr) {
+        return false;
+    }
+    aclshmemi_bootstrap_uid_state_t *uid_args = (aclshmemi_bootstrap_uid_state_t *)arg;
+    struct sockaddr *sa = reinterpret_cast<struct sockaddr *>(&uid_args->addr.addr);
+    SHM_LOG_INFO("uid_args sa_family: " << sa->sa_family);
+    return sa->sa_family == AF_INET || sa->sa_family == AF_INET6;
+}
+
 int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
     int32_t status = ACLSHMEM_SUCCESS;
     void *arg;
+    
     g_boot_handle.use_attr_ipport = false;
     if (flags & ACLSHMEMX_INIT_WITH_UNIQUEID) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_UNIQUEID");
@@ -187,7 +200,7 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         arg = (attr != NULL) ? attr->comm_args : NULL;
         g_boot_handle.mype = attr->my_pe;
         g_boot_handle.npes = attr->n_pes;
-        if (arg == nullptr) {
+        if (!is_uid_args_valid(arg)) {
             SHM_LOG_ERROR("BootStrap UID Mode Must Have UID !");
             return ACLSHMEM_INVALID_PARAM;
         }
@@ -199,18 +212,23 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_DEFAULT");
         plugin_name = BOOTSTRAP_MODULE_CONFIG_STORE;
         arg = (attr != NULL) ? attr->comm_args : NULL;
-        g_boot_handle.use_attr_ipport = true;
         g_boot_handle.mype = attr->my_pe;
         g_boot_handle.npes = attr->n_pes;
-        if (attr->ip_port[0] == '\0') {
-            SHM_LOG_ERROR("BootStrap Default Mode Must Set Ipport !");
-            return ACLSHMEM_INVALID_PARAM;
-        } else {
+        
+        // Priority: ipport > uid (comm_args), if neither provided returns error
+        if (attr->ip_port[0] != '\0') {
+            g_boot_handle.use_attr_ipport = true;
             g_boot_handle.sockFd = attr->option_attr.sockFd;
             g_boot_handle.timeOut = attr->option_attr.shm_init_timeout;
             g_boot_handle.timeControlOut = attr->option_attr.control_operation_timeout;
             strncpy(g_boot_handle.ipport, attr->ip_port, sizeof(g_boot_handle.ipport) - 1);
             g_boot_handle.ipport[sizeof(g_boot_handle.ipport) - 1] = '\0';
+        } else if (is_uid_args_valid(arg)) {
+            SHM_LOG_WARN("Using default mode but ipport parameter not provided, try to use comm_args.");
+            g_boot_handle.use_attr_ipport = false;
+        } else {
+            SHM_LOG_ERROR("Using default mode but ipport parameter not provided and comm_args is not initialized.");
+            return ACLSHMEM_INVALID_PARAM;
         }
     } else {
         SHM_LOG_ERROR("Unknown Type for bootstrap");

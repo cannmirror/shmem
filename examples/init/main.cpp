@@ -15,7 +15,7 @@
 #include <acl/acl.h>
 #include "shmem.h"
 
-#if defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_MPI)
+#if defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_MPI) || defined(RUN_UNIQUEID_WITH_DEFAULT)
 #include <mpi.h>
 #endif
 
@@ -50,6 +50,61 @@ int run_main(int argc, char* argv[]) {
                                                 local_mem_size, 
                                                 &uid, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
+
+    if (status != ACLSHMEM_SUCCESS) {
+        std::cout << "[ERROR] pe " << pe << ": demo run failed!" << std::endl;
+        aclrtResetDevice(pe);
+        aclFinalize();
+        MPI_Finalize();
+        return 1;
+    }
+    std::cout << "pe " << pe << ": shmem init SUCCESS" << std::endl;
+
+    status = shmem_finalize();
+    aclrtResetDevice(pe);
+    aclFinalize();
+    MPI_Finalize();
+    if (status != ACLSHMEM_SUCCESS) {
+        std::cout << "[ERROR] pe " << pe << ": demo run failed!" << std::endl;
+        return 1;
+    } else {
+        std::cout << "[SUCCESS] pe " << pe << ": demo run success!" << std::endl;
+        return 0;
+    }
+}
+#endif
+
+#ifdef RUN_UNIQUEID_WITH_DEFAULT
+int run_main(int argc, char* argv[]) {
+    if (argc < 1) {
+        std::cerr << "Usage: " << argv[0] << " <pe> <pe_size>" << std::endl;
+        return 1;
+    }
+    MPI_Init(nullptr, nullptr);
+    int g_npu = atoi(argv[1]);
+    int pe;
+    int pe_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &pe);
+    MPI_Comm_size(MPI_COMM_WORLD, &pe_size);
+    int status = ACLSHMEM_SUCCESS;
+    
+    aclInit(nullptr);
+    int device_id = pe % g_npu;
+    aclrtSetDevice(device_id);
+    
+    aclshmemx_init_attr_t attributes;
+    aclshmemx_uniqueid_t uid = ACLSHMEM_UNIQUEID_INITIALIZER;
+    
+    int64_t local_mem_size = 1024 * 1024 * 1024;
+    if (pe == 0) {
+        status = aclshmemx_get_uniqueid(&uid);
+    }
+
+    MPI_Bcast(&uid, sizeof(aclshmemx_uniqueid_t), MPI_UINT8_T, 0, MPI_COMM_WORLD);
+    status = aclshmemx_set_attr_uniqueid_args(pe, pe_size, 
+                                                local_mem_size, 
+                                                &uid, &attributes);
+    status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
     if (status != ACLSHMEM_SUCCESS) {
         std::cout << "[ERROR] pe " << pe << ": demo run failed!" << std::endl;
@@ -198,10 +253,10 @@ int main(int main_argc, char* main_argv[]) {
     int status = ACLSHMEM_SUCCESS;
     #ifdef RUN_WITH_DEFAULT
         status = run_main(main_argc, main_argv);
-    #elif defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_MPI)
+    #elif defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_MPI) || defined(RUN_UNIQUEID_WITH_DEFAULT)
         status = run_main(main_argc, main_argv);
     #else
-        std::cerr << "Error: Please define one of RUN_WITH_UNIQUEID/RUN_WITH_MPI/RUN_WITH_DEFAULT" << std::endl;
+        std::cerr << "Error: Please define one of RUN_WITH_UNIQUEID/RUN_WITH_MPI/RUN_WITH_DEFAULT/RUN_UNIQUEID_WITH_DEFAULT" << std::endl;
         return 1;
     #endif
     return status;

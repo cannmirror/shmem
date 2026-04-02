@@ -62,10 +62,12 @@ Result HybmVmmBasedSegment::ReserveMemorySpace(void **address) noexcept
     }
 
     void *base = nullptr;
+    uint64_t expectSt = HYBM_GVM_START_ADDR;
     size_t reserveAlignedSize = ALIGN_UP(options_.size, DEVMM_HEAP_SIZE);
     size_t totalReservedSize = options_.rankCnt * reserveAlignedSize;
-
-    auto ret = aclrtReserveMemAddress(&base, totalReservedSize, 0, nullptr, 1);
+    uint64_t flag = MEM_RSV_TYPE_REMOTE_MAP;
+    flag |= options_.shared ? MEM_RSV_TYPE_DEVICE_SHARE : 0U;
+    auto ret = DlHalApi::HalMemAddressReserve(&base, totalReservedSize, 0, reinterpret_cast<void *>(expectSt), flag);
     if (ret != 0 || base == nullptr) {
         SHM_LOG_ERROR("prepare virtual memory total size(" << totalReservedSize << ") failed. ret: " << ret);
         return ACLSHMEM_MALLOC_FAILED;
@@ -97,7 +99,7 @@ Result HybmVmmBasedSegment::UnReserveMemorySpace() noexcept
     allocatedSize_ = 0;
     sliceCount_ = 0;
     if (globalVirtualAddress_ != nullptr) {
-        aclrtReleaseMemAddress(reinterpret_cast<void *>(globalVirtualAddress_));
+        DlHalApi::HalMemAddressFree(reinterpret_cast<void *>(globalVirtualAddress_));
         reservedVirtualAddresses_.clear();
         totalVirtualSize_ = 0;
         globalVirtualAddress_ = nullptr;

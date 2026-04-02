@@ -71,7 +71,6 @@ def worker(pe):
     load_torch_library('aclshmem_torch.so')
     aclshmem_common = torch.classes.ShmemOps.Manager()
     torch_npu.npu.set_device(pe)
-    stream = torch_npu.npu.Stream(device=f'npu:{torch_npu.npu.current_device()}')
     local_mem_size = 1024 * 1024 * 1024
     ipports = "tcp://127.0.0.1:8662"
     aclshmem_common.attr_init(pe, PES, local_mem_size, ipports)
@@ -81,43 +80,46 @@ def worker(pe):
 
     data = gen_allgather_data(pe)
     local_input_npu = data.local_input.npu(non_blocking=True)
-    aclshmem_output = torch.empty(OUTPUT_SHAPE, dtype=DTYPE, device=f'npu:{torch_npu.npu.current_device()}')
-    aclshmem_output.zero_() 
+    aclshmem_output = torch.zeros(OUTPUT_SHAPE, dtype=DTYPE).npu(device=f'npu:{torch_npu.npu.current_device()}')
+    torch_npu.npu.synchronize()
 
-   
-    experimental_config = torch_npu.profiler._ExperimentalConfig(
-        export_type=torch_npu.profiler.ExportType.Text,
-        profiler_level=torch_npu.profiler.ProfilerLevel.Level2,
-        msprof_tx=False,
-        aic_metrics=torch_npu.profiler.AiCMetrics.AiCoreNone,
-        l2_cache=False,
-        op_attr=False,
-        data_simplification=False,
-        record_op_args=False
-    )
+    if TOOL == 1:
+        experimental_config = torch_npu.profiler._ExperimentalConfig(
+            export_type=torch_npu.profiler.ExportType.Text,
+            profiler_level=torch_npu.profiler.ProfilerLevel.Level2,
+            msprof_tx=False,
+            aic_metrics=torch_npu.profiler.AiCMetrics.AiCoreNone,
+            l2_cache=False,
+            op_attr=False,
+            data_simplification=False,
+            record_op_args=False
+        )
 
-    with torch_npu.profiler.profile(
-        activities=[
-            torch_npu.profiler.ProfilerActivity.CPU,
-            torch_npu.profiler.ProfilerActivity.NPU
-            ],
-        schedule=torch_npu.profiler.schedule(wait=0, warmup=0, active=1, repeat=1, skip_first=0),
-        on_trace_ready=torch_npu.profiler.tensorboard_trace_handler("./result"),
-        record_shapes=True,
-        profile_memory=True,
-        with_stack=True,
-        with_modules=False,
-        with_flops=False,
-        experimental_config=experimental_config
-    ) as prof:
+        with torch_npu.profiler.profile(
+            activities=[
+                torch_npu.profiler.ProfilerActivity.CPU,
+                torch_npu.profiler.ProfilerActivity.NPU
+                ],
+            schedule=torch_npu.profiler.schedule(wait=0, warmup=0, active=1, repeat=1, skip_first=0),
+            on_trace_ready=torch_npu.profiler.tensorboard_trace_handler("./result"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+            with_modules=False,
+            with_flops=False,
+            experimental_config=experimental_config) as prof:
 
-        with torch_npu.npu.stream(stream):
             for _ in range(10):
                 allgather.compute(aclshmem_output, local_input_npu)
-            stream.synchronize()
-            prof.step()
+                torch_npu.npu.synchronize()
+                prof.step()
+    elif TOOL == 0:
+        allgather.compute(aclshmem_output, local_input_npu)
+        torch_npu.npu.synchronize()
+    else:
+        print("Unknown tool, exiting...")
+        return
 
-    print(f"PE {pe} start result check...")
     npu_output_cpu = aclshmem_output.cpu()
 
     is_correct = torch.equal(npu_output_cpu, data.golden_output)
@@ -132,13 +134,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Allgather")
 
     parser.add_argument(
+        "--tool",
+        type=int,
+        default=0
+    )
+    parser.add_argument(
         "--pes",
         type=int,
         default=8
     )
 
     args = parser.parse_args()
-
+    
+    TOOL = args.tool
     PES = args.pes
     OUTPUT_SHAPE = (PES,) + INPUT_SHAPE
 

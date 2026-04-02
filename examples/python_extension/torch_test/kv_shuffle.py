@@ -213,7 +213,6 @@ def worker(pe):
     load_torch_library('aclshmem_torch.so')
     aclshmem_common = torch.classes.ShmemOps.Manager()
     torch_npu.npu.set_device(pe)
-    stream = torch_npu.npu.Stream(device=f'npu:{torch_npu.npu.current_device()}')
     local_mem_size = 1024 * 1024 * 1024
     ipports = "tcp://127.0.0.1:8662"
     aclshmem_common.attr_init(pe, PES, local_mem_size, ipports)
@@ -269,23 +268,18 @@ def worker(pe):
             with_flops=False,
             experimental_config=experimental_config) as prof:
 
-            with torch_npu.npu.stream(stream):
-                for _ in range(10):
-                    kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
-                                    aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
-                stream.synchronize()
+            for _ in range(10):
+                kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
+                                aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
+                torch_npu.npu.synchronize() 
                 prof.step()
     elif TOOL == 0:
-         with torch_npu.npu.stream(stream):
-                kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
-                                aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
-                stream.synchronize()
+        kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
+                        aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
+        torch_npu.npu.synchronize() 
     else:
-        print("Unknown tool, Running without any tools!")
-        with torch_npu.npu.stream(stream):
-                kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
-                                aclshmem_v_cache_tensor, src_block_tensor, dst_block_tensor)
-                stream.synchronize()
+        print("Unknown tool, exiting...")
+        return 
     
     print("pe: ", pe, " kv_shuffle end !!!!")
     npu_tensork = aclshmem_k_cache_tensor.cpu()

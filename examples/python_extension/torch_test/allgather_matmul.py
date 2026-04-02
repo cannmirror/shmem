@@ -80,7 +80,6 @@ def worker(pe):
     
     aclshmem_common = torch.classes.ShmemOps.Manager()
     torch_npu.npu.set_device(pe)
-    stream = torch_npu.npu.Stream(device=f'npu:{torch_npu.npu.current_device()}')
     local_mem_size = 1024 * 1024 * 1024
     ipports = "tcp://127.0.0.1:8662"
     aclshmem_common.attr_init(pe, PES, local_mem_size, ipports)
@@ -92,37 +91,43 @@ def worker(pe):
     tensor_a_npu = data.tensor_a.npu(non_blocking=True)
     tensor_b_npu = data.tensor_b.npu(non_blocking=True)
     
-    tensor_c_npu = torch.empty(C_SHAPE, dtype=DTYPE, device=f'npu:{pe}')
-    tensor_c_npu.zero_()
+    tensor_c_npu = torch.zeros(C_SHAPE, dtype=DTYPE).npu(device=f'npu:{torch_npu.npu.current_device()}')
+    torch_npu.npu.synchronize()
 
-    experimental_config = torch_npu.profiler._ExperimentalConfig(
-        export_type=torch_npu.profiler.ExportType.Text,
-        profiler_level=torch_npu.profiler.ProfilerLevel.Level2,
-        msprof_tx=False,
-        aic_metrics=torch_npu.profiler.AiCMetrics.AiCoreNone,
-        l2_cache=False,
-        op_attr=False,
-        data_simplification=False,
-        record_op_args=False
-    )
+    if TOOL == 1:
+        experimental_config = torch_npu.profiler._ExperimentalConfig(
+            export_type=torch_npu.profiler.ExportType.Text,
+            profiler_level=torch_npu.profiler.ProfilerLevel.Level2,
+            msprof_tx=False,
+            aic_metrics=torch_npu.profiler.AiCMetrics.AiCoreNone,
+            l2_cache=False,
+            op_attr=False,
+            data_simplification=False,
+            record_op_args=False
+        )
 
-    with torch_npu.profiler.profile(
-        activities=[torch_npu.profiler.ProfilerActivity.CPU, torch_npu.profiler.ProfilerActivity.NPU],
-        schedule=torch_npu.profiler.schedule(wait=0, warmup=0, active=1, repeat=1, skip_first=0),
-        on_trace_ready=torch_npu.profiler.tensorboard_trace_handler("./allgather_matmul_result"),
-        record_shapes=True,
-        profile_memory=True,
-        with_stack=True,
-        with_modules=False,
-        with_flops=False,
-        experimental_config=experimental_config
-    ) as prof:
+        with torch_npu.profiler.profile(
+            activities=[torch_npu.profiler.ProfilerActivity.CPU, torch_npu.profiler.ProfilerActivity.NPU],
+            schedule=torch_npu.profiler.schedule(wait=0, warmup=0, active=1, repeat=1, skip_first=0),
+            on_trace_ready=torch_npu.profiler.tensorboard_trace_handler("./allgather_matmul_result"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+            with_modules=False,
+            with_flops=False,
+            experimental_config=experimental_config
+        ) as prof:
 
-        with torch_npu.npu.stream(stream):
             for _ in range(10):
                 allgather_matmul.compute(tensor_c_npu, tensor_a_npu, tensor_b_npu)
-            stream.synchronize()
-            prof.step()
+                torch_npu.npu.synchronize()
+                prof.step()
+    elif TOOL == 0:
+        allgather_matmul.compute(tensor_c_npu, tensor_a_npu, tensor_b_npu)
+        torch_npu.npu.synchronize()
+    else:
+        print("Unknown tool, exiting...")
+        return
 
     print(f"PE {pe} start ALLGATHER_MATMUL golden check...")
     tensor_c_cpu = tensor_c_npu.cpu()
@@ -141,13 +146,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AllgatherMatmul")
 
     parser.add_argument(
+        "--tool",
+        type=int,
+        default=0
+    )
+    parser.add_argument(
         "--pes",
         type=int,
         default=8
     )
 
     args = parser.parse_args()
-
+    
+    TOOL = args.tool
     PES = args.pes
     C_SHAPE = (PES * M, N)
 

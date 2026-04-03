@@ -5,7 +5,9 @@ shmem后续会适配[msprof算子调优工具](https://www.hiascend.com/document
 当前版本暂不支持，预计Q1支持。
 
 ## mssanitizer
-shmem已适配[mssanitizer内存检测工具](https://www.hiascend.com/document/detail/zh/mindstudio/830/ODtools/Operatordevelopmenttools/atlasopdev_16_0039.html)（暂不支持软同步竞争检测）
+shmem已适配[mssanitizer内存检测工具](https://www.hiascend.com/document/detail/zh/mindstudio/830/ODtools/Operatordevelopmenttools/atlasopdev_16_0039.html)，以下功能的相关接口暂不支持该工具的使用：
+- P2P同步接口暂不支持软同步竞争检测
+- SDMA/RDMA/UDMA相关接口和用例不支持使用mssanitizer进行内存检测
 
 **该功能依赖对应 CANN 版本能力，预计社区版 9.0.0-beta.2 支持**
 **提前尝鲜可自行编译[mssanitizer](https://gitcode.com/Ascend/mssanitizer?source_module=search_project)工具，并将编译产物替换CANN包内部`tools/mssanitizer`**

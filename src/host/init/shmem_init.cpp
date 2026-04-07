@@ -195,7 +195,8 @@ int32_t aclshmemi_signal_finalize()
 
 int32_t aclshmemi_signal_init()
 {
-    g_state.signal_addr = (uint64_t)aclshmem_malloc(ACLSHMEM_SIGNAL_SIZE);
+    constexpr size_t align_size = 512;
+    g_state.signal_addr = (uint64_t)aclshmem_malloc(align_size);
     if (g_state.signal_addr == 0) {
         SHM_LOG_ERROR("malloc signal failed.");
         return ACLSHMEM_INNER_ERROR;

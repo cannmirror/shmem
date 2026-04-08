@@ -10,19 +10,22 @@
 #include "shmemi_host_common.h"
 #include "shmemi_host_def.h"
 #include "dlfcn.h"
+#include <arpa/inet.h>
 #include <limits.h>
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 
 #define BOOTSTRAP_MODULE_MPI "aclshmem_bootstrap_mpi.so"
 #define BOOTSTRAP_MODULE_CONFIG_STORE "aclshmem_bootstrap_config_store.so"
-
+aclshmemi_bootstrap_handle_t g_boot_handle; 
+ 
+void *plugin_hdl = nullptr;
 #define BOOTSTRAP_PLUGIN_INIT_FUNC "aclshmemi_bootstrap_plugin_init"
 #define BOOTSTRAP_PLUGIN_PREINIT_FUNC "aclshmemi_bootstrap_plugin_pre_init"
 
-aclshmemi_bootstrap_handle_t g_boot_handle;
-
-void *plugin_hdl = nullptr;
 const char *plugin_name = nullptr;
 
 static bool get_current_so_dir(char *dir_buf, size_t buf_len)
@@ -189,10 +192,64 @@ static bool is_uid_args_valid(void *arg)
     return sa->sa_family == AF_INET || sa->sa_family == AF_INET6;
 }
 
+static bool is_valid_ip_port_url(const char *ip_port)
+{
+    if (ip_port == nullptr || ip_port[0] == '\0') {
+        return false;
+    }
+
+    constexpr const char *tcp_prefix = "tcp://";
+    constexpr const char *tcp6_prefix = "tcp6://";
+    constexpr long min_port = 1024;
+
+    std::string url(ip_port);
+    std::string ip;
+    std::string port_str;
+
+    if (url.rfind(tcp_prefix, 0) == 0) {
+        std::string endpoint = url.substr(strlen(tcp_prefix));
+        size_t colon_pos = endpoint.rfind(':');
+        if (colon_pos == std::string::npos || colon_pos == 0 || colon_pos == endpoint.size() - 1) {
+            return false;
+        }
+        ip = endpoint.substr(0, colon_pos);
+        port_str = endpoint.substr(colon_pos + 1);
+    } else if (url.rfind(tcp6_prefix, 0) == 0) {
+        std::string endpoint = url.substr(strlen(tcp6_prefix));
+        if (endpoint.size() < 4 || endpoint[0] != '[') {
+            return false;
+        }
+        size_t bracket_pos = endpoint.find(']');
+        if (bracket_pos == std::string::npos || bracket_pos + 2 >= endpoint.size() || endpoint[bracket_pos + 1] != ':') {
+            return false;
+        }
+        ip = endpoint.substr(1, bracket_pos - 1);
+        port_str = endpoint.substr(bracket_pos + 2);
+    } else {
+        return false;
+    }
+
+    if (ip.empty() || port_str.empty()) {
+        return false;
+    }
+
+    errno = 0;
+    char *end_ptr = nullptr;
+    long port = std::strtol(port_str.c_str(), &end_ptr, 10);
+    if (errno == ERANGE || end_ptr == nullptr || *end_ptr != '\0' || port <= min_port || port > UINT16_MAX) {
+        return false;
+    }
+
+    char addr_buf[sizeof(struct in6_addr)] = {0};
+    if (inet_pton(AF_INET, ip.c_str(), addr_buf) == 1) {
+        return true;
+    }
+    return inet_pton(AF_INET6, ip.c_str(), addr_buf) == 1;
+}
+
 int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
     int32_t status = ACLSHMEM_SUCCESS;
     void *arg;
-    
     g_boot_handle.use_attr_ipport = false;
     if (flags & ACLSHMEMX_INIT_WITH_UNIQUEID) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_UNIQUEID");
@@ -214,20 +271,23 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         arg = (attr != NULL) ? attr->comm_args : NULL;
         g_boot_handle.mype = attr->my_pe;
         g_boot_handle.npes = attr->n_pes;
-        
-        // Priority: ipport > uid (comm_args), if neither provided returns error
-        if (attr->ip_port[0] != '\0') {
+        if (is_valid_ip_port_url(attr->ip_port)) {
             g_boot_handle.use_attr_ipport = true;
             g_boot_handle.sockFd = attr->option_attr.sockFd;
             g_boot_handle.timeOut = attr->option_attr.shm_init_timeout;
             g_boot_handle.timeControlOut = attr->option_attr.control_operation_timeout;
             strncpy(g_boot_handle.ipport, attr->ip_port, sizeof(g_boot_handle.ipport) - 1);
             g_boot_handle.ipport[sizeof(g_boot_handle.ipport) - 1] = '\0';
+            SHM_LOG_INFO("Default bootstrap will use attr ip_port directly: " << g_boot_handle.ipport);
         } else if (is_uid_args_valid(arg)) {
-            SHM_LOG_WARN("Using default mode but ipport parameter not provided, try to use comm_args.");
+            SHM_LOG_INFO("BootStrap Default Mode got invalid ip_port: "
+                << (attr->ip_port[0] != '\0' ? attr->ip_port : "<empty>")
+                << ", fallback to UNIQUEID bootstrap args.");
             g_boot_handle.use_attr_ipport = false;
         } else {
-            SHM_LOG_ERROR("Using default mode but ipport parameter not provided and comm_args is not initialized.");
+            SHM_LOG_ERROR("BootStrap Default Mode got invalid ip_port: "
+                << (attr->ip_port[0] != '\0' ? attr->ip_port : "<empty>")
+                << ", and no valid UNIQUEID comm_args fallback.");
             return ACLSHMEM_INVALID_PARAM;
         }
     } else {
@@ -250,8 +310,12 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         aclshmemi_bootstrap_free();
         return ACLSHMEM_INNER_ERROR;
     }
-    SHM_LOG_INFO("plugin_init");
+    SHM_LOG_INFO("Calling plugin_init for " << plugin_name
+        << ", use_attr_ipport=" << g_boot_handle.use_attr_ipport
+        << ", mype=" << g_boot_handle.mype
+        << ", npes=" << g_boot_handle.npes);
     status = plugin_init(arg, &g_boot_handle);
+    SHM_LOG_INFO("plugin_init returned status=" << status << " for " << plugin_name);
     if (status != 0) {
         SHM_LOG_ERROR("Bootstrap plugin init failed for " << plugin_name);
         aclshmemi_bootstrap_free();

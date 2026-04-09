@@ -27,7 +27,7 @@ extern "C" {
  *        both scale-up network HCCS and scale-out network (RDMA), ACLSHMEM only guarantees that updates to the
  *        memory of a given PE are visible to that PE.
  *        Quiet operations issued on the CPU and the NPU only complete communication operations that were
- *        issued from the CPU and the NPU, respectively. To ensure completion of GPU-side operations from
+ *        issued from the CPU and the NPU, respectively. To ensure completion of NPU-side operations from
  *        the CPU, using aclrtSynchronizeStream/aclrtDeviceSynchronize or stream-based API.
  *
  */
@@ -40,7 +40,7 @@ ACLSHMEM_DEVICE void aclshmem_quiet(void);
  *        However, due to hardware capabilities, we implemented aclshmem_fence same as aclshmem_quiet, ensuring both ordering
  *        and completion.
  *        Fence operations issued on the CPU and the NPU only order communication operations that were issued from the
- *        CPU and the NPU, respectively. To ensure completion of GPU-side operations from the CPU,
+ *        CPU and the NPU, respectively. To ensure completion of NPU-side operations from the CPU,
  *        using aclrtSynchronizeStream/aclrtDeviceSynchronize or stream-based API.
  *
  */

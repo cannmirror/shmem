@@ -62,7 +62,7 @@ def _gather_along_first_dim(input_, group, output_split_sizes=None):
         torch.Tensor: Gathered tensor.
     """
     world_size = torch.distributed.get_world_size(group)
-    # Bypass the function if we are using only 1 GPU.
+    # Bypass the function if we are using only 1 NPU.
     if world_size == 1:
         return input_
 

@@ -35,7 +35,7 @@ extern "C" {
  *        HCCS and scale-out network (RDMA), ACLSHMEM only guarantees that updates to the memory of a given PE are
  *        visible to that PE.
  *        Barrier operations issued on the CPU and the NPU only complete communication operations that were issued
- *        from the CPU and the NPU, respectively. To ensure completion of GPU-side operations from the CPU, using
+ *        from the CPU and the NPU, respectively. To ensure completion of NPU-side operations from the CPU, using
  *        aclrtSynchronizeStream/aclrtDeviceSynchronize or stream-based API.
  *
  * @param team              [in] team to do barrier

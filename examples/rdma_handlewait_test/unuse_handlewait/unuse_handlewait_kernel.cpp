@@ -15,7 +15,7 @@
 #include "shmem.h"
 
 // all_gather简易实现
-extern "C" __global__ __aicore__ void device_all_gather_test(GM_ADDR gva, int message_length)
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void device_all_gather_test(GM_ADDR gva, int message_length)
 {
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
@@ -35,7 +35,7 @@ extern "C" __global__ __aicore__ void device_all_gather_test(GM_ADDR gva, int me
     }
 }
 
-extern "C" __global__ __aicore__ void device_copy(GM_ADDR src, GM_ADDR dst, int message_length)
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void device_copy(GM_ADDR src, GM_ADDR dst, int message_length)
 {
     __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
 

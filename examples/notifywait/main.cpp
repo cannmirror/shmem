@@ -224,7 +224,7 @@ int test_allgather_sdma(int my_pe, int n_pes)
     aclrtStream stream = nullptr;
     CHECK_RET(aclrtCreateStream(&stream));
 
-    constexpr uint32_t block_num = 20;
+    constexpr uint32_t total_block_num = 20;
     constexpr int num10 = 10;
     constexpr int sub_block_num = 2;
     uint8_t *device_dump = nullptr;
@@ -245,9 +245,9 @@ int test_allgather_sdma(int my_pe, int n_pes)
         trans_size * sizeof(T), input.data(), trans_size * sizeof(T), ACL_MEMCPY_HOST_TO_DEVICE));
     uint8_t *ptr = reinterpret_cast<uint8_t *>(gva);
     uint8_t *ptr_A = ptr + n_pes * trans_size * sizeof(T);
-    allgather_kernel<T>(block_num, stream, ptr, trans_size, device_dump, false, true);
+    allgather_kernel<T>(total_block_num, stream, ptr, trans_size, device_dump, false, true);
 
-    for(int i = 0; i < block_num * sub_block_num; i++) {
+    for(int i = 0; i < total_block_num * sub_block_num; i++) {
         CHECK_RET(aclrtWaitAndResetNotify(g_state_host.notify_arr[i], g_state_host.default_stream, 0));
     }
     aclshmem_barrier_all();

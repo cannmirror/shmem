@@ -64,23 +64,91 @@ else()
     set(SANITIZER_FLAGS)
 endif()
 
+# AscendC head files
+set(ASCEND_HOME_PATH $ENV{ASCEND_HOME_PATH})
+set(PLUGIN_VERSION 0)
+# 分界版本时间戳
+set(TARGET_TIMESTAMP 20260327)
+set(CURRENT_TIMESTAMP 0)
+set(IS_NEW_VERSION FALSE)
+
+# 通过 bisheng -v 获取编译器版本时间
+execute_process(
+    COMMAND bisheng -v
+    OUTPUT_VARIABLE BISHENG_STDOUT
+    ERROR_VARIABLE BISHENG_STDERR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_STRIP_TRAILING_WHITESPACE
+)
+
+set(BISHENG_VERSION_OUTPUT "${BISHENG_STDOUT} ${BISHENG_STDERR}")
+
+if(BISHENG_VERSION_OUTPUT)
+    message(STATUS "bisheng -v output: ${BISHENG_VERSION_OUTPUT}")
+    
+    string(REGEX MATCH "([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])" DATE_MATCH "${BISHENG_VERSION_OUTPUT}")
+    if(DATE_MATCH)
+        string(REGEX REPLACE "([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])" "\\1\\2\\3" CURRENT_TIMESTAMP "${DATE_MATCH}")
+        message(STATUS "Extracted date: ${DATE_MATCH}, timestamp: ${CURRENT_TIMESTAMP}")
+        
+        if(CURRENT_TIMESTAMP GREATER_EQUAL 20260327)
+            set(IS_NEW_VERSION TRUE)
+            message(STATUS "Detected NEW version (${CURRENT_TIMESTAMP} >= 20260327)")
+        else()
+            set(IS_NEW_VERSION FALSE)
+            message(STATUS "Detected OLD version (${CURRENT_TIMESTAMP} < 20260327)")
+        endif()
+    else()
+        message(WARNING "Failed to extract date from bisheng -v output, treat as OLD version")
+        set(IS_NEW_VERSION FALSE)
+    endif()
+else()
+    message(WARNING "Failed to run bisheng -v, treat as OLD version")
+    set(IS_NEW_VERSION FALSE)
+endif()
+
 message(STATUS "SOC_TYPE:${SOC_TYPE}")
-if(SOC_TYPE STREQUAL "Ascend950")
-    set(CCE_AICORE_ARCH
-        --cce-aicore-arch=dav-c310
-    )
-    set(CCE_AICORE_ARCH_VEC
-        --cce-aicore-arch=dav-c310-vec
+
+if(IS_NEW_VERSION)
+    set(CCE_AICORE_ARCH "")
+    set(CCE_AICORE_ARCH_VEC "")
+    set(FFTS_COMPILE_FLAG "")
+    
+    if(SOC_TYPE STREQUAL "Ascend950")
+        set(NPU_ARCH dav-3510)
+    else()
+        set(NPU_ARCH dav-2201)
+        set(FFTS_COMPILE_FLAG --cce-auto-set-ffts=false)
+        add_compile_definitions(FFTS_CONFIG=1)
+    endif()
+    set(CMAKE_CCE_COMPILE_OPTIONS
+        -xasc
+        -Xhost-start -ftrapv -Xhost-end
+        --npu-arch=${NPU_ARCH}
+        --cce-auto-infer-kernel-type=false
+        ${FFTS_COMPILE_FLAG}
     )
 else()
-    set(CCE_AICORE_ARCH
-        --cce-aicore-arch=dav-c220
+    if(SOC_TYPE STREQUAL "Ascend950")
+        set(CCE_AICORE_ARCH --cce-aicore-arch=dav-c310)
+        set(CCE_AICORE_ARCH_VEC --cce-aicore-arch=dav-c310-vec)
+    else()
+        set(CCE_AICORE_ARCH --cce-aicore-arch=dav-c220)
+        set(CCE_AICORE_ARCH_VEC --cce-aicore-arch=dav-c220-vec)
+        add_compile_definitions(FFTS_CONFIG=1)
+    endif()
+    set(NPU_ARCH "")
+    set(CMAKE_CCE_COMPILE_OPTIONS	 
+        -xcce	 
+        -Xhost-start -ftrapv -Xhost-end	 
+        "SHELL:-mllvm -cce-aicore-stack-size=0x8000"	 
+        "SHELL:-mllvm -cce-aicore-function-stack-size=0x8000"	 
+        "SHELL:-mllvm -cce-aicore-record-overflow=true"	 
+        "SHELL:-mllvm -cce-aicore-addr-transform" 
+        "SHELL:-mllvm -cce-aicore-dcci-insert-for-scalar=false" 
     )
-    set(CCE_AICORE_ARCH_VEC
-        --cce-aicore-arch=dav-c220-vec
-    )
-    add_compile_definitions(FFTS_CONFIG=1)
 endif()
+message(STATUS "CMAKE_CCE_COMPILE_OPTIONS: ${CMAKE_CCE_COMPILE_OPTIONS}")
 
 option(USE_EXAMPLES "USE_EXAMPLES" OFF)
 option(ENABLE_ASCENDC_DUMP "ENABLE_ASCENDC_DUMP" OFF)
@@ -131,16 +199,6 @@ add_link_options(
     -Wl,-z,relro
     -Wl,-z,now
     )
-
-set(CMAKE_CCE_COMPILE_OPTIONS
-    -xcce
-    -Xhost-start -ftrapv -Xhost-end
-    "SHELL:-mllvm -cce-aicore-stack-size=0x8000"
-    "SHELL:-mllvm -cce-aicore-function-stack-size=0x8000"
-    "SHELL:-mllvm -cce-aicore-record-overflow=true"
-    "SHELL:-mllvm -cce-aicore-addr-transform"
-    "SHELL:-mllvm -cce-aicore-dcci-insert-for-scalar=false"
-)
 
 set(CMAKE_CPP_COMPILE_OPTIONS
     -xc++

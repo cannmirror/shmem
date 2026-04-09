@@ -14,13 +14,13 @@
 extern "C" ACLSHMEM_GLOBAL void increase(uint64_t config, GM_ADDR addr, int rank_id, int rank_size) {
     util_set_ffts_config(config);
 
-#ifdef __DAV_C220_CUBE__
+#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
     // scalar unit of cube core is not affected by barrier
     aclshmem_barrier_all();
     aclshmem_barrier_all();
 #endif
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     uint64_t val = aclshmemi_load((__gm__ uint64_t *)addr);
 
     aclshmem_barrier_all();
@@ -33,7 +33,7 @@ extern "C" ACLSHMEM_GLOBAL void increase(uint64_t config, GM_ADDR addr, int rank
 extern "C" ACLSHMEM_GLOBAL void increase_vec(uint64_t config, GM_ADDR addr, int rank_id, int rank_size) {
     util_set_ffts_config(config);
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     uint64_t val = aclshmemi_load((__gm__ uint64_t *)addr);
 
     aclshmemx_barrier_all_vec();
@@ -47,13 +47,13 @@ extern "C" ACLSHMEM_GLOBAL void increase_odd_team(uint64_t config, GM_ADDR addr,
     int rank_size, aclshmem_team_t team_id) {
     util_set_ffts_config(config);
 
-#ifdef __DAV_C220_CUBE__
+#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
     // scalar unit of cube core is not affected by barrier
     aclshmem_barrier_all();
     aclshmem_barrier_all();
 #endif
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     uint64_t val = aclshmemi_load((__gm__ uint64_t *)addr);
 
     aclshmem_barrier(team_id);
@@ -69,7 +69,7 @@ extern "C" ACLSHMEM_GLOBAL void increase_vec_odd_team(uint64_t config, GM_ADDR a
     int rank_size, aclshmem_team_t team_id) {
     util_set_ffts_config(config);
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     uint64_t val = aclshmemi_load((__gm__ uint64_t *)addr);
 
     aclshmemx_barrier_vec(team_id);

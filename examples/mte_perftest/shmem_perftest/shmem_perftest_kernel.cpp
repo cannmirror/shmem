@@ -118,11 +118,11 @@ __aicore__ inline void mte_perf_test_get_impl(GM_ADDR dst_gva, GM_ADDR src_gva, 
 }
 
 #define DEFINE_MTE_PERF_KERNEL_FOR_TYPE(type_name, cpp_type) \
-extern "C" __global__ __aicore__ void mte_perf_test_##type_name##_put(GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::mte_mode_t test_mode, int ub_size_kb, int64_t prof_pe_val, int loop_count) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void mte_perf_test_##type_name##_put(GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::mte_mode_t test_mode, int ub_size_kb, int64_t prof_pe_val, int loop_count) \
 { \
     mte_perf_test_put_impl<cpp_type>(dst_gva, src_gva, elements, frame_id, test_mode, ub_size_kb, prof_pe_val, loop_count); \
 } \
-extern "C" __global__ __aicore__ void mte_perf_test_##type_name##_get(GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::mte_mode_t test_mode, int ub_size_kb, int64_t prof_pe_val, int loop_count) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void mte_perf_test_##type_name##_get(GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::mte_mode_t test_mode, int ub_size_kb, int64_t prof_pe_val, int loop_count) \
 { \
     mte_perf_test_get_impl<cpp_type>(dst_gva, src_gva, elements, frame_id, test_mode, ub_size_kb, prof_pe_val, loop_count); \
 }

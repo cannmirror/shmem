@@ -267,7 +267,6 @@ void DispatchGMM(
     GM_ADDR ptrWorkspace, CoCTiling cocTiling, int64_t tilingKey,
     optiling::MoeInitRoutingQuantV2TilingData moeInitRoutingQuantV2TilingData)
 {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     // Set FFTS address
     AscendC::SetSyncBaseAddr(reinterpret_cast<uint64_t>(fftsAddr));
 

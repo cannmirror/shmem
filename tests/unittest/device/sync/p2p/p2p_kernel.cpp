@@ -30,7 +30,7 @@ extern "C" ACLSHMEM_GLOBAL void p2p_chain(uint64_t config, GM_ADDR addr, int ran
 
     aclshmem_barrier_all();
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     if (rank_id == 0) {
         aclshmemx_signal_op(sig_addr, 1, ACLSHMEM_SIGNAL_SET, next);
         aclshmem_signal_wait_until(sig_addr, ACLSHMEM_CMP_EQ, 1);

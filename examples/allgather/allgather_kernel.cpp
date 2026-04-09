@@ -279,7 +279,7 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t fftsAddr, __gm__ T *input, _
 }
 
 #define ALLGATHER_FUNC_DEF(type)                                                                                   \
-    extern "C" __global__ __aicore__ void ShmemAllGather_##type(uint64_t fftsAddr, GM_ADDR input, GM_ADDR output,  \
+    extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void ShmemAllGather_##type(uint64_t fftsAddr, GM_ADDR input, GM_ADDR output,  \
                                                                 GM_ADDR gva, int elements, int magic)              \
     {                                                                                                              \
         if (elements * sizeof(type) < 2097152) {                                                                   \

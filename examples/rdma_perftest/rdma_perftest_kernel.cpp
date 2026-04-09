@@ -14,7 +14,7 @@
 constexpr uint32_t MAGIC_VAL = 10;
 constexpr uint32_t WARMUP_MESSAGE_LENGTH = 32;
 
-extern "C" __global__ __aicore__ void rdma_highlevel_put_pingpong_latency(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highlevel_put_pingpong_latency(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -76,7 +76,7 @@ void rdma_highlevel_put_pingpong_latency_do(uint32_t block_dim, void* stream, ui
     rdma_highlevel_put_pingpong_latency<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" __global__ __aicore__ void rdma_postsend_cost(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_postsend_cost(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -111,7 +111,7 @@ void rdma_postsend_cost_do(uint32_t block_dim, void* stream, uint64_t fftsConfig
     rdma_postsend_cost<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" __global__ __aicore__ void rdma_highlevel_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highlevel_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -157,7 +157,7 @@ void rdma_highlevel_put_bw_do(uint32_t block_dim, void* stream, uint64_t fftsCon
     rdma_highlevel_put_bw<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length, int64_t iter) {
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length, int64_t iter) {
     util_set_ffts_config(fftsConfig);
     AscendC::LocalTensor<uint32_t> ubLocal;
     ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);

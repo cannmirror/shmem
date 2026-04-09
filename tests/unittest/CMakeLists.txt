@@ -23,4 +23,18 @@ set_target_properties(aclshmem_unittest PROPERTIES
     LINK_FLAGS "-rdynamic"
 )
 
-target_link_libraries(aclshmem_unittest PRIVATE aclshmem_unittest_device gtest gcov aclshmem_unittest_include shmem_utils)
+if(IS_NEW_VERSION)
+    set(UT_LIBRARIES 
+        ascendc_runtime
+        mmpa
+        ascend_dump
+        c_sec
+        error_manager
+        unified_dlog
+        profapi
+    )
+else()
+    set(UT_LIBRARIES "")
+endif()
+
+target_link_libraries(aclshmem_unittest PRIVATE ${UT_LIBRARIES} aclshmem_unittest_device gtest gcov aclshmem_unittest_include shmem_utils)

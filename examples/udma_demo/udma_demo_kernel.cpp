@@ -14,7 +14,7 @@
 constexpr uint64_t INIT_DUMP_SIZE = 200 * 1024 * 1024;
 
 // Minimal all-gather implementation using UDMA.
-extern "C" __global__ __aicore__ void udma_all_gather_kernel(GM_ADDR gva, GM_ADDR dump, int message_length)
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void udma_all_gather_kernel(GM_ADDR gva, GM_ADDR dump, int message_length)
 {
     AscendC::TPipe pipe;
 #if ASCENDC_DUMP == 1

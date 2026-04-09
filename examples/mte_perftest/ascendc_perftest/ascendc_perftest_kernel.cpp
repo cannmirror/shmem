@@ -488,27 +488,27 @@ __aicore__ inline void rma_operation_gm2ub_remote_impl(GM_ADDR d1_ptr, GM_ADDR d
 }
 
 #define DEFINE_RMA_OPERATION_KERNEL_FOR_TYPE(type_name, cpp_type) \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_ub2gm_remote(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_ub2gm_remote(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_ub2gm_remote_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 } \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_ascendc_put(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_ascendc_put(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_ascendc_put_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 } \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_ascendc_get(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_ascendc_get(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_ascendc_get_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 } \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_ub2gm_local(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_ub2gm_local(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_ub2gm_local_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 } \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_gm2ub_local(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_gm2ub_local(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_gm2ub_local_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 } \
-extern "C" __global__ __aicore__ void rma_operation_##type_name##_gm2ub_remote(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rma_operation_##type_name##_gm2ub_remote(GM_ADDR d1_ptr, GM_ADDR d0_ptr, GM_ADDR time_gva, int elements, int loop_count, int ub_size_kb) \
 { \
     rma_operation_gm2ub_remote_impl<cpp_type>(d1_ptr, d0_ptr, time_gva, elements, loop_count, ub_size_kb); \
 }

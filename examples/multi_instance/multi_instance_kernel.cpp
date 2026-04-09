@@ -197,7 +197,7 @@ template <typename T>
 ACLSHMEM_DEVICE void all_gather_big_data(uint64_t fftsAddr, __gm__ T *input, __gm__ T *output, __gm__ T *gva,
                                       int elements, int magic)
 {
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     util_set_ffts_config(fftsAddr);
 
     const int64_t max_gva_num = GVA_BUFF_MAX_SIZE / sizeof(T);
@@ -224,7 +224,7 @@ template <typename T>
 ACLSHMEM_DEVICE void all_gather_small_data(uint64_t fftsAddr, __gm__ T *input, __gm__ T *output, __gm__ T *gva,
                                         int elements, int magic)
 {
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     const int64_t aivNum = GetBlockNum();
     const int64_t aivIndex = GetBlockIdx();
 
@@ -280,7 +280,7 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t fftsAddr, __gm__ T *input, _
 }
 
 #define ALLGATHER_FUNC_DEF(type)                                                                                                \
-    extern "C" __global__ __aicore__ void ShmemAllGather_##type(uint64_t fftsAddr, GM_ADDR input, GM_ADDR output,               \
+    extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void ShmemAllGather_##type(uint64_t fftsAddr, GM_ADDR input, GM_ADDR output,               \
                                         GM_ADDR gva, int elements, int magic, uint64_t instance_id)                             \
     {                                                                                                                           \
         /* Set multi-instance context. */                                                                                       \

@@ -23,7 +23,7 @@ using bf16_t = op::bfloat16;
 
 constexpr int64_t SYNC_FLAG_INTERVAL = 16;
 
-extern "C" __global__ __aicore__ void ShmemKVShuffle(
+extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void ShmemKVShuffle(
     uint64_t fftsAddr,
     GM_ADDR k_cache,
     GM_ADDR v_cache,

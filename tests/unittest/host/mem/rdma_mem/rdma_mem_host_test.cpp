@@ -27,6 +27,10 @@ extern void test_rdma_get_low_level(uint32_t block_dim, void* stream, uint8_t* g
 extern void test_rdma_put_high_level(uint32_t block_dim, void* stream, uint8_t* gva, uint64_t config);
 extern void test_rdma_get_high_level(uint32_t block_dim, void* stream, uint8_t* gva, uint64_t config);
 
+namespace {
+constexpr int TIMEOUT = 30;
+}
+
 static void test_rdma_put_get(aclrtStream stream, uint8_t *gva, uint32_t rank_id, uint32_t rank_size)
 {
     size_t messageSize = 64;
@@ -49,7 +53,7 @@ static void test_rdma_put_get(aclrtStream stream, uint8_t *gva, uint32_t rank_id
     aclshmemi_control_barrier_all();
     test_rdma_put_low_level(block_dim, stream, (uint8_t *)gva, util_get_ffts_config());
     aclshmemx_handle_wait(handle, stream);
-    ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
+    ASSERT_EQ(aclrtSynchronizeStreamWithTimeout(stream, TIMEOUT), 0);
     ASSERT_EQ(aclrtMemcpy(outHost, totalSize, gva, totalSize, ACL_MEMCPY_DEVICE_TO_HOST), 0);
     for (uint32_t i = 0; i < rank_size; i++) {
         ASSERT_EQ(outHost[i * messageSize / sizeof(uint32_t)], i + rankOffset);
@@ -59,7 +63,7 @@ static void test_rdma_put_get(aclrtStream stream, uint8_t *gva, uint32_t rank_id
     aclshmemi_control_barrier_all();
     test_rdma_get_low_level(block_dim, stream, (uint8_t *)gva, util_get_ffts_config());
     aclshmemx_handle_wait(handle, stream);
-    ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
+    ASSERT_EQ(aclrtSynchronizeStreamWithTimeout(stream, TIMEOUT), 0);
     ASSERT_EQ(aclrtMemcpy(outHost, totalSize, gva, totalSize, ACL_MEMCPY_DEVICE_TO_HOST), 0);
     for (uint32_t i = 0; i < rank_size; i++) {
         ASSERT_EQ(outHost[i * messageSize / sizeof(uint32_t)], i + rankOffset);
@@ -69,7 +73,7 @@ static void test_rdma_put_get(aclrtStream stream, uint8_t *gva, uint32_t rank_id
     aclshmemi_control_barrier_all();
     test_rdma_put_high_level(block_dim, stream, (uint8_t *)gva, util_get_ffts_config());
     aclshmemx_handle_wait(handle, stream);
-    ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
+    ASSERT_EQ(aclrtSynchronizeStreamWithTimeout(stream, TIMEOUT), 0);
     ASSERT_EQ(aclrtMemcpy(outHost, totalSize, gva, totalSize, ACL_MEMCPY_DEVICE_TO_HOST), 0);
     for (uint32_t i = 0; i < rank_size; i++) {
         ASSERT_EQ(outHost[i * messageSize / sizeof(uint32_t)], i + rankOffset);
@@ -79,7 +83,7 @@ static void test_rdma_put_get(aclrtStream stream, uint8_t *gva, uint32_t rank_id
     aclshmemi_control_barrier_all();
     test_rdma_get_high_level(block_dim, stream, (uint8_t *)gva, util_get_ffts_config());
     aclshmemx_handle_wait(handle, stream);
-    ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
+    ASSERT_EQ(aclrtSynchronizeStreamWithTimeout(stream, TIMEOUT), 0);
     ASSERT_EQ(aclrtMemcpy(outHost, totalSize, gva, totalSize, ACL_MEMCPY_DEVICE_TO_HOST), 0);
     for (uint32_t i = 0; i < rank_size; i++) {
         ASSERT_EQ(outHost[i * messageSize / sizeof(uint32_t)], i + rankOffset);

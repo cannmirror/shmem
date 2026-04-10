@@ -28,6 +28,7 @@ This file provides device-side collective synchronization implementations, ensur
 #include "shmemi_device_p2p_sync.h"
 #include "gm2gm/engine/shmemi_device_rdma.h"
 #include "device/team/shmem_device_team.h"
+#include "utils/mstx/shmemi_mstx_report.h"
 
 constexpr int32_t BARRIER_DISSEM_KVAL = 2;
 constexpr int32_t BARRIER_DISSEM_KVAL_MIN = 2;
@@ -291,6 +292,8 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_npu_v3(aclshmem_team_t team_idx)
     int32_t vec_id = AscendC::GetBlockIdx();
     int32_t vec_size = AscendC::GetBlockNum() * AscendC::GetTaskRation();
 
+    MSTX_DFX_REPORT_START(MSTX_EVENT_CROSS_CORE_BARRIER, mstx_cross_core_barrier, (uint32_t)vec_size, nullptr, IS_AIV_ONLY, true);
+
     int32_t my_pe = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD]->mype;
     int32_t start = team->start;
     int32_t stride = team->stride;
@@ -320,6 +323,7 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_npu_v3(aclshmem_team_t team_idx)
         aclshmemi_store((__gm__ int32_t *)sync_counter, count);
     }
     aclshmemi_barrier_core<IS_AIV_ONLY>();
+    MSTX_DFX_REPORT_END();
 }
 
 template<bool IS_AIV_ONLY = true>

@@ -69,7 +69,7 @@ int32_t prof_util_init(aclshmem_prof_pe_t *host_profs, aclshmem_device_host_stat
 void prof_data_print(aclshmem_prof_pe_t *host_profs, aclshmem_device_host_state_t *global_state)
 {
     if (host_profs->pe_id != global_state->mype) {
-        SHM_LOG_INFO("not collect profoling data on this rank, skip print.");
+        SHM_LOG_INFO("not collect profiling data on this rank, skip print.");
         return;
     }
     auto copySize = sizeof(aclshmem_prof_pe_t);

@@ -32,11 +32,13 @@ int aclshmemi_barrier_on_stream(aclshmem_team_t team, aclrtStream stream)
 void aclshmem_barrier(aclshmem_team_t team)
 {
     aclshmemi_barrier_on_stream(team, g_state_host.default_stream);
+    aclrtSynchronizeStream(g_state_host.default_stream);
 }
 
 void aclshmem_barrier_all()
 {
     aclshmemi_barrier_on_stream(ACLSHMEM_TEAM_WORLD, g_state_host.default_stream);
+    aclrtSynchronizeStream(g_state_host.default_stream);
 }
 
 void aclshmemx_barrier_on_stream(aclshmem_team_t team, aclrtStream stream)

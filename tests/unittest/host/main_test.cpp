@@ -59,7 +59,7 @@ void test_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtStream *s
 {
     *st = nullptr;
     int status = 0;
-    if (n_ranks != (n_ranks & (~(n_ranks - 1)))) {
+    if (n_ranks != (n_ranks & (~(static_cast<unsigned int>(n_ranks) - 1)))) {
         std::cout << "[TEST] input rank_size: "<< n_ranks << " is not the power of 2" << std::endl;
         status = -1;
     }
@@ -86,7 +86,7 @@ void test_cross_init(int pe_id, int n_pes, uint64_t local_mem_size, aclrtStream 
 {
     *st = nullptr;
     int status = 0;
-    if (n_pes != (n_pes & (~(n_pes - 1)))) {
+    if (n_pes != (n_pes & (~(static_cast<unsigned int>(n_pes) - 1)))) {
         std::cout << "[TEST] input pe_size: "<< n_pes << " is not the power of 2" << std::endl;
         status = -1;
     }
@@ -111,7 +111,7 @@ int32_t test_rdma_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtS
 {
     *st = nullptr;
     int status = 0;
-    if (n_ranks != (n_ranks & (~(n_ranks - 1)))) {
+    if (n_ranks != (n_ranks & (~(static_cast<unsigned int>(n_ranks) - 1)))) {
         std::cout << "[TEST] input rank_size: "<< n_ranks << " is not the power of 2" << std::endl;
         status = -1;
     }
@@ -139,7 +139,7 @@ int32_t test_sdma_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtS
 {
     *st = nullptr;
     int status = 0;
-    if (n_ranks != (n_ranks & (~(n_ranks - 1)))) {
+    if (n_ranks != (n_ranks & (~(static_cast<unsigned int>(n_ranks) - 1)))) {
         std::cout << "[TEST] input rank_size: "<< n_ranks << " is not the power of 2" << std::endl;
         status = -1;
     }
@@ -166,7 +166,7 @@ int32_t test_udma_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtS
 {
     *st = nullptr;
     int status = 0;
-    if (n_ranks != (n_ranks & (~(n_ranks - 1)))) {
+    if (n_ranks != (n_ranks & (~(static_cast<unsigned int>(n_ranks) - 1)))) {
         std::cout << "[TEST] input rank_size: " << n_ranks << " is not the power of 2" << std::endl;
         status = -1;
     }

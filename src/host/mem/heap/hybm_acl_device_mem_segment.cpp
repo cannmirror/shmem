@@ -40,28 +40,77 @@ Result MemSegmentDevice::ValidateOptions() noexcept
     return ACLSHMEM_SUCCESS;
 }
 
+Result MemSegmentDevice::ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept
+{
+    // because 950 not support specify va
+    void *base = nullptr;
+    if (socType_ == AscendSocType::ASCEND_950) {
+        auto ret = aclrtReserveMemAddress(&base, totalReservedSize, 0, nullptr, 1);
+        if (ret != 0 || base == 0) {
+            SHM_LOG_ERROR("prepare virtual memory size(" << totalReservedSize << ") failed. ret: " << ret);
+            return ACLSHMEM_MALLOC_FAILED;
+        }
+        uint8_t* currentAddr = static_cast<uint8_t*>(base);
+        for (uint32_t i = 0; i < options_.rankCnt; i++) {
+            reservedVirtualAddresses_.emplace_back(reinterpret_cast<uint64_t>(currentAddr));
+            SHM_LOG_INFO("rankId: " << i << ", vaddr: " << (void*)currentAddr << " size: " << options_.size << " align_size: " << reserveAlignedSize);
+            currentAddr += reserveAlignedSize;
+        }
+        return ACLSHMEM_SUCCESS;
+    }
+    uint8_t *curBase = (uint8_t *)expectSt;
+    for (uint32_t i = 0; i < options_.rankCnt; i++) {
+        auto ret = aclrtReserveMemAddress(&base, reserveAlignedSize, 0, curBase, 1);
+        if (ret != 0 || base == 0) {
+            SHM_LOG_ERROR("prepare virtual memory size(" << totalVirtualSize_ << ") failed. ret: " << ret);
+            return ACLSHMEM_MALLOC_FAILED;
+        }
+        SHM_LOG_INFO("success to reserve memory space for logic deviceid " << logicDeviceId_ << ", vaddr: " << (void *)base << " size: " << options_.size << ", rankId: " << i);
+        totalVirtualSize_ += reserveAlignedSize;
+        reservedVirtualAddresses_.emplace_back(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(base)));
+        curBase = (uint8_t *)base + reserveAlignedSize;
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
 Result MemSegmentDevice::ReserveMemorySpace(void **address) noexcept
 {
     if (globalVirtualAddress_ != nullptr) {
         SHM_LOG_ERROR("already prepare virtual memory.");
         return ACLSHMEM_INNER_ERROR;
     }
-    void *base = nullptr;
-    for (uint32_t i = 0; i < options_.rankCnt; i++) {
-        auto ret = aclrtReserveMemAddress(&base, options_.size, 0, nullptr, 1);
-        if (ret != 0 || base == 0) {
-            SHM_LOG_ERROR("prepare virtual memory size(" << totalVirtualSize_ << ") failed. ret: " << ret);
-            return ACLSHMEM_MALLOC_FAILED;
-        }
-        SHM_LOG_INFO("success to reserve memory space for logic deviceid " << logicDeviceId_ << ", vaddr: " << (void *)base << " size: " << options_.size << ", rankId: " << i);
-        totalVirtualSize_ += options_.size;
-        reservedVirtualAddresses_.emplace_back(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(base)));
+    size_t reserveAlignedSize = ALIGN_UP(options_.size, DEVMM_HEAP_SIZE);
+    size_t totalReservedSize = options_.rankCnt * reserveAlignedSize;
+    uint64_t expectSt;
+    if (FindAvaliableVirtualAddr(totalReservedSize, expectSt) != ACLSHMEM_SUCCESS) {
+        SHM_LOG_ERROR("prepare virtual memory size(" << totalReservedSize << ") failed.");
+        return ACLSHMEM_MALLOC_FAILED;
+    }
+    if (ReserveEachPeMemorySpace(reserveAlignedSize, totalReservedSize, expectSt) != ACLSHMEM_SUCCESS) {
+        SHM_LOG_ERROR("ReserveEachPeMemorySpace virtual memory size(" << totalReservedSize << ") failed.");
+        return ACLSHMEM_MALLOC_FAILED;
     }
 
     globalVirtualAddress_ = reinterpret_cast<uint8_t *>(reservedVirtualAddresses_[0]);
     allocatedSize_ = 0UL;
     sliceCount_ = 0;
     *address = reinterpret_cast<void *>(reservedVirtualAddresses_[0]);
+    return ACLSHMEM_SUCCESS;
+}
+
+Result MemSegmentDevice::FindAvaliableVirtualAddr(uint64_t size, uint64_t &baseVa) noexcept
+{
+    void *base;
+    auto ret = aclrtReserveMemAddress(&base, size, 0, nullptr, 1);
+    if (ret != 0 || base == 0) {
+        SHM_LOG_ERROR("prepare virtual memory size to (" << size << ") failed. ret: " << ret);
+        return ACLSHMEM_MALLOC_FAILED;
+    }
+    baseVa = (uint64_t)base;
+    ret = aclrtReleaseMemAddress(base);
+    if (ret != 0) {
+        SHM_LOG_ERROR("aclrtReleaseMemAddress failed: " << ret);
+    }
     return ACLSHMEM_SUCCESS;
 }
 
@@ -372,10 +421,13 @@ void MemSegmentDevice::FreeMemory() noexcept
     allocatedSize_ = 0;
     sliceCount_ = 0;
     if (globalVirtualAddress_ != nullptr) {
-        for (auto reserved : reservedVirtualAddresses_) {
-            aclrtReleaseMemAddress(reinterpret_cast<void *>(reserved));
+        if (socType_ == AscendSocType::ASCEND_950 && !reservedVirtualAddresses_.empty()) {
+            aclrtReleaseMemAddress(reinterpret_cast<void *>(reservedVirtualAddresses_[0]));
+        } else {
+            for (auto reserved : reservedVirtualAddresses_) {
+                aclrtReleaseMemAddress(reinterpret_cast<void *>(reserved));
+            }
         }
-
         reservedVirtualAddresses_.clear();
         totalVirtualSize_ = 0;
         globalVirtualAddress_ = nullptr;

@@ -35,6 +35,14 @@ Result MemSegmentDevice::ValidateOptions() noexcept
     return ACLSHMEM_SUCCESS;
 }
 
+Result MemSegmentDevice::ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept
+{
+    (void)expectSt;
+    (void)reserveAlignedSize;
+    (void)totalReservedSize;
+    return ACLSHMEM_SUCCESS;
+}
+
 Result MemSegmentDevice::ReserveMemorySpace(void **address) noexcept
 {
     if (globalVirtualAddress_ != nullptr) {
@@ -66,6 +74,13 @@ Result MemSegmentDevice::UnReserveMemorySpace() noexcept
 {
     SHM_LOG_INFO("un-reserve memory space.");
     FreeMemory();
+    return ACLSHMEM_SUCCESS;
+}
+
+Result MemSegmentDevice::FindAvaliableVirtualAddr(uint64_t size, uint64_t &baseVa) noexcept
+{
+    (void)size;
+    (void)baseVa;
     return ACLSHMEM_SUCCESS;
 }
 

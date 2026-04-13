@@ -15,25 +15,14 @@
 #include "kernel_operator.h"
 #include "device/shmem_def.h"
 #include "shmemi_device_udma.h"
+#include "utils/shmemi_kernel_debug.h"
 
-#if defined(ASCENDC_DEBUG) && defined(ASCENDC_DUMP) && (ASCENDC_DUMP == 1) && defined(DEBUG_MODE)
-#define ACLSHMEM_DEBUG_FUNC(func, ...) do { func(__VA_ARGS__); } while(0)
-#else
-#define ACLSHMEM_DEBUG_FUNC(func, ...) ((void)0)
-#endif
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #define ACLSHMEM_UDMA_SUPPORTED 1
 #else
 #define ACLSHMEM_UDMA_SUPPORTED 0
 #endif
-
-template<class... Args>
-ACLSHMEM_DEVICE void aclshmemi_kernel_abort(__gm__ const char* fmt, Args&&... args)
-{
-    AscendC::printf(fmt, args...);
-    trap();
-}
 
 ACLSHMEM_DEVICE void aclshmemi_dump_sge(__gm__ uint8_t* wqeAddr, uint32_t sge_num);
 ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr);

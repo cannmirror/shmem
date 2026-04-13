@@ -86,6 +86,8 @@ public:
 protected:
     void FreeMemory() noexcept;
     Result SetMemAccess() noexcept;
+    Result FindAvaliableVirtualAddr(uint64_t size, uint64_t &baseVa) noexcept;
+    Result ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept;
 
 protected:
     uint8_t *globalVirtualAddress_{nullptr};

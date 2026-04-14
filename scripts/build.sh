@@ -281,6 +281,10 @@ while [[ $# -gt 0 ]]; do
             COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_RDMA_SUPPORT=ON"
             shift
             ;;
+        -enable_simt)
+            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_SIMT_SUPPORT=ON"
+            shift
+            ;;
         -python_extension)
             PYEXPAND_TYPE=ON
             shift

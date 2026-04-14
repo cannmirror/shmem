@@ -24,6 +24,8 @@ else()
 endif()
 
 file(GLOB_RECURSE ACLSHMEM_KERNEL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/device/*.cpp)
+file(GLOB_RECURSE _TEMP_KERNEL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/device_simt/*.cpp)
+list(APPEND ACLSHMEM_KERNEL_FILES ${_TEMP_KERNEL_FILES})
 add_library(aclshmem_device OBJECT ${ACLSHMEM_KERNEL_FILES})
 target_compile_options(aclshmem_device
     PRIVATE
@@ -34,6 +36,7 @@ target_include_directories(aclshmem_device
     PUBLIC
     ${PROJECT_SOURCE_DIR}/include/
     ${PROJECT_SOURCE_DIR}/src/device/
+    ${PROJECT_SOURCE_DIR}/src/device_simt/
 )
 
 file(GLOB_RECURSE ACLSHMEM_HOST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/*.cpp)
@@ -53,6 +56,7 @@ target_include_directories(aclshmem_host
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/host
     ${PROJECT_SOURCE_DIR}/src/device
+    ${PROJECT_SOURCE_DIR}/src/device_simt
     ${PROJECT_SOURCE_DIR}/src/host/utils
     ${PROJECT_SOURCE_DIR}/src/host/utils/under_api
     ${PROJECT_SOURCE_DIR}/src/host/entity
@@ -112,6 +116,12 @@ if(ACLSHMEM_MPI_SUPPORT)
     )
 
 endif()
+
+# simt
+if(ACLSHMEM_SIMT_SUPPORT)
+    target_compile_definitions(shmem INTERFACE USE_SIMT)
+endif()
+
 # UID
 add_library(aclshmem_bootstrap_uid SHARED)
 
@@ -169,6 +179,10 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
 )
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/device
+    DESTINATION src
+)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/device_simt
     DESTINATION src
 )
 

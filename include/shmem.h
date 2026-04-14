@@ -27,6 +27,13 @@
 #include "device/ub2gm/engine/shmem_device_mte.h"
 #include "device/shmem_def.h"
 #include "device/team/shmem_device_team.h"
+
+// simt
+#if defined(USE_SIMT)
+#include "device_simt/gm2gm/shmem_device_simt_rma.h"
+#include "device_simt/gm2gm/engine/shmem_device_simt_mte.h"
+#include "device_simt/team/shmem_device_simt_team.h"
+#endif
 #endif
 
 #include "host/shmem_host_def.h"

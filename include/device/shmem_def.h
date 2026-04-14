@@ -15,6 +15,13 @@
 #include "kernel_operator.h"
 #include "host_device/shmem_common_types.h"
 
+#if defined(USE_SIMT)
+#include "__clang_cce_vector_intrinsics.h"
+#include "simt_api/asc_simt.h"
+
+#include "device_simt/shmem_simt_common_types.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

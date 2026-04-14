@@ -13,12 +13,14 @@
 #include <acl/acl.h>
 #include <climits>
 #include <iostream>
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <cmath>
 #include <string>
 #include <iomanip>
+#include <cstring>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>

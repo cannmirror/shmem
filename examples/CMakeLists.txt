@@ -10,6 +10,7 @@
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/src/device/
+    ${PROJECT_SOURCE_DIR}/src/device_simt/
 )
 
 # catlass 适配宏
@@ -50,6 +51,7 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/device_simt/
             ${PROJECT_SOURCE_DIR}/src/
             ${MPI_INCLUDE_PATH}
         )
@@ -77,6 +79,7 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/device_simt/
             ${PROJECT_SOURCE_DIR}/src/
             ${MPI_INCLUDE_PATH}
         )
@@ -111,6 +114,7 @@ function(aclshmem_add_collective_example NAME)
         ${PROJECT_SOURCE_DIR}/examples/${NAME}
         ${PROJECT_SOURCE_DIR}/examples/utils
         ${PROJECT_SOURCE_DIR}/src/device/
+        ${PROJECT_SOURCE_DIR}/src/device_simt/
         ${PROJECT_SOURCE_DIR}/src/
     )
     target_link_options(${NAME}_kernel PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH_VEC} ${SANITIZER_FLAGS})
@@ -124,6 +128,7 @@ function(aclshmem_add_collective_example NAME)
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
+            ${PROJECT_SOURCE_DIR}/src/device_simt/
             ${PROJECT_SOURCE_DIR}/src/host
             ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store
             ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store/acc_links/include
@@ -164,6 +169,17 @@ foreach(EXAMPLE
 )
     add_subdirectory(${EXAMPLE})
 endforeach()
+
+
+if(ACLSHMEM_SIMT_SUPPORT)
+foreach(
+    EXAMPLE
+    simt_rma
+    simt_rma_scalar
+)
+    add_subdirectory(${EXAMPLE})
+endforeach()
+endif()
 
 if(ACLSHMEM_RDMA_SUPPORT)
     foreach(EXAMPLE

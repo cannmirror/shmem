@@ -23,7 +23,7 @@ g_sig_value = 2
 
 
 def run_put_signal_test():
-    pe = dist.get_pe()
+    pe = dist.get_rank()
     world_size = dist.get_world_size()
     next = (pe + 1) % world_size
     ret = ash.set_conf_store_tls(False, "")
@@ -45,7 +45,7 @@ def run_put_signal_test():
         unique_id = bytes(tensor.tolist())
 
     # 2. init with unique id
-    core.init(pe=pe, npes=world_size, mem_size=g_ash_size, uid=unique_id, initializer_method='uid')
+    core.init(rank=pe, nranks=world_size, mem_size=g_ash_size, uid=unique_id, initializer_method='uid')
 
     # 3. malloc buffer
     send_aclshmem_buffer = core.buffer(g_malloc_size)

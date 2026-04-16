@@ -19,7 +19,7 @@ G_IP_PORT = "tcp://127.0.0.1:8667"
 
 
 def run_register_decrypt_tests():
-    pe = dist.get_pe()
+    pe = dist.get_rank()
     world_size = dist.get_world_size()
     # 1. test set tls info
     ret = ash.set_conf_store_tls(False, "")
@@ -27,8 +27,8 @@ def run_register_decrypt_tests():
         raise ValueError("[ERROR] set_conf_store_tls failed")
     # 2. test init
     attributes = ash.InitAttr()
-    attributes.my_pe = pe
-    attributes.n_pes = world_size
+    attributes.my_rank = pe
+    attributes.n_ranks = world_size
     attributes.local_mem_size = g_ash_size
     attributes.ip_port = G_IP_PORT
     attributes.option_attr.data_op_engine_type = ash.OpEngineType.MTE
@@ -48,6 +48,6 @@ if __name__ == "__main__":
     local_pe = int(os.environ["LOCAL_RANK"])
     # shmem init must comes after torch.npu.set_device(or any other aclInit device action)
     torch.npu.set_device(local_pe)
-    dist.init_process_group(backend="hccl", pe=local_pe)
+    dist.init_process_group(backend="hccl", rank=local_pe)
     run_register_decrypt_tests()
     print("tls_test.py running success!")

@@ -19,7 +19,7 @@ g_malloc_size = 8 * 1024 * 1024
 
 
 def run_init_with_unique_id_tests():
-    pe = dist.get_pe()
+    pe = dist.get_rank()
     world_size = dist.get_world_size()
     ret = ash.set_conf_store_tls(False, "")
 

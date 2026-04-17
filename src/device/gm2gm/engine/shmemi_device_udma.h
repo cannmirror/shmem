@@ -15,7 +15,7 @@
 #include "kernel_operator.h"
 #include "device/shmem_def.h"
 
-enum class UDMAOPCODE : uint32_t {
+enum class aclshmemi_udma_opcode_t : uint32_t {
     UDMA_OP_SEND = 0,
     UDMA_OP_SEND_WITH_IMM,
     UDMA_OP_SEND_WITH_INV,
@@ -28,6 +28,7 @@ enum class UDMAOPCODE : uint32_t {
     UDMA_OP_ATOMIC_STORE,
     UDMA_OP_ATOMIC_LOAD,
     UDMA_OPCODE_FAA = 0xb,
+    UDMA_OP_WRITE_WITH_REDUCE = 0x10, // self-defined opcode, will be converted to UDMA_OP_WRITE in actual usage
     UDMA_OPCODE_NOP = 0x11
 };
 
@@ -53,6 +54,7 @@ struct ACLSHMEMUBmemInfo {
 };
 
 enum class ACLSHMEMUDMADBMode : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
+
 struct ACLSHMEMUDMAWQCtx {
     uint32_t wqn; // work queue number
     uint64_t bufAddr; // start address of ring buffer
@@ -63,6 +65,8 @@ struct ACLSHMEMUDMAWQCtx {
     ACLSHMEMUDMADBMode dbMode;
     uint64_t dbAddr; // doorbell address
     uint32_t sl; // service level
+    uint64_t wqeCntAddr; // wqe count address
+    uint64_t amoAddr; // amo address to store fetch data
 };
 
 struct ACLSHMEMUDMACqCtx {
@@ -169,11 +173,11 @@ ACLSHMEM_DEVICE __gm__ ACLSHMEMAIVUDMAInfo* aclshmemi_udma_qp_info_fetch();
 /**
  * @brief UDMA Poll Completion Queue (CQ) function. Return status: 0 means success, non-zero means error.
  *
- * @param destRankId             [in] destination rank ID
+ * @param pe                     [in] destination PE ID
  * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
  * @param idx                    [in] expect completion queue consumer index after polling
  */
-ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t destRankId, uint32_t qpIdx, uint32_t idx);
+ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uint32_t idx);
 
 ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(uint32_t curTail, uint32_t qpIdx,
     __gm__ ACLSHMEMUDMACqCtx* cqCtxEntry, __gm__ ACLSHMEMUDMAWQCtx* wqCtxEntry);
@@ -183,14 +187,15 @@ ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(uint32_t curTail, uint32
  *
  * @param remoteAddr             [in] address in remote HBM
  * @param localAddr              [in] address in lcoal HBM
- * @param destRankId             [in] destination rank ID
+ * @param pe                     [in] destination PE ID
  * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
- * @param opcode                 [in] udma opcode in UDMAOPCODE enum class
+ * @param opcode                 [in] udma opcode in aclshmemi_udma_opcode_t enum class
  * @param messageLen             [in] message length in Bytes
  */
+template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send(__gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr,
-                                        uint32_t destRankId, uint32_t qpIdx,
-                                        UDMAOPCODE opcode, uint64_t messageLen);
+                                        uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+                                        T value = 0, T cond = 0);
 
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm__ ACLSHMEMUDMAWQCtx *&qpCtxEntry);
 
@@ -200,12 +205,12 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm
  *
  * @param destDmaAddr            [in] destination address in remote HBM
  * @param srcDmaAddr             [in] source address in local HBM
- * @param destRankId             [in] destination rank ID
+ * @param pe                     [in] destination PE ID
  * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
  * @param messageLen             [in] message length in Bytes
  */
 template<typename T>
-ACLSHMEM_DEVICE void aclshmemi_udma_write(__gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t destRankId,
+ACLSHMEM_DEVICE void aclshmemi_udma_write(__gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe,
                                     uint32_t qpIdx, uint64_t messageLen);
 
 /**
@@ -213,12 +218,12 @@ ACLSHMEM_DEVICE void aclshmemi_udma_write(__gm__ T* destDmaAddr, __gm__ T* srcDm
  *
  * @param destDmaAddr            [in] destination address in local HBM
  * @param srcDmaAddr             [in] source address in remote HBM
- * @param srcRankId              [in] destination rank ID
+ * @param srcPe                  [in] source PE ID
  * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
  * @param messageLen             [in] message length in Bytes
  */
 template<typename T>
-ACLSHMEM_DEVICE void aclshmemi_udma_read(__gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcRankId,
+ACLSHMEM_DEVICE void aclshmemi_udma_read(__gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe,
                                    uint32_t qpIdx, uint64_t messageLen);
 
 template <typename T>
@@ -226,4 +231,5 @@ ACLSHMEM_DEVICE void aclshmemi_udma_get_nbi(__gm__ T* dst, __gm__ T* src, uint32
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_put_nbi(__gm__ T* dst, __gm__ T* src, uint32_t elem_size, int pe);
+
 #endif

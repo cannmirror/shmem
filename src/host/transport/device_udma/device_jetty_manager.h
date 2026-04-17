@@ -75,6 +75,8 @@ private:
     void *cqCiAddr_{nullptr};
     void *sqPiAddr_{nullptr};
     void *sqCiAddr_{nullptr};
+    void *wqeCntAddr_{nullptr};
+    void *amoAddr_{nullptr};
 
     // host
     std::vector<ACLSHMEMUDMAWQCtx> wqInfoList_;

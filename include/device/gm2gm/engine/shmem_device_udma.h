@@ -86,4 +86,47 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(const AscendC::GlobalTensor<T>& dst,
  */
 ACLSHMEM_DEVICE void aclshmemx_udma_quiet(int pe);
 
+
+/**
+ * @brief Asynchronous interface. Add value to dst (remote symmetric address) on the specified PE pe,
+ * and atomically update the dst without returning the value. Supported types: int32, uint32, int64, uint64, float.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of atomic add
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_add(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Add value to dst (remote symmetric address) on the specified PE pe,
+ * and return the previous content of dst. Supported types: int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of atomic add
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_add(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Conditionally update dst (remote symmetric address) on the specified PE pe
+ * and return the previous content of dst. If cond and the remote dst value are equal,
+ * then value is swapped into the remote dst; otherwise, the remote dst is unchanged. In either case, the old
+ * value of the remote dest is returned. Supported types: int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param cond              [in] condition for swap
+ * @param value             [in] Operand of atomic add
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T *dst, T cond, T value, int32_t pe);
+
 #endif

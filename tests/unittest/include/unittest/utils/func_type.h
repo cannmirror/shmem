@@ -69,6 +69,19 @@
     FUNC(int16, int16_t);                          \
     FUNC(int32, int32_t)
 
+#define UDMA_ATOMIC_ADD_FUNC_TYPE(FUNC) \
+    FUNC(int32, int32_t);               \
+    FUNC(uint32, uint32_t);             \
+    FUNC(int64, int64_t);               \
+    FUNC(uint64, uint64_t);             \
+    FUNC(float, float)
+
+#define UDMA_ATOMIC_FETCH_FUNC_TYPE(FUNC) \
+    FUNC(int32, int32_t);                 \
+    FUNC(uint32, uint32_t);               \
+    FUNC(int64, int64_t);                 \
+    FUNC(uint64, uint64_t)
+
 struct uint128_t {
     uint64_t x;
     uint64_t y;

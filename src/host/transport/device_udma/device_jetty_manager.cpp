@@ -20,6 +20,8 @@
 constexpr uint32_t CQ_DEPTH_DEFAULT = 16384;
 constexpr uint32_t SQ_DEPTH_DEFAULT = 4096;
 constexpr uint32_t RQ_DEPTH_DEFAULT = 256;
+constexpr uint32_t MAX_SQE_BB_NUM = 4;
+constexpr uint32_t SQ_BASKBLK_CNT = SQ_DEPTH_DEFAULT * MAX_SQE_BB_NUM;
 constexpr uint8_t RNR_RETRY_COUNT_DEFAULT = 7;
 
 namespace shm {
@@ -59,6 +61,14 @@ Result DeviceJettyManager::Shutdown() noexcept
     if (sqCiAddr_ != nullptr) {
         aclrtFree(sqCiAddr_);
         sqCiAddr_ = nullptr;
+    }
+    if (wqeCntAddr_ != nullptr) {
+        aclrtFree(wqeCntAddr_);
+        wqeCntAddr_ = nullptr;
+    }
+    if (amoAddr_ != nullptr) {
+        aclrtFree(amoAddr_);
+        amoAddr_ = nullptr;
     }
     if (udmaInfo_ != nullptr) {
         aclrtFree(udmaInfo_);
@@ -245,7 +255,7 @@ Result DeviceJettyManager::JettyCreate() noexcept
     localWq.wqn = 0;
     localWq.bufAddr = qpCreateInfo_.ub.sqBuffVa;
     localWq.wqeShiftSize = log2(qpCreateInfo_.ub.wqebbSize); // wqeSize = 64 = 2^6, wqeShiftSize此处取6
-    localWq.depth = qpCreateAttr.sqDepth;
+    localWq.depth = SQ_BASKBLK_CNT;
     aclrtMalloc(&sqPiAddr_, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
     aclrtMemset(sqPiAddr_, sizeof(uint32_t), 0, sizeof(uint32_t));
     localWq.headAddr = reinterpret_cast<uintptr_t>(sqPiAddr_);
@@ -255,6 +265,12 @@ Result DeviceJettyManager::JettyCreate() noexcept
     localWq.dbMode = ACLSHMEMUDMADBMode::SW_DB;
     localWq.dbAddr = qpCreateInfo_.ub.dbAddr;
     localWq.sl = 0;
+    aclrtMalloc(&wqeCntAddr_, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMemset(wqeCntAddr_, sizeof(uint32_t), 0, sizeof(uint32_t));
+    localWq.wqeCntAddr = reinterpret_cast<uintptr_t>(wqeCntAddr_);
+    aclrtMalloc(&amoAddr_, sizeof(uint64_t), ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMemset(amoAddr_, sizeof(uint64_t), 0, sizeof(uint64_t));
+    localWq.amoAddr = reinterpret_cast<uintptr_t>(amoAddr_);
     g_boot_handle.allgather((void *)&localWq, wqInfoList_.data(), sizeof(ACLSHMEMUDMAWQCtx), &g_boot_handle);
 
     SHM_LOG_INFO("Qp create success.");
@@ -345,6 +361,8 @@ void DeviceJettyManager::FillUdmaWq(ACLSHMEMUDMAWQCtx &srcWq, ACLSHMEMUDMAWQCtx 
     dstWq.dbMode = srcWq.dbMode;
     dstWq.dbAddr = srcWq.dbAddr;
     dstWq.sl = srcWq.sl;
+    dstWq.wqeCntAddr = srcWq.wqeCntAddr;
+    dstWq.amoAddr = srcWq.amoAddr;
 }
 
 void DeviceJettyManager::FillUdmaCq(ACLSHMEMUDMACqCtx &srcCq, ACLSHMEMUDMACqCtx &dstCq) const
@@ -384,6 +402,7 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo &hostInfo) const
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.dbMode: " << static_cast<int>(tempWQCtx.dbMode));
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.dbAddr: " << tempWQCtx.dbAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.sl: " << tempWQCtx.sl);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeCntAddr: " << tempWQCtx.wqeCntAddr);
 
     auto tempCQCtx = ((ACLSHMEMUDMACqCtx *)hostInfo.scqPtr)[rankId_];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.cqn: " << tempCQCtx.cqn);

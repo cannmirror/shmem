@@ -166,6 +166,7 @@ foreach(EXAMPLE
     cmo
     mte_perftest
     udma_demo
+    udma_atomic_add
 )
     add_subdirectory(${EXAMPLE})
 endforeach()

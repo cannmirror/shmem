@@ -40,6 +40,8 @@ struct ACLSHMEMUDMAWQCtx {
     ACLSHMEMUDMADBMode dbMode; /* dbtype */
     uint64_t dbAddr;           /* doorbell address  */
     uint32_t sl;               /* service level */
+    uint64_t wqeCntAddr;       /* wqe count address*/
+    uint64_t amoAddr;          /* amo address to store fetch data*/
 };
 
 struct ACLSHMEMUDMACqCtx {

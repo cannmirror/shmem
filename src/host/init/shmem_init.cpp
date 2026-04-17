@@ -485,7 +485,7 @@ int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_ini
 #endif
     ACLSHMEM_CHECK_RET(aclshmemi_signal_init());
     ACLSHMEM_CHECK_RET(aclshmemi_team_init(g_state.mype, g_state.npes));
-    ACLSHMEM_CHECK_RET(aclshmemi_sync_init());	
+    ACLSHMEM_CHECK_RET(aclshmemi_sync_init());
     g_state.is_aclshmem_initialized = true;
     ACLSHMEM_CHECK_RET(prof_util_init(&g_host_profs, &g_state));
     ACLSHMEM_CHECK_RET(update_device_state());

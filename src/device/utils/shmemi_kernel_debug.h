@@ -26,4 +26,10 @@ ACLSHMEM_DEVICE void aclshmemi_kernel_abort(__gm__ const char* fmt, Args&&... ar
     trap();
 }
 
+template<class... Args>
+ACLSHMEM_DEVICE void aclshmemi_kernel_printf(__gm__ const char* fmt, Args&&... args)
+{
+    AscendC::printf(fmt, args...);
+}
+
 #endif

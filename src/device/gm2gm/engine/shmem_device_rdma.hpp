@@ -7,8 +7,8 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#ifndef SHMEM_DEVICE_RDMA_HPP
-#define SHMEM_DEVICE_RDMA_HPP
+#ifndef ACLSHMEM_DEVICE_RDMA_HPP
+#define ACLSHMEM_DEVICE_RDMA_HPP
 
 #include "kernel_operator.h"
 #include "device/shmem_def.h"
@@ -16,43 +16,44 @@
 #include "rdma_backends/rdma_device_backend_base.h"
 
 // Decide Current RDMA Backend
-#include "rdma_backends/rdma_device_backend_inDie.hpp"
-#define K_RDMA_BACKEND (AclShmemRdmaBackend::inDie)
+#include "rdma_backends/rdma_device_backend_in_die.hpp"
+#define K_RDMA_BACKEND (aclshmemi_rdma_backend_t::IN_DIE)
 
-ACLSHMEM_DEVICE __gm__ ACLSHMEMRDMAInfo* aclshmemi_qp_info_fetch()
+ACLSHMEM_DEVICE __gm__ aclshmemi_rdma_info* aclshmemi_qp_info_fetch()
 {
-    __gm__ ACLSHMEMRDMAInfo* RDMAInfo = (__gm__ ACLSHMEMRDMAInfo*)(aclshmemi_get_qp_info_address(0));
-    return RDMAInfo;
+    __gm__ aclshmemi_rdma_info* rdma_info = (__gm__ aclshmemi_rdma_info*)(aclshmemi_get_qp_info_address(0));
+    return rdma_info;
 }
 
 template<typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_write(__gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qpIdx,
-                                          uint64_t messageLen, AscendC::LocalTensor<uint64_t> ubLocal64,
-                                          AscendC::LocalTensor<uint32_t> ubLocal32, uint32_t sync_id)
+ACLSHMEM_DEVICE void aclshmemi_roce_write(__gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx,
+                                          uint64_t message_len, AscendC::LocalTensor<uint64_t> ub_local64,
+                                          AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
-    aclshmemi_roce_write<T, K_RDMA_BACKEND>(dst, src, pe, qpIdx, messageLen, ubLocal64, ubLocal32, sync_id);
+    aclshmemi_roce_write<T, K_RDMA_BACKEND>(dst, src, pe, qp_idx, message_len, ub_local64, ub_local32, sync_id);
 }
 
 template<typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_read(__gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qpIdx,
-                                         uint64_t messageLen, AscendC::LocalTensor<uint64_t> ubLocal64,
-                                         AscendC::LocalTensor<uint32_t> ubLocal32, uint32_t sync_id)
+ACLSHMEM_DEVICE void aclshmemi_roce_read(__gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx,
+                                         uint64_t message_len, AscendC::LocalTensor<uint64_t> ub_local64,
+                                         AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
-    aclshmemi_roce_read<T, K_RDMA_BACKEND>(dst, src, pe, qpIdx, messageLen, ubLocal64, ubLocal32, sync_id);
+    aclshmemi_roce_read<T, K_RDMA_BACKEND>(dst, src, pe, qp_idx, message_len, ub_local64, ub_local32, sync_id);
 }
 
-ACLSHMEM_DEVICE void aclshmemi_roce_quiet(uint32_t pe, uint32_t qpIdx, AscendC::LocalTensor<uint64_t> ubLocal64,
-                                          AscendC::LocalTensor<uint32_t> ubLocal32, uint32_t sync_id)
+ACLSHMEM_DEVICE void aclshmemi_roce_quiet(uint32_t pe, uint32_t qp_idx, AscendC::LocalTensor<uint64_t> ub_local64,
+                                          AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
-    __gm__ ACLSHMEMRDMAInfo* RDMAInfo = aclshmemi_qp_info_fetch();
+    __gm__ aclshmemi_rdma_info* rdma_info = aclshmemi_qp_info_fetch();
+    uint32_t qp_num = rdma_info->qp_num;
 
-    uint32_t qpNum = RDMAInfo->qpNum;
-    __gm__ ACLSHMEMWQCtx* qpCtxEntry =
-        (__gm__ ACLSHMEMWQCtx*)(RDMAInfo->sqPtr + (pe * qpNum + qpIdx) * sizeof(ACLSHMEMWQCtx));
-    auto curHardwareHeadAddr = qpCtxEntry->headAddr;
-    dcci_cachelines((__gm__ uint8_t*)curHardwareHeadAddr, 8);
-    uint32_t curHead = *(__gm__ uint32_t*)(curHardwareHeadAddr);
-    aclshmemi_roce_poll_cq<K_RDMA_BACKEND>(pe, qpIdx, curHead, ubLocal64, ubLocal32, sync_id);
+    __gm__ aclshmemi_rdma_sq_ctx* sq_context =
+        (__gm__ aclshmemi_rdma_sq_ctx*)(rdma_info->sq_ptr + (pe * qp_num + qp_idx) * sizeof(aclshmemi_rdma_sq_ctx));
+
+    auto sq_pi_addr = sq_context->head_addr;
+    dcci_cachelines((__gm__ uint8_t*)sq_pi_addr, 8);
+    uint32_t cur_head = *(__gm__ uint32_t*)(sq_pi_addr);
+    aclshmemi_roce_poll_cq<K_RDMA_BACKEND>(pe, qp_idx, cur_head, ub_local64, ub_local32, sync_id);
 }
 
 ACLSHMEM_DEVICE __gm__ void* aclshmem_roce_ptr(__gm__ void* ptr, int pe)
@@ -212,8 +213,8 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(AscendC::GlobalTensor<T> dst, Ascend
 template<typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_quiet(uint32_t pe, __ubuf__ T* buf, uint32_t sync_id)
 {
-    __gm__ ACLSHMEMRDMAInfo* RDMAInfo = aclshmemi_qp_info_fetch();
-    uint32_t qpNum = RDMAInfo->qpNum;
+    __gm__ aclshmemi_rdma_info* rdma_info = aclshmemi_qp_info_fetch();
+    uint32_t qp_num = rdma_info->qp_num;
 
     AscendC::LocalTensor<uint32_t> ub_tensor_32;
     ub_tensor_32.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
@@ -224,14 +225,14 @@ ACLSHMEM_DEVICE void aclshmemx_roce_quiet(uint32_t pe, __ubuf__ T* buf, uint32_t
     ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf) + UB_ALIGN_SIZE;
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
 
-    for (uint32_t qpIdx = 0; qpIdx < qpNum; qpIdx++) {
-        __gm__ ACLSHMEMWQCtx* qpCtxEntry =
-            (__gm__ ACLSHMEMWQCtx*)(RDMAInfo->sqPtr + (pe * qpNum + qpIdx) * sizeof(ACLSHMEMWQCtx));
-        auto curHardwareHeadAddr = qpCtxEntry->headAddr;
-        dcci_cachelines((__gm__ uint8_t*)curHardwareHeadAddr, 8);
-        uint32_t curHead = *(__gm__ uint32_t*)(curHardwareHeadAddr);
-        aclshmemi_roce_poll_cq<K_RDMA_BACKEND>(pe, qpIdx, curHead, ub_tensor_64, ub_tensor_32, sync_id);
+    for (uint32_t qp_idx = 0; qp_idx < qp_num; qp_idx++) {
+        __gm__ aclshmemi_rdma_sq_ctx* sq_context =
+            (__gm__ aclshmemi_rdma_sq_ctx*)(rdma_info->sq_ptr + (pe * qp_num + qp_idx) * sizeof(aclshmemi_rdma_sq_ctx));
+        auto sq_pi_addr = sq_context->head_addr;
+        dcci_cachelines((__gm__ uint8_t*)sq_pi_addr, 8);
+        uint32_t cur_head = *(__gm__ uint32_t*)(sq_pi_addr);
+        aclshmemi_roce_poll_cq<K_RDMA_BACKEND>(pe, qp_idx, cur_head, ub_tensor_64, ub_tensor_32, sync_id);
     }
 }
 
-#endif
+#endif  // ACLSHMEM_DEVICE_RDMA_HPP

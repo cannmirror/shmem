@@ -97,15 +97,22 @@ include/
 ## docs
 ```
 └── docs
-    ├── api_demo.md              // shmem api调用demo
-    ├── code_organization.md     // 工程组织架构（本文件）
-    ├── example.md               // 使用样例
-    ├── quickstart.md            // 快速开始
-    ├── related_scripts.md       // 相关脚本介绍
-    ├── pythonAPI.md             // shmem python api列表
-    └── Troubleshooting_FAQs.md  // QA
+    ├── api                          // shmem api
+    ├── debug                        // shmem debug调测
+    ├── deployment                   // SO文件部署与使用指导
+    ├── doxygen
+    ├── example                      // 使用样例
+    ├── images                       //图片
+    ├── SECURITY.md                  //安全声明
+    ├── code_organization.md         // 工程组织架构（本文件）
+    ├── compilation_build_guide.md   // 相关脚本介绍
+    ├── conf.py                      // conf文件
+    ├── index.rst                    // 目录树
+    ├── multi_instance.md            // 多实例支持
+    ├── principles.md                // SHMEM原理概述
+    ├── quickstart.md                // 快速开始
 ```
 
 ## scripts
 存放相关脚本。
-[脚本具体功能和使用](related_scripts.md)
+[脚本具体功能和使用](compilation_build_guide.md)

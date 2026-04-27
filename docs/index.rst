@@ -7,7 +7,7 @@ Welcome to Shmem's Documentation!
     :name: Getting Started
 
     quickstart.md
-    related_scripts.md
+    compilation_build_guide.md
 
 .. toctree::
     :maxdepth: 2
@@ -15,7 +15,6 @@ Welcome to Shmem's Documentation!
     :name: Using SHMEM
     
     example/api_demo.md
-    compilation_build_guide.md
     debug/log_debug.md
     debug/tools_debug.md
     debug/dump_debug.md

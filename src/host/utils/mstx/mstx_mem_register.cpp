@@ -70,13 +70,13 @@ public:
             SHM_LOG_INFO("No regions to register for group=" << group);
             return;
         }
+
         SHM_LOG_INFO("Register group " << group << ", total regions: " << target_ranges.size());
-        
         for (size_t i = 0; i < target_ranges.size(); ++i) {
             const auto& region = target_ranges[i];
-            SHM_LOG_INFO("  Region " << i 
-                         << ": ptr=" << region.ptr 
-                         << ", size=" << region.size 
+            SHM_LOG_INFO("  Region " << i
+                         << ": ptr=" << region.ptr
+                         << ", size=" << region.size
                          << ", deviceId=" << static_cast<unsigned int>(region.deviceId));
         }
 
@@ -88,9 +88,21 @@ public:
         regions_desc.regionCount = target_ranges.size();
         regions_desc.regionDescArray = target_ranges.data();
         regions_desc.regionHandleArrayOut = target_handles.data();
-
         mstxMemRegionsRegister(domain_, &regions_desc);
         SHM_LOG_INFO("Registered " << target_ranges.size() << " regions for group " << group);
+
+        std::vector<mstxMemPermissionsAssignRegionsDesc_t> permAssignDesc(target_handles.size());
+        for (size_t i = 0; i < target_handles.size(); ++i) {
+            permAssignDesc[i].flags = MSTX_MEM_PERMISSIONS_REGION_FLAGS_SHARED;
+            permAssignDesc[i].region.refType = MSTX_MEM_REGION_REF_TYPE_HANDLE;
+            permAssignDesc[i].region.handle = target_handles[i];
+        }
+
+        mstxMemPermissionsAssignBatch_t permAssignBatch{};
+        permAssignBatch.regionCount = permAssignDesc.size();
+        permAssignBatch.regionDescArray = permAssignDesc.data();
+        mstxMemPermissionsAssign(domain_, &permAssignBatch);
+        SHM_LOG_INFO("Registered " << permAssignDesc.size() << " permissions for group " << group);
     }
 
     void mstx_mem_regions_unregister(int group = 0) override

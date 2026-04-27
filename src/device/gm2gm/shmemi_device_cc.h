@@ -50,7 +50,7 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_core_soft()
     if ASCEND_IS_AIC {
         return;
     }
-
+    MSTX_FUSE_SCOPE_START();
     int32_t cur_block_idx = AscendC::GetBlockIdx();
     int32_t block_dim = AscendC::GetBlockNum() * AscendC::GetTaskRation();
     auto sync_pool = aclshmemi_get_core_sync_pool();
@@ -71,6 +71,8 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_core_soft()
     }
 
     aclshmemi_store((__gm__ int32_t *)(sync_counter), count);
+    MSTX_FUSE_SCOPE_END();
+    MSTX_CROSS_CORE_BARRIER_REPORT(block_dim);
 }
 
 /* Level 1: barrier between vec cores (within a device) */
@@ -292,8 +294,8 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_npu_v3(aclshmem_team_t team_idx)
     int32_t vec_id = AscendC::GetBlockIdx();
     int32_t vec_size = AscendC::GetBlockNum() * AscendC::GetTaskRation();
 
-    MSTX_DFX_REPORT_START(MSTX_EVENT_CROSS_CORE_BARRIER, mstx_cross_core_barrier, (uint32_t)vec_size, nullptr, IS_AIV_ONLY, true);
-
+    MSTX_FUSE_SCOPE_START();
+    
     int32_t my_pe = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD]->mype;
     int32_t start = team->start;
     int32_t stride = team->stride;
@@ -323,7 +325,8 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_npu_v3(aclshmem_team_t team_idx)
         aclshmemi_store((__gm__ int32_t *)sync_counter, count);
     }
     aclshmemi_barrier_core<IS_AIV_ONLY>();
-    MSTX_DFX_REPORT_END();
+    MSTX_FUSE_SCOPE_END();
+    MSTX_BARRIER_NPU_REPORT(size, vec_size);
 }
 
 template<bool IS_AIV_ONLY = true>

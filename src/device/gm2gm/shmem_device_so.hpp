@@ -14,6 +14,7 @@
 #include "device/shmem_def.h"
 #include "host/shmem_host_def.h"
 #include "shmemi_device_rma.h"
+#include "utils/mstx/shmemi_mstx_report.h"
 
 /**
  * @brief Standard RMA Types and Names
@@ -254,10 +255,13 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE_MEM_SIGNAL_DETAILED_NBI);
 
 ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int32_t val)
 {
+    MSTX_FUSE_SCOPE_START();
     aclshmemi_store(addr, val);
 
     // flush data cache to GM after signal to ensure it is visible to other ranks
     dcci_cacheline((__gm__ uint8_t *)addr);
+    MSTX_FUSE_SCOPE_END();
+    MSTX_SIGNAL_SET_REPORT(addr, val);
 }
 
 ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int pe, int32_t val)

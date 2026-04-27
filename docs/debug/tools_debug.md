@@ -6,7 +6,6 @@ shmem后续会适配[msprof算子调优工具](https://www.hiascend.com/document
 
 ## mssanitizer
 shmem已适配[mssanitizer内存检测工具](https://www.hiascend.com/document/detail/zh/mindstudio/830/ODtools/Operatordevelopmenttools/atlasopdev_16_0039.html)，以下功能的相关接口暂不支持该工具的使用：
-- P2P同步接口暂不支持软同步竞争检测
 - SDMA/RDMA/UDMA相关接口和用例不支持使用mssanitizer进行内存检测
 
 **该功能依赖对应 CANN 版本能力，预计社区版 9.0.0-beta.2 支持**
@@ -37,7 +36,7 @@ bash scripts/build.sh -examples -mssanitizer
 用mssanitizer工具拉起allgather样例进行内存检测
 ```sh
 cd examples/allgather
-bash run.sh -ranks 2 -tool mssanitizer
+bash run.sh -pes 2 -tool mssanitizer
 ```
 ### 内存越界日志
 当内存发生越界时工具会先打屏越界地址，越界内存大小、所属kernel，核号、卡号等信息。

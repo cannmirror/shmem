@@ -14,6 +14,7 @@
 
 #include "host_device/shmem_common_types.h"
 #include "shmemi_device_p2p_sync.h"
+#include "utils/mstx/shmemi_mstx_report.h"
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_signal_wait_until_eq(__gm__ volatile T *sig_addr, T cmp_val)
@@ -386,7 +387,10 @@ extern "C" {
 
 ACLSHMEM_DEVICE int32_t aclshmem_signal_wait_until(__gm__ int32_t *sig_addr, int cmp, int32_t cmp_val)
 {
+    MSTX_FUSE_SCOPE_START();
     aclshmemi_wait_until<int32_t>(sig_addr, cmp, cmp_val);
+    MSTX_FUSE_SCOPE_END();
+    MSTX_SIGNAL_WAIT_REPORT(sig_addr, cmp, cmp_val);
     return *sig_addr;
 }
 

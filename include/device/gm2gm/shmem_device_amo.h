@@ -80,7 +80,7 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(ACLSHMEM_ATOMIC_ADD_TYPENAME);
  * |int64      | int64     |
  * |uint64     | uint64    |
  */
-#define ACLSHMEM_TYPE_FUNC_ATOMIC_FETCH(FUNC) \
+#define ACLSHMEM_TYPE_FUNC_ATOMIC(FUNC) \
     FUNC(int32, int32_t);                     \
     FUNC(uint32, uint32_t);                   \
     FUNC(int64, int64_t);                     \
@@ -109,7 +109,7 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(ACLSHMEM_ATOMIC_ADD_TYPENAME);
     ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_add(__gm__ TYPE *dst, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC_FETCH(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
 /** \endcond */
 
 /**
@@ -138,7 +138,275 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_FETCH(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
     ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_compare_swap(__gm__ TYPE *dst, TYPE cond, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC_FETCH(ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch(\_\_gm\_\_ TYPE *dst, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Fetch the contents of dst (remote symmetric address) on the specified PE pe
+ * and return the contents.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch(__gm__ TYPE *dst, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic set functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Set value to dst (remote symmetric address) on the specified PE pe
+ * without returning a value.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to be atomically written to the remote PE.
+ * - **pe**     - [in] PE number of the remote PE.
+ */
+#define ACLSHMEM_ATOMIC_SET_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_set(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_SET_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic swap functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_swap(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Swap value to dst (remote symmetric address) on the specified PE pe
+ * and return the previous contents of dst.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to be atomically written to the remote PE.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the previous contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_SWAP_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_swap(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_SWAP_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch inc functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_inc(\_\_gm\_\_ TYPE *dst, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
+ * and return the previous contents of dst.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the previous contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_inc(__gm__ TYPE *dst, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic inc functions for different data types
+ *        (e.g., int32, uint32, int64, uint64, float).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_inc(\_\_gm\_\_ TYPE *dst, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
+ * without returning a value.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **pe**     - [in] PE number of the remote PE.
+ */
+#define ACLSHMEM_ATOMIC_INC_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_inc(__gm__ TYPE *dst, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(ACLSHMEM_ATOMIC_INC_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch and functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_and(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise AND operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the previous contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_and(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic and functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_and(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise AND operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ */
+#define ACLSHMEM_ATOMIC_AND_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_and(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_AND_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch or functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_or(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise OR operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the previous contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_or(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic or functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_or(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise OR operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ */
+#define ACLSHMEM_ATOMIC_OR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_or(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_OR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch xor functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_xor(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise XOR operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Returns
+ *      Return the previous contents of dst.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_xor(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic xor functions for different data types
+ *        (e.g., int32, uint32, int64, uint64).
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_xor(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value.
+ *
+ * @par Parameters
+ * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Operand of bitwise XOR operation.
+ * - **pe**     - [in] PE number of the remote PE.
+ */
+#define ACLSHMEM_ATOMIC_XOR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_xor(__gm__ TYPE *dst, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_XOR_TYPENAME);
 /** \endcond */
 
 #include "gm2gm/shmem_device_amo.hpp"

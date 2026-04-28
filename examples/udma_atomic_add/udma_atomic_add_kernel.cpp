@@ -20,18 +20,13 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void udma_atomic_a
     AscendC::InitDump(false, dump, INIT_DUMP_SIZE);
 #endif
 
-    int64_t my_rank = aclshmem_my_pe();
-    int64_t pe_size = aclshmem_n_pes();
+    int32_t my_rank = aclshmem_my_pe();
+    int32_t pe_size = aclshmem_n_pes();
+    int32_t peer_id = (my_rank + 1) % pe_size;
     AscendC::PipeBarrier<PIPE_ALL>();
-    // Push the local segment to every other PE.
-    for (int i = 0; i < pe_size; i++) {
-        if (i == my_rank) {
-            continue;
-        }
-        int32_t value = 10;
-        aclshmemx_udma_atomic_add((__gm__ int32_t *)gva, value, i);
-        aclshmemx_udma_quiet(i);
-    }
+    int32_t value = 10;
+    aclshmemx_udma_atomic_add((__gm__ int32_t *)gva, value, peer_id);
+    aclshmemx_udma_quiet(peer_id);
 }
 
 void launch_udma_atomic_add(uint32_t block_dim, void *stream, uint8_t *gva, uint8_t *dump, int elements)

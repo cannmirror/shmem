@@ -107,7 +107,9 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
         /* UDMA */
-        aclshmemi_udma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src), elem_size, pe);
+        aclshmemx_udma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
+            (__ubuf__ char *)nullptr, elem_size, pe);
+        aclshmemx_udma_quiet(pe);
     }
 }
 
@@ -132,7 +134,7 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             AscendC::TEventID sync_id = (AscendC::TEventID)device_state->mte_config.sync_id;                         \
             aclshmemx_mte_get_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, elem_size, pe, \
                                   sync_id);                                                                          \
-            aclshmemx_mte_quiet();                                                                                        \
+            aclshmemx_mte_quiet();                                                                                   \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                          \
             /* ROCE */                                                                                               \
             uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                                \
@@ -141,7 +143,8 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                           \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                          \
             /* UDMA */                                                                                               \
-            aclshmemi_udma_get_nbi(dst, src, elem_size, pe);                                                         \
+            aclshmemx_udma_get_nbi(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                               \
+            aclshmemx_udma_quiet(pe);                                                                                \
         }                                                                                                            \
     }
 
@@ -329,7 +332,9 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
         /* UDMA */
-        aclshmemi_udma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src), elem_size, pe);
+        aclshmemx_udma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
+            (__ubuf__ char *)nullptr, elem_size, pe);
+        aclshmemx_udma_quiet(pe);
     }
 }
 
@@ -363,7 +368,8 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                              \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                             \
             /* UDMA */                                                                                                  \
-            aclshmemi_udma_put_nbi(dst, src, elem_size, pe);                                                            \
+            aclshmemx_udma_put_nbi(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                                  \
+            aclshmemx_udma_quiet(pe);                                                                                   \
         }                                                                                                               \
     }
 

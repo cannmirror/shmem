@@ -83,10 +83,11 @@ int test_aclshmem_udma_atomic_add(int pe_id, int n_pes, uint64_t local_mem_size)
 
     if (y_host[0] != (pe_id + num10 * 2)) {
         std::cout << "pe" << pe_id << ": " << y_host[0] << " != " << (pe_id + num10 * 2) << std::endl;
-        return -1;
+        status |= -1;
+    } else {
+        std::cout << "check transport result success, pe=" << pe_id << std::endl;
     }
 
-    std::cout << "check transport result success, pe=" << pe_id << std::endl;
     // Release resources.
     status |= aclrtFreeHost(y_host);
     aclshmem_free(ptr);
@@ -94,7 +95,7 @@ int test_aclshmem_udma_atomic_add(int pe_id, int n_pes, uint64_t local_mem_size)
     status |= aclrtDestroyStream(stream);
     status |= aclrtResetDevice(device_id);
     status |= aclFinalize();
-    return 0;
+    return status;
 }
 
 int main(int argc, char *argv[])
@@ -109,7 +110,8 @@ int main(int argc, char *argv[])
     f_npu = atoi(argv[argIdx++]);
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     status = test_aclshmem_udma_atomic_add(pe_id, n_pes, local_mem_size);
-
-    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
-    return 0;
+    if (status == 0) {
+        std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl; 
+    }
+    return status;
 }

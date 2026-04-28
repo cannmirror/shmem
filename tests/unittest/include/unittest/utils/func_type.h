@@ -76,7 +76,7 @@
     FUNC(uint64, uint64_t);             \
     FUNC(float, float)
 
-#define UDMA_ATOMIC_FETCH_FUNC_TYPE(FUNC) \
+#define UDMA_ATOMIC_FUNC_TYPE(FUNC) \
     FUNC(int32, int32_t);                 \
     FUNC(uint32, uint32_t);               \
     FUNC(int64, int64_t);                 \

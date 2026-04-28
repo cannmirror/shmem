@@ -24,7 +24,10 @@
 #define ACLSHMEM_UDMA_SUPPORTED 0
 #endif
 
+constexpr uint32_t MAX_RETRY_TIMES = 1000000;
+
 ACLSHMEM_DEVICE void aclshmemi_dump_sge(__gm__ uint8_t* wqeAddr, uint32_t sge_num);
+template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr);
 
 ACLSHMEM_DEVICE __gm__ ACLSHMEMAIVUDMAInfo* aclshmemi_udma_qp_info_fetch()
@@ -83,17 +86,16 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uin
     auto cqeSize = 1 << bbShift;
     auto curHardwareTailAddr = cqCtxEntry->tailAddr;
     uint32_t curTail = ld_dev((__gm__ uint32_t*)(curHardwareTailAddr), 0);
-    const uint32_t maxTimes = 1000000;
     while (curTail != idx) {
         __gm__ ACLSHMEMJfcCqeCtx* cqeAddr =
             (__gm__ ACLSHMEMJfcCqeCtx*)(cqBaseAddr + cqeSize * (curTail & (shm::UDMA_CQ_DEPTH_DEFAULT - 1)));
         bool validOwner = (curTail / shm::UDMA_CQ_DEPTH_DEFAULT) & 1;
         uint32_t times = 0;
-        while ((validOwner ^ cqeAddr->owner) == 0 && times < maxTimes) { // util cqeAddr->owner changed
+        while ((validOwner ^ cqeAddr->owner) == 0 && times < MAX_RETRY_TIMES) { // util cqeAddr->owner changed
             dcci_cachelines((__gm__ uint8_t*)cqeAddr, sizeof(ACLSHMEMJfcCqeCtx));
             times++;
         }
-        if (times >= maxTimes) {
+        if (times >= MAX_RETRY_TIMES) {
             ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Poll cq timeout! curTail=%d idx=%d\n", curTail, idx);
             return 0xFF;
         }
@@ -129,6 +131,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(
     st_dev(curTail, (__gm__ uint32_t*)curWQTailAddr, 0);
 }
 
+template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr)
 {
     if (wqeAddr == nullptr) {
@@ -172,7 +175,31 @@ ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr)
         reduceDataType, reduceOpcode);
     AscendC::printf(
         "WQE: rmt_addr_l_or_token_id: %x rmt_addr_h_or_token_value: %x\n", rmtAddrLOrTokenId, rmtAddrHOrTokenValue);
+    if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY)) {
+        __gm__ ACLSHMEMNotifyCtx* notifyCtx =
+            (__gm__ ACLSHMEMNotifyCtx*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx));
+        auto notifyTokenId = notifyCtx->notifyTokenId;
+        auto notifyTokenValue = notifyCtx->notifyTokenValue;
+        auto notifyAddrL = notifyCtx->notifyAddrL;
+        auto notifyAddrH = notifyCtx->notifyAddrH;
+        auto notifyDataL = notifyCtx->notifyDataL;
+        auto notifyDataH = notifyCtx->notifyDataH;
+        AscendC::printf(
+            "WQE: notifyTokenId: %x notifyTokenValue: %x notifyAddrL: %x notifyAddrH: %x notifyDataL: %x "
+            "notifyDataH: %x \n", notifyTokenId, notifyTokenValue, notifyAddrL, notifyAddrH, notifyDataL, notifyDataH);
+    }
     aclshmemi_dump_sge(wqeAddr, sgeNum);
+    if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OPCODE_FAA)) {
+        __gm__ T* amoDataAddr = (__gm__ T*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx));
+        T add_data = *amoDataAddr;
+        AscendC::printf("SGE: add_data: 0x%llx \n", (unsigned long long)add_data);
+    } else if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_CAS)) {
+        __gm__ T* amoDataAddr = (__gm__ T*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx));
+        T swap_data = *amoDataAddr;
+        T cond_data = *(amoDataAddr + 1);
+        AscendC::printf("SGE: cond_data: 0x%llx, swap_data: 0x%llx\n",
+            (unsigned long long)cond_data, (unsigned long long)swap_data);
+    }
 }
 
 ACLSHMEM_DEVICE void aclshmemi_dump_sge(__gm__ uint8_t* wqeAddr, uint32_t sge_num)
@@ -381,7 +408,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
-    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeCtx);
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe<T>, (__gm__ uint8_t*)sqeCtx);
 }
 
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm__ ACLSHMEMUDMAWQCtx*& qpCtxEntry)
@@ -442,7 +469,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_get_nbi(__gm__ T* dst, __gm__ T* src, uint32
         auto ptr = aclshmem_ptr(src, pe);
         aclshmemi_udma_read((__gm__ uint8_t*)dst, (__gm__ uint8_t*)ptr, pe, 0, elem_size * sizeof(T));
     } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
     }
 }
 
@@ -469,7 +496,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_put_nbi(__gm__ T* dst, __gm__ T* src, uint32
         auto ptr = aclshmem_ptr(dst, pe);
         aclshmemi_udma_write((__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T));
     } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
     }
 }
 
@@ -492,6 +519,22 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     aclshmemi_udma_put_nbi(dstPhyAddr, srcPhyAddr, elem_size, pe);
 }
 
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
+    __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe)
+{
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+        auto ptr = aclshmem_ptr(dst, pe);
+        auto sig_addr_dst = aclshmem_ptr(sig_addr, pe);
+        aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY> signal_params{
+            .sig_addr = (__gm__ uint64_t*)(sig_addr_dst), .signal = signal};
+        aclshmemi_udma_write_notify<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY>(
+            (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T), signal_params);
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
+}
+
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE constexpr bool aclshmemi_udma_check_atomic_len()
 {
@@ -508,18 +551,30 @@ ACLSHMEM_DEVICE constexpr bool aclshmemi_udma_check_atomic_len()
     return true;
 }
 
-template <typename T>
-ACLSHMEM_DEVICE T aclshmemi_udma_get_atomic_fetch_data(uint32_t pe, uint32_t qp_idx)
+ACLSHMEM_DEVICE uint64_t aclshmemi_udma_get_amo_addr(uint32_t pe, uint32_t qp_idx)
 {
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     uint32_t qp_num = udmaInfo->qpNum;
-    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry =
-        (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (pe * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
+    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr
+        + (pe * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
     auto amo_addr = qpCtxEntry->amoAddr;
+    return amo_addr;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemi_udma_get_amo_addr_value(uint64_t amo_addr)
+{
     dcci_cachelines((__gm__ uint8_t*)amo_addr, sizeof(T));
     __gm__ T* fetch_addr = reinterpret_cast<__gm__ T*>(amo_addr);
     T fetch_data = *fetch_addr;
     return fetch_data;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemi_udma_get_atomic_fetch_data(uint32_t pe, uint32_t qp_idx)
+{
+    auto amo_addr = aclshmemi_udma_get_amo_addr(pe, qp_idx);
+    return aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
 }
 
 template <typename T>
@@ -541,7 +596,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_add(__gm__ T* dst, T value, int32_t p
                 reinterpret_cast<__gm__ uint8_t*>(ptr), nullptr, pe, 0, sizeof(T), atomic_params);
         }
     } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
     }
 }
 
@@ -563,7 +618,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_add(__gm__ T* dst, T value, int32_
         aclshmemx_udma_quiet(pe);
         return aclshmemi_udma_get_atomic_fetch_data<T>(pe, 0);
     } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
         return 0;
     }
 }
@@ -584,24 +639,174 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T* dst, T cond, T va
         aclshmemx_udma_quiet(pe);
         return aclshmemi_udma_get_atomic_fetch_data<T>(pe, 0);
     } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
         return 0;
     }
 }
 
+
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
-    __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T *dst, int32_t pe)
 {
-    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
-        auto ptr = aclshmem_ptr(dst, pe);
-        auto sig_addr_dst = aclshmem_ptr(sig_addr, pe);
-        aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY> signal_params{
-            .sig_addr = (__gm__ uint64_t*)(sig_addr_dst), .signal = signal};
-        aclshmemi_udma_write_notify<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY>(
-            (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T), signal_params);
-    } else {
-        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on NPU_ARCH 3510\n");
-    }
+    return aclshmemx_udma_atomic_fetch_add<T>(dst, 0, pe);
 }
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, value, pe) == old_value) {
+            break;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_set timeout!\n");
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, value, pe) == old_value) {
+            return old_value;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_swap timeout!\n");
+    return 0;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T *dst, int32_t pe)
+{
+    return aclshmemx_udma_atomic_fetch_add<T>(dst, 1, pe);
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T *dst, int32_t pe)
+{
+    aclshmemx_udma_atomic_add<T>(dst, 1, pe);
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value & value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            return old_value;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_fetch_and timeout!\n");
+    return 0;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value & value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            break;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_and timeout!\n");
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value | value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            return old_value;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_fetch_or timeout!\n");
+    return 0;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value | value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            break;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_or timeout!\n");
+}
+
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value ^ value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            return old_value;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_fetch_xor timeout!\n");
+    return 0;
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T *dst, T value, int32_t pe)
+{
+    uint32_t times = 0;
+    while (times < MAX_RETRY_TIMES) {
+        auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
+        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemx_udma_quiet(pe);
+        T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
+        T new_value = old_value ^ value;
+        if (aclshmemx_udma_atomic_compare_swap(dst, old_value, new_value, pe) == old_value) {
+            break;
+        }
+        times++;
+    }
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Atomic_xor timeout!\n");
+}
+
 #endif

@@ -80,6 +80,24 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     uint32_t elem_size, int pe, uint32_t sync_id);
 
 /**
+ * @brief Asynchronous interface. Copy a contiguous data from local to symmetric address on the specified PE and
+ *        updating a remote signal flag on completion using UDMA.
+ *        Template function for different data types.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ *        PE are not supported.
+ *
+ * @param dst               [in] Pointer on Symmetric memory of the destination data.
+ * @param src               [in] Pointer on local device of the source data.
+ * @param elem_size         [in] Number of elements in the dest and source arrays.
+ * @param sig_addr          [in] Symmetric address of the signal word to be updated.
+ * @param signal            [in] The value used to update sig_addr.
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
+    __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe);
+
+/**
  * @brief UDMA Quiet function. This synchronous function ensures all previous UDMA WQEs are completed
  * (data has arrived at the destination PE).
  *
@@ -109,6 +127,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_add(__gm__ T* dst, T value, int32_t p
  * @param dst               [in] Pointer on local device of the destination data.
  * @param value             [in] Operand of atomic add
  * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous content of dst.
  */
 template <typename T>
 ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_add(__gm__ T* dst, T value, int32_t pe);
@@ -125,25 +144,162 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_add(__gm__ T* dst, T value, int32_
  * @param cond              [in] condition for swap
  * @param value             [in] Operand of atomic add
  * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous content of dst.
  */
 template <typename T>
 ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T* dst, T cond, T value, int32_t pe);
 
+
 /**
- * @brief Asynchronous interface. Copy a contiguous data from local to symmetric address on the specified PE and
- *        updating a remote signal flag on completion using UDMA.
- *        Template function for different data types.
+ * @brief Synchronous interface. Fetch the contents of dst (remote symmetric address) on the specified PE pe
+ * and return the contents. Supported types: int32, uint32, int64, uint64.
  *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
- *        PE are not supported.
+ * PE are not supported.
  *
- * @param dst               [in] Pointer on Symmetric memory of the destination data.
- * @param src               [in] Pointer on local device of the source data.
- * @param elem_size         [in] Number of elements in the dest and source arrays.
- * @param sig_addr          [in] Symmetric address of the signal word to be updated.
- * @param signal            [in] The value used to update sig_addr.
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T *dst, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Set value to dst (remote symmetric address) on the specified PE pe
+ * without returning a value. Supported types: int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Value to be atomically written to the remote PE.
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
-    __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Swap value to dst (remote symmetric address) on the specified PE pe
+ * and return the previous contents of dst. Supported types: int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Value to be atomically written to the remote PE.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
+ * and return the previous contents of dst. Supported types: int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T *dst, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
+ * without returning a value. Supported types: int32, uint32, int64, uint64, float.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T *dst, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise AND operation.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise AND operation.
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise OR operation.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise OR operation.
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, and return the previous contents of dst. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise XOR operation.
+ * @param pe                [in] PE number of the remote PE.
+ * @return                  Return the previous contents of dst.
+ */
+template <typename T>
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_t pe);
+
+/**
+ * @brief Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
+ * specified PE pe with the operand value, without returning a value. Supported types:
+ * int32, uint32, int64, uint64.
+ *        WARNING: When using UDMA as the underlying transport, concurrent RMA/AMO operations to the same
+ * PE are not supported.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param value             [in] Operand of bitwise XOR operation.
+ * @param pe                [in] PE number of the remote PE.
+ */
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T *dst, T value, int32_t pe);
+
 #endif

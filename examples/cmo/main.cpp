@@ -435,7 +435,7 @@ int test_copy_perf(int my_pe, int n_pes)
     }
 
     write_csv("output/"+int_to_string(my_pe)+"_cmo.csv", csv_data_2);
-    std::cout << "PE " << my_pe << " Finised !" << std::endl;
+    std::cout << "PE " << my_pe << " Finished !" << std::endl;
 
     CHECK_RET(aclrtDestroyStream(stream));
     return 0;

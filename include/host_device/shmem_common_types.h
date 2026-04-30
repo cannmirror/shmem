@@ -194,12 +194,14 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// \brief SDMA flag data length
 #define ACLSHMEM_SDMA_FLAG_LENGTH 64
 
-/// \def ALIGH_TO
+/// \def ALIGN_TO
 /// \brief Memory address/size alignment macro
 /// \param size Original size/address to be aligned
 /// \param page Target alignment granularity (usually page size)
 /// \details Aligns the size up to an integer multiple of the page to avoid memory fragmentation and out-of-bounds access
-#define ALIGH_TO(size, page) (((size) + (page) - 1) / (page) * (page))
+#define ALIGN_TO(size, page) (((size) + (page) - 1) / (page) * (page))
+/// @deprecated Use ALIGN_TO instead
+#define ALIGH_TO ALIGN_TO
 
 /* synchronization related */
 /// \def ACLSHMEMI_SYNCBIT_SIZE
@@ -249,13 +251,15 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 #define ACLSHMEM_CORE_SYNC_COUNTER_SIZE ACLSHMEMI_SYNCBIT_SIZE
 
 // Total extra
-/// \def ACLSHMEM_EXTRA_SIZE_UNALIGHED
+/// \def ACLSHMEM_EXTRA_SIZE_UNALIGNED
 /// \brief Unaligned size of the ACLSHMEM extra memory (only includes NPU sync pool)
-#define ACLSHMEM_EXTRA_SIZE_UNALIGHED SYNC_POOL_SIZE
+#define ACLSHMEM_EXTRA_SIZE_UNALIGNED SYNC_POOL_SIZE
+/// @deprecated Use ACLSHMEM_EXTRA_SIZE_UNALIGNED instead
+#define ACLSHMEM_EXTRA_SIZE_UNALIGHED ACLSHMEM_EXTRA_SIZE_UNALIGNED
 
 /// \def ACLSHMEM_EXTRA_SIZE
 /// \brief Aligned size of the ACLSHMEM extra memory, aligned to the memory page size
-#define ACLSHMEM_EXTRA_SIZE ALIGH_TO(ACLSHMEM_EXTRA_SIZE_UNALIGHED, ACLSHMEM_PAGE_SIZE)
+#define ACLSHMEM_EXTRA_SIZE ALIGN_TO(ACLSHMEM_EXTRA_SIZE_UNALIGNED, ACLSHMEM_PAGE_SIZE)
 
 /**@} */ // end of group_macros
 
@@ -362,9 +366,9 @@ typedef struct {
 } aclshmem_prof_pe_t;
 
 // Legacy type aliases for backward compatibility
-typedef aclshmem_ub_config_t aclshmem_mte_config_t;  ///< @deprecated Use aclshmem_ub_config_t instead
-typedef aclshmem_ub_config_t aclshmem_sdma_config_t;  ///< @deprecated Use aclshmem_ub_config_t instead
-typedef aclshmem_ub_config_t aclshmem_rdma_config_t;  ///< @deprecated Use aclshmem_ub_config_t instead
+typedef aclshmem_ub_config_t aclshmem_mte_config_t;  ///< @deprecated Use aclshmem_mte_config_t instead
+typedef aclshmem_ub_config_t aclshmem_sdma_config_t;  ///< @deprecated Use aclshmem_sdma_config_t instead
+typedef aclshmem_ub_config_t aclshmem_rdma_config_t;  ///< @deprecated Use aclshmem_rdma_config_t instead
 
 // state
 /**
@@ -432,7 +436,7 @@ typedef struct {
 
 /**
  * @struct aclshmem_instance_ctx
- * @brief Instance context used to store gloabl_id
+ * @brief Instance context used to store global_id
  * @details Stores the instance identifier and reserved fields for future extension
  */
 typedef struct {

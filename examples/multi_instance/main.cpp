@@ -155,7 +155,7 @@ int group_all_gather(uint64_t instance_id)
         outFile << 1 << "," << trans_size << "," << " " << "\n";
 
         if (aclshmem_my_pe() == 0) {
-            printf("Instance %lu, Case: %d Finised !! Result Correct !!. \n", instance_id, test_cases[i]);
+            printf("Instance %lu, Case: %d Finished !! Result Correct !!. \n", instance_id, test_cases[i]);
         }
     }
 

@@ -279,7 +279,7 @@ int test_allgather_sdma(int my_pe, int n_pes)
     CHECK_RET(aclrtFreeHost(y_host));
     aclshmem_free(gva);
 
-    std::cout << " Pe " << my_pe << "Finised !! Result Correct !!" << std::endl;
+    std::cout << " Pe " << my_pe << "Finished !! Result Correct !!" << std::endl;
 
     CHECK_RET(aclrtDestroyStream(stream));
     return 0;

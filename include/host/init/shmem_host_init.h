@@ -122,7 +122,7 @@ ACLSHMEM_HOST_API void aclshmem_global_exit(int status);
  * @brief aclshmemx_set_conf_store_tls.
  *
  * @param enable whether to enable tls
- * @param tls_info the format describle in memfabric SECURITYNOTE.md, if disabled tls_info won't be use
+ * @param tls_info the format described in memfabric SECURITYNOTE.md, if disabled tls_info won't be use
  * @param tls_info_len length of tls_info, if disabled tls_info_len won't be use
  * @return Returns 0 on success or an error code on failure
  */

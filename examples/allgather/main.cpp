@@ -158,7 +158,7 @@ int test_aclshmem_all_gather(int pe_id, int n_pes)
         outFile << 1 << "," << trans_size << "," << " " << "\n";
 
         if (pe_id == 0) {
-            std::cout << "Case: " << test_cases[i] << " Finised !! Result Correct !!" << std::endl;
+            std::cout << "Case: " << test_cases[i] << " Finished !! Result Correct !!" << std::endl;
         }
     }
 

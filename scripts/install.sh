@@ -293,7 +293,7 @@ function install_process()
 
     if [ -n "${ARCH}" ]; then
         if [ "${arch_pkg}" != "${ARCH}" ]; then
-            print "ERROR" "Install failed, pkg arch ${arch_pkg} is not consistent with the current enviroment ${ARCH}"
+            print "ERROR" "Install failed, pkg arch ${arch_pkg} is not consistent with the current environment ${ARCH}"
             exit 1
         fi
     fi

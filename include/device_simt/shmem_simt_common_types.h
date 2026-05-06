@@ -38,14 +38,14 @@ typedef struct {
 
     uint64_t team_pools[ACLSHMEM_MAX_TEAMS]; ///< Team pool array, storing all created team instances
 
-    // Using aclshmemi_sync_bit instead of basic types to aclshmemi_store flag,
+    // Using aclshmemx_sync_bit instead of basic types as sync flag,
     // avoiding concurrent write due to cacheline sharing.
-    // Refer to shmemi_barrier.h for more details.
-    // These members are 'shmemi_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler restriction.
-    uint64_t sync_pool;          ///< NPU-level sync pool pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t sync_counter;       ///< NPU-level sync counter pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_pool;     ///< Core-level sync pool pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_counter;  ///< Core-level sync counter pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
+    // Refer to shmemi_device_cc.h for more details.
+    // These members are 'aclshmemx_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler restriction.
+    uint64_t sync_pool;          ///< NPU-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t sync_counter;       ///< NPU-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t core_sync_pool;     ///< Core-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t core_sync_counter;  ///< Core-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
 
     bool is_aclshmem_initialized; ///< Flag indicating whether ACLSHMEM has completed initialization
     bool is_aclshmem_created;     ///< Flag indicating whether ACLSHMEM has been created

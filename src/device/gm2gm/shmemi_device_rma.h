@@ -16,6 +16,21 @@
 #include "shmem.h"
 #include "host_device/shmem_common_types.h"
 
+/**
+* @brief The state of the ACLSHMEM host OP type.
+*/
+enum aclshmemi_op_t {
+    ACLSHMEMI_OP_PUT = 0,
+    ACLSHMEMI_OP_P,
+    ACLSHMEMI_OP_PUT_SIGNAL,
+    ACLSHMEMI_OP_GET,
+    ACLSHMEMI_OP_G,
+    ACLSHMEMI_OP_FENCE,
+    ACLSHMEMI_OP_AMO,
+    ACLSHMEMI_OP_QUIET,
+    ACLSHMEMI_OP_SENTINEL = INT_MAX,
+};
+
 #define ACLSHMEMI_TYPENAME_PREPARE_RMA_P(NAME, TYPE)                                                           \
     void aclshmemi_prepare_and_post_rma_##NAME##_p(const char *api_name, uint8_t *dst_ptr, TYPE value, int pe, \
                                                 aclrtStream acl_strm, size_t block_size)

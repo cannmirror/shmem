@@ -35,14 +35,14 @@ constexpr int32_t BARRIER_DISSEM_KVAL_MIN = 2;
 constexpr int32_t SHIFT_MULTIPLIER = 2;
 constexpr uint64_t ACLSHMEM_DATA_CACHE_LINE_SIZE = 64;
 
-ACLSHMEM_DEVICE __gm__ aclshmemi_sync_bit *aclshmemi_get_core_sync_pool()
+ACLSHMEM_DEVICE __gm__ aclshmemx_sync_bit *aclshmemi_get_core_sync_pool()
 {
-    return (__gm__ aclshmemi_sync_bit *)aclshmemi_get_state()->core_sync_pool;
+    return (__gm__ aclshmemx_sync_bit *)aclshmemi_get_state()->core_sync_pool;
 }
 
-ACLSHMEM_DEVICE __gm__ aclshmemi_sync_bit *aclshmemi_get_core_sync_counter()
+ACLSHMEM_DEVICE __gm__ aclshmemx_sync_bit *aclshmemi_get_core_sync_counter()
 {
-    return (__gm__ aclshmemi_sync_bit *)aclshmemi_get_state()->core_sync_counter;
+    return (__gm__ aclshmemx_sync_bit *)aclshmemi_get_state()->core_sync_counter;
 }
 
 ACLSHMEM_DEVICE void aclshmemi_barrier_core_soft()
@@ -86,18 +86,18 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_core()
 #endif
 }
 
-ACLSHMEM_DEVICE __gm__ aclshmemi_sync_bit *aclshmemi_get_team_sync_pool(aclshmem_team_t team_idx)
+ACLSHMEM_DEVICE __gm__ aclshmemx_sync_bit *aclshmemi_get_team_sync_pool(aclshmem_team_t team_idx)
 {
     uint64_t addr = (uint64_t) aclshmemi_get_state()->sync_pool;
     addr += team_idx * SYNC_ARRAY_SIZE;
-    return (__gm__ aclshmemi_sync_bit *) addr;
+    return (__gm__ aclshmemx_sync_bit *) addr;
 }
 
-ACLSHMEM_DEVICE __gm__ aclshmemi_sync_bit *aclshmemi_get_team_sync_counter(aclshmem_team_t team_idx)
+ACLSHMEM_DEVICE __gm__ aclshmemx_sync_bit *aclshmemi_get_team_sync_counter(aclshmem_team_t team_idx)
 {
     uint64_t addr = (uint64_t) aclshmemi_get_state()->sync_counter;
     addr += team_idx * SYNC_COUNTER_SIZE;
-    return (__gm__ aclshmemi_sync_bit *) addr;
+    return (__gm__ aclshmemx_sync_bit *) addr;
 }
 
 /* Level 2: barrier between devices (within a host)
@@ -161,7 +161,7 @@ d. rank n-2 overwrites rank n-1，so rank n may miss rank n-1's signal and wait 
    ... | 1 | 0 | 0 | ...
 --------------------------------------------
 
-To avoid this issue, separate elements must exist on different cachelines. See aclshmemi_sync_bit for detailed definition.
+To avoid this issue, separate elements must exist on different cachelines. See aclshmemx_sync_bit for detailed definition.
 
 Additionly, instead of simply write a flag, each rank writes a 64-bit number into the array,
 indicating how many times this team has performed barrier.

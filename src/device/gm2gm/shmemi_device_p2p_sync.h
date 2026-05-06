@@ -76,7 +76,7 @@ ACLSHMEM_DEVICE size_t aclshmemi_wait_until_some_vector(__gm__ volatile T *ivars
 
 template <typename T>
 ACLSHMEM_DEVICE int aclshmemi_test_all(__gm__ T *sig_addr, size_t nelems, __gm__ const int *status, int cmp,
-    T cmp_value, int stride = ACLSHMEMI_SYNCBIT_SIZE / sizeof(T));
+    T cmp_value, int stride = ACLSHMEM_SYNCBIT_SIZE / sizeof(T));
 
 template <typename T>
 ACLSHMEM_DEVICE size_t aclshmemi_test_any(__gm__ volatile T *ivars, size_t nelems, __gm__ const int *status, int cmp,

@@ -68,21 +68,6 @@ extern "C" {
     FUNC(char, char)
 
 /**
-* @brief The state of the ACLSHMEM host OP type.
-*/
-enum aclshmemi_op_t {
-    ACLSHMEMI_OP_PUT = 0,
-    ACLSHMEMI_OP_P,
-    ACLSHMEMI_OP_PUT_SIGNAL,
-    ACLSHMEMI_OP_GET,
-    ACLSHMEMI_OP_G,
-    // ACLSHMEMI_OP_FENCE,
-    // ACLSHMEMI_OP_AMO,
-    // ACLSHMEMI_OP_QUIET,
-    // ACLSHMEMI_OP_SENTINEL = INT_MAX,
-};
-
-/**
  * @brief Team's index.
 */
 enum aclshmem_team_index_t {
@@ -204,9 +189,11 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 #define ALIGH_TO ALIGN_TO
 
 /* synchronization related */
-/// \def ACLSHMEMI_SYNCBIT_SIZE
+/// \def ACLSHMEM_SYNCBIT_SIZE
 /// \brief Memory size of the ACLSHMEM synchronization bit, consistent with the scalar data cache line size
-#define ACLSHMEMI_SYNCBIT_SIZE SCALAR_DATA_CACHELINE_SIZE
+#define ACLSHMEM_SYNCBIT_SIZE SCALAR_DATA_CACHELINE_SIZE
+/// @deprecated Use ACLSHMEM_SYNCBIT_SIZE instead
+#define ACLSHMEMI_SYNCBIT_SIZE ACLSHMEM_SYNCBIT_SIZE
 
 // npu level sync
 /// \def SYNC_LOG_MAX_PES
@@ -219,11 +206,11 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 
 /// \def SYNC_ARRAY_SIZE
 /// \brief Total size of the NPU-level synchronization array, calculated from sync bit size, log bits and dissemination coefficient
-#define SYNC_ARRAY_SIZE (ACLSHMEMI_SYNCBIT_SIZE * SYNC_LOG_MAX_PES * ACLSHMEM_BARRIER_TG_DISSEM_KVAL)
+#define SYNC_ARRAY_SIZE (ACLSHMEM_SYNCBIT_SIZE * SYNC_LOG_MAX_PES * ACLSHMEM_BARRIER_TG_DISSEM_KVAL)
 
 /// \def SYNC_COUNTER_SIZE
 /// \brief Memory size of the NPU-level synchronization counter, consistent with the sync bit size
-#define SYNC_COUNTER_SIZE ACLSHMEMI_SYNCBIT_SIZE
+#define SYNC_COUNTER_SIZE ACLSHMEM_SYNCBIT_SIZE
 
 /// \def SYNC_POOL_SIZE
 /// \brief Total size of the NPU-level synchronization pool, expanding the sync array by the maximum number of teams
@@ -244,11 +231,11 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 
 /// \def ACLSHMEM_CORE_SYNC_POOL_SIZE
 /// \brief Total size of the core-level synchronization pool, calculated from AIV count, log bits and sync bit size
-#define ACLSHMEM_CORE_SYNC_POOL_SIZE (ACLSHMEM_MAX_AIV_PER_NPU * ACLSHMEM_LOG_MAX_AIV_PER_NPU * ACLSHMEMI_SYNCBIT_SIZE)
+#define ACLSHMEM_CORE_SYNC_POOL_SIZE (ACLSHMEM_MAX_AIV_PER_NPU * ACLSHMEM_LOG_MAX_AIV_PER_NPU * ACLSHMEM_SYNCBIT_SIZE)
 
 /// \def ACLSHMEM_CORE_SYNC_COUNTER_SIZE
 /// \brief Memory size of the core-level synchronization counter, consistent with the sync bit size
-#define ACLSHMEM_CORE_SYNC_COUNTER_SIZE ACLSHMEMI_SYNCBIT_SIZE
+#define ACLSHMEM_CORE_SYNC_COUNTER_SIZE ACLSHMEM_SYNCBIT_SIZE
 
 // Total extra
 /// \def ACLSHMEM_EXTRA_SIZE_UNALIGNED
@@ -269,7 +256,9 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
  * @{
  */
 /// \brief ACLSHMEM synchronization bit array type, cache line-aligned storage structure for synchronization flags
-typedef int32_t aclshmemi_sync_bit[ACLSHMEMI_SYNCBIT_SIZE / sizeof(int32_t)];
+typedef int32_t aclshmemx_sync_bit[ACLSHMEM_SYNCBIT_SIZE / sizeof(int32_t)];
+/// @deprecated Use aclshmemx_sync_bit instead
+#define aclshmemi_sync_bit aclshmemx_sync_bit
 /**@} */ // end of group_typedef
 /**
  * @addtogroup group_structs
@@ -398,14 +387,14 @@ typedef struct {
 
     aclshmemx_team_t *team_pools[ACLSHMEM_MAX_TEAMS]; ///< Team pool array, storing all created team instances
 
-    // Using aclshmemi_sync_bit instead of basic types to aclshmemi_store flag,
+    // Using aclshmemx_sync_bit instead of basic types as sync flag,
     // avoiding concurrent write due to cacheline sharing.
-    // Refer to shmemi_barrier.h for more details.
-    // These members are 'shmemi_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler restriction.
-    uint64_t sync_pool;          ///< NPU-level sync pool pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t sync_counter;       ///< NPU-level sync counter pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_pool;     ///< Core-level sync pool pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_counter;  ///< Core-level sync counter pointer (actual type is aclshmemi_sync_bit*, defined as uint64_t due to compiler restrictions)
+    // Refer to shmemi_device_cc.h for more details.
+    // These members are 'aclshmemx_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler restriction.
+    uint64_t sync_pool;          ///< NPU-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t sync_counter;       ///< NPU-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t core_sync_pool;     ///< Core-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    uint64_t core_sync_counter;  ///< Core-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
 
     bool is_aclshmem_initialized; ///< Flag indicating whether ACLSHMEM has completed initialization
     bool is_aclshmem_created;     ///< Flag indicating whether ACLSHMEM has been created

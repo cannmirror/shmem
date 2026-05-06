@@ -24,8 +24,9 @@
 namespace shm {
 namespace transport {
 
-constexpr std::size_t HCCP_EID_RAW_SIZE = 16;
-constexpr std::size_t HCCP_EID_HEX_SIZE = HCCP_EID_RAW_SIZE * 2;
+constexpr std::size_t URMA_EID_RAW_SIZE = 16;
+constexpr std::size_t URMA_EID_HEX_SIZE = URMA_EID_RAW_SIZE * 2;
+constexpr uint32_t URMA_EID_IPV4_PREFIX = 0x0000;
 
 struct RankInfo {
     uint32_t device_id{0};
@@ -43,7 +44,7 @@ struct RootInfo {
     // localId -> port -> eidIndex
     std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> portEidMap;
     // localId -> eidIndex -> eid raw bytes from rootinfo addr
-    std::unordered_map<uint32_t, std::map<uint32_t, std::array<uint8_t, HCCP_EID_RAW_SIZE>>> eidAddrMap;
+    std::unordered_map<uint32_t, std::map<uint32_t, std::array<uint8_t, URMA_EID_RAW_SIZE>>> eidAddrMap;
 };
 
 struct TopoEdge {
@@ -66,7 +67,7 @@ public:
     static bool ParseTopoInfo(const std::string& path, TopoInfo& out);
     static bool GetLocalEidRouteForPeer(
         const RootInfo& root, const TopoInfo& topo, uint32_t myLocalId, uint32_t peerLocalId, uint32_t& localEidIndex,
-        std::array<uint8_t, HCCP_EID_RAW_SIZE>& localEidRaw);
+        std::array<uint8_t, URMA_EID_RAW_SIZE>& localEidRaw);
     static bool GetLocalId(const RootInfo& root, uint32_t deviceId, uint32_t& localId);
     static bool GetLocalIdWithDeviceIdOffset(const RootInfo& root, uint32_t deviceId, uint32_t& localId);
     static uint32_t GetDeviceIdOffset(const RootInfo& root);
@@ -74,7 +75,12 @@ public:
     static bool GetEidCount(const RootInfo& root, uint32_t& count);
 
 private:
-    static bool ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t, HCCP_EID_RAW_SIZE>& raw);
+    static bool ParseRankAddrRaw(
+        const nlohmann::json& rankAddrJson, uint32_t localId, uint32_t eidIndex,
+        std::array<uint8_t, URMA_EID_RAW_SIZE>& raw);
+    static bool ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw);
+    static bool ParseIpv4EidRaw(const std::string& addr, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw);
+    static bool ParseIpv6EidRaw(const std::string& addr, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw);
     static bool ParseUint(const nlohmann::json& jsonValue, uint32_t& value);
 };
 

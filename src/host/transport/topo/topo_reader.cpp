@@ -8,7 +8,10 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <algorithm>
+#include <arpa/inet.h>
 #include <cctype>
+#include <cstring>
 #include <exception>
 #include <fstream>
 #include <utility>
@@ -96,9 +99,13 @@ bool TopoReader::ParseRootInfo(RootInfo& out)
                 }
                 uint32_t eidIndex = 0;
                 for (const auto& rankAddrJson : rankAddrListJson) {
-                    std::array<uint8_t, HCCP_EID_RAW_SIZE> rawAddr{};
-                    if (rankAddrJson.contains("addr") && ParseEidRaw(rankAddrJson["addr"], rawAddr)) {
+                    std::array<uint8_t, URMA_EID_RAW_SIZE> rawAddr{};
+                    if (ParseRankAddrRaw(rankAddrJson, rankInfo.local_id, eidIndex, rawAddr)) {
                         out.eidAddrMap[rankInfo.local_id][eidIndex] = rawAddr;
+                    } else {
+                        SHM_LOG_WARN(
+                            "Rootinfo: failed to parse rank_addr_list addr, localId " << rankInfo.local_id
+                                                                                      << ", eidIndex " << eidIndex);
                     }
                     if (rankAddrJson.contains("ports") && rankAddrJson["ports"].is_array()) {
                         for (const auto& port : rankAddrJson["ports"]) {
@@ -178,7 +185,7 @@ bool TopoReader::ParseTopoInfo(const std::string& path, TopoInfo& out)
 // port -- EID
 bool TopoReader::GetLocalEidRouteForPeer(
     const RootInfo& root, const TopoInfo& topo, uint32_t myLocalId, uint32_t peerLocalId, uint32_t& localEidIndex,
-    std::array<uint8_t, HCCP_EID_RAW_SIZE>& localEidRaw)
+    std::array<uint8_t, URMA_EID_RAW_SIZE>& localEidRaw)
 {
     std::string localPort;
     for (const auto& edge : topo.edge_list) {
@@ -267,7 +274,72 @@ bool TopoReader::GetEidCount(const RootInfo& root, uint32_t& count)
     return false;
 }
 
-bool TopoReader::ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t, HCCP_EID_RAW_SIZE>& raw)
+bool TopoReader::ParseRankAddrRaw(
+    const nlohmann::json& rankAddrJson, uint32_t localId, uint32_t eidIndex,
+    std::array<uint8_t, URMA_EID_RAW_SIZE>& raw)
+{
+    if (!rankAddrJson.contains("addr")) {
+        SHM_LOG_ERROR("Rootinfo rank_addr_list entry does not contain addr, localId " << localId << ", eidIndex "
+                                                                                       << eidIndex);
+        return false;
+    }
+
+    std::string addrType = "EID";
+    if (rankAddrJson.contains("addr_type")) {
+        if (!rankAddrJson["addr_type"].is_string()) {
+            SHM_LOG_ERROR("Rootinfo addr_type format is unsupported, localId " << localId << ", eidIndex " << eidIndex);
+            return false;
+        }
+        addrType = rankAddrJson["addr_type"].get<std::string>();
+        std::transform(addrType.begin(), addrType.end(), addrType.begin(), [](unsigned char ch) {
+            return static_cast<char>(std::toupper(ch));
+        });
+    }
+
+    if (addrType == "EID") {
+        return ParseEidRaw(rankAddrJson["addr"], raw);
+    }
+
+    if (!rankAddrJson["addr"].is_string()) {
+        SHM_LOG_ERROR("Rootinfo " << addrType << " addr must be a string, localId " << localId << ", eidIndex "
+                                  << eidIndex);
+        return false;
+    }
+
+    const auto& addr = rankAddrJson["addr"].get_ref<const std::string&>();
+    if (addrType == "IPV4") {
+        const bool ret = ParseIpv4EidRaw(addr, raw);
+        if (ret) {
+            SHM_LOG_INFO(
+                "Rootinfo IPV4 addr converted to EID, localId " << localId << ", eidIndex " << eidIndex << ", addr "
+                                                                << addr);
+        } else {
+            SHM_LOG_ERROR(
+                "Rootinfo IPV4 addr conversion failed, localId " << localId << ", eidIndex " << eidIndex << ", addr "
+                                                                 << addr);
+        }
+        return ret;
+    }
+    if (addrType == "IPV6") {
+        const bool ret = ParseIpv6EidRaw(addr, raw);
+        if (ret) {
+            SHM_LOG_INFO(
+                "Rootinfo IPV6 addr converted to EID, localId " << localId << ", eidIndex " << eidIndex << ", addr "
+                                                                << addr);
+        } else {
+            SHM_LOG_ERROR(
+                "Rootinfo IPV6 addr conversion failed, localId " << localId << ", eidIndex " << eidIndex << ", addr "
+                                                                 << addr);
+        }
+        return ret;
+    }
+
+    SHM_LOG_ERROR("Rootinfo addr_type is unsupported: " << addrType << ", localId " << localId << ", eidIndex "
+                                                        << eidIndex);
+    return false;
+}
+
+bool TopoReader::ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw)
 {
     raw.fill(0);
     if (jsonValue.is_array()) {
@@ -304,7 +376,7 @@ bool TopoReader::ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t
         }
     }
 
-    if (normalized.size() != HCCP_EID_HEX_SIZE) {
+    if (normalized.size() != URMA_EID_HEX_SIZE) {
         SHM_LOG_ERROR("Rootinfo addr hex length is invalid: " << normalized.size());
         return false;
     }
@@ -316,6 +388,33 @@ bool TopoReader::ParseEidRaw(const nlohmann::json& jsonValue, std::array<uint8_t
         }
     } catch (const std::exception& ex) {
         SHM_LOG_ERROR("Failed to parse rootinfo addr hex string, error: " << ex.what());
+        return false;
+    }
+    return true;
+}
+
+bool TopoReader::ParseIpv4EidRaw(const std::string& addr, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw)
+{
+    in_addr ipv4Addr {};
+    if (inet_pton(AF_INET, addr.c_str(), &ipv4Addr) != 1) {
+        SHM_LOG_ERROR("Rootinfo IPV4 addr is invalid: " << addr);
+        return false;
+    }
+
+    raw.fill(0);
+    raw[10] = static_cast<uint8_t>((URMA_EID_IPV4_PREFIX >> 8) & 0xff);
+    raw[11] = static_cast<uint8_t>(URMA_EID_IPV4_PREFIX & 0xff);
+
+    const auto *ipv4Bytes = reinterpret_cast<const uint8_t *>(&ipv4Addr.s_addr);
+    std::copy_n(ipv4Bytes, sizeof(ipv4Addr), raw.begin() + 12);
+    return true;
+}
+
+bool TopoReader::ParseIpv6EidRaw(const std::string& addr, std::array<uint8_t, URMA_EID_RAW_SIZE>& raw)
+{
+    raw.fill(0);
+    if (inet_pton(AF_INET6, addr.c_str(), raw.data()) != 1) {
+        SHM_LOG_ERROR("Rootinfo IPV6 addr is invalid: " << addr);
         return false;
     }
     return true;

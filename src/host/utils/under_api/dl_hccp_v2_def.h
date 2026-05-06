@@ -120,7 +120,7 @@ union HccpEid {
     uint8_t raw[16];        /* Network Order */
     struct {
         uint64_t reserved;  /* If IPv4 mapped to IPv6, == 0 */
-        uint32_t prefix;    /* If IPv4 mapped to IPv6, == 0x0000ffff*/
+        uint32_t prefix;    /* If IPv4 mapped to IPv6, == 0x00000000*/
         uint32_t addr;      /* If IPv4 mapped to IPv6, == IPv4 address */
     } in4;
     struct {

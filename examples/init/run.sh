@@ -27,12 +27,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -pesize)
             NUM_PROCESSES="$2"
-            if ! [[ "$NUM_PROCESSES" =~ ^[1-9][0-9]*$ ]]; then
+            if ! [[ "${NUM_PROCESSES}" =~ ^[1-9][0-9]*$ ]]; then
                 echo "Error: pesize must be a positive integer!"
                 exit 1
             fi
-            if [ "$GNPU_NUM" -gt "$NUM_PROCESSES" ]; then
-                GNPU_NUM="$NUM_PROCESSES"
+            if [ "${GNPU_NUM}" -gt "${NUM_PROCESSES}" ]; then
+                GNPU_NUM="${NUM_PROCESSES}"
                 echo "Because GNPU_NUM is greater than NUM_PROCESSES, GNPU_NUM is assigned the value of NUM_PROCESSES=${NUM_PROCESSES}."
             fi
             shift 2
@@ -117,7 +117,7 @@ case "$MODE" in
         MODE_ID=5
         ;;
     *)
-        echo "Error: Invalid mode '$MODE'! Only 'default'/'mpi'/'uid'/'uid_default' are allowed"
+        echo "Error: Invalid mode '${MODE}'! Only 'default'/'mpi'/'uid'/'uid_default' are allowed"
         echo "Usage: $0 [-mode <default|mpi|uid|uid_default>] [-pesize <num>]"
         exit 1
         ;;
@@ -126,16 +126,16 @@ esac
 BUILD_DIR="build"
 EXECUTABLE_NAME="init_examples"
 
-export SHMEM_UID_SESSION_ID=$SESSION_ID
+export SHMEM_UID_SESSION_ID="${SESSION_ID}"
 
 echo "=== Prepare build directory ==="
-if [ -d "$BUILD_DIR" ]; then
-    rm -rf "$BUILD_DIR"/*
+if [ -d "${BUILD_DIR}" ]; then
+    rm -rf "${BUILD_DIR}"/*
 fi
-mkdir -p "$BUILD_DIR"
+mkdir -p "${BUILD_DIR}"
 
 echo "=== Run CMake with RUN_MODE=${MODE_ID} (mode: ${MODE}) ==="
-cd "$BUILD_DIR" || { echo "Error: Failed to enter build directory!"; exit 1; }
+cd "${BUILD_DIR}" || { echo "Error: Failed to enter build directory!"; exit 1; }
 cmake -DRUN_MODE="${MODE_ID}" ..
 if [ $? -ne 0 ]; then
     echo "Error: CMake configuration failed!"
@@ -150,7 +150,7 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
-if [ "$ONLY_BUILD" == "ON" ]; then
+if [ "${ONLY_BUILD}" == "ON" ]; then
     echo "Compile only, prepare for cross-machine tasks."
     exit 0
 fi
@@ -158,20 +158,20 @@ fi
 echo "=== Launch executable (mode: ${MODE}, pesize: ${NUM_PROCESSES}) ==="
 
 
-case "$MODE" in
+case "${MODE}" in
     mpi|uid|uid_default)
         if [ -f "hostfile" ]; then
             echo "Found hostfile, run mpirun with -f hostfile"
-            mpirun -f hostfile ./build/bin/"${EXECUTABLE_NAME}" "$GNPU_NUM"
+            mpirun -f hostfile ./build/bin/"${EXECUTABLE_NAME}" "${GNPU_NUM}"
         else
             echo "No hostfile found, run mpirun without hostfile"
-            mpirun -np "$NUM_PROCESSES" ./build/bin/"${EXECUTABLE_NAME}" "NUM_PROCESSES"
+            mpirun -np "${NUM_PROCESSES}" ./build/bin/"${EXECUTABLE_NAME}" "${NUM_PROCESSES}"
         fi
         ;;
     default)
         for (( idx=0; idx < GNPU_NUM; idx++ )); do
-            echo "Starting process $idx/$NUM_PROCESSES..."
-            ./build/bin/"${EXECUTABLE_NAME}" "$idx" "$NUM_PROCESSES" "${IPPORT}" "$GNPU_NUM" "$FIRST_PE" "$FIRST_NPU" &
+            echo "Starting process $idx/${NUM_PROCESSES}..."
+            ./build/bin/"${EXECUTABLE_NAME}" "${idx}" "${NUM_PROCESSES}" "${IPPORT}" "${GNPU_NUM}" "${FIRST_PE}" "${FIRST_NPU}" &
         done
         wait
         echo "=== All processes completed ==="

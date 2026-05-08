@@ -67,10 +67,37 @@ COMPILE_OPTIONS=""
 COVERAGE_TYPE=""
 GEN_DOC=OFF
 SOC_TYPE=""
+RDMA_BACKEND=""
 
 cann_default_path="/usr/local/Ascend/ascend-toolkit"
 
 cd ${PROJECT_ROOT}
+
+function print_usage()
+{
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  -uttests                   Build with unit tests"
+    echo "  -cann                      Enable CANN build"
+    echo "  -debug                     Build in debug mode"
+    echo "  -examples                  Build with examples"
+    echo "  -enable_rdma               Enable RDMA support. For Ascend950, must be used with -rdma_backend"
+    echo "  -enable_rdma               Enable RDMA support"
+    echo "  -enable_simt               Enable SIMT support"
+    echo "  -python_extension          Build Python extension"
+    echo "  -python_example            Build Python example"
+    echo "  -gendoc                    Generate documentation"
+    echo "  -onlygendoc                Only generate documentation"
+    echo "  -enable_ascendc_dump       Enable AscendC dump"
+    echo "  -package                   Build package"
+    echo "  -full                      Full build (all components)"
+    echo "  -use_cxx11_abi1            Use CXX11 ABI=1"
+    echo "  -use_cxx11_abi0            Use CXX11 ABI=0"
+    echo "  -mssanitizer               Enable memory sanitizer"
+    echo "  -soc_type <type>           Specify SOC type (e.g., Ascend950)"
+    echo "  -rdma_backend <backend>    Specify RDMA backend (XSCALE, only for Ascend950)"
+    echo "                             Requires -enable_rdma and -soc_type Ascend950"
+}
 
 function fn_build()
 {
@@ -355,14 +382,54 @@ while [[ $# -gt 0 ]]; do
             SOC_TYPE="$2"
             shift 2
             ;;
+        -rdma_backend)
+            if [ "$RDMA_BACKEND" != "" ]; then
+                echo "Error: -rdma_backend can only be specified once."
+                print_usage
+                exit 1
+            fi
+            shift
+            RDMA_BACKEND="$1"
+            if [ "$RDMA_BACKEND" != "XSCALE" ]; then
+                echo "Error: Invalid RDMA_BACKEND value '$RDMA_BACKEND'. Must be 'XSCALE'."
+                print_usage
+                exit 1
+            fi
+            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_RDMA_BACKEND=${RDMA_BACKEND}"
+            shift
+            ;;
         *)
             echo "Error: Unknown option $1."
+            print_usage
             exit 1
             ;;
     esac
 done
 
+# Validate RDMA parameter dependencies
+if [ -n "$RDMA_BACKEND" ]; then
+    if [ "$SOC_TYPE" != "Ascend950" ]; then
+        echo "Error: -rdma_backend can only be specified when SOC_TYPE is Ascend950."
+        echo "       Please use -soc_type Ascend950 when specifying -rdma_backend."
+        print_usage
+        exit 1
+    fi
+    if [ -z "$(echo "$COMPILE_OPTIONS" | grep -o '\-DACLSHMEM_RDMA_SUPPORT=ON')" ]; then
+        echo "Error: -rdma_backend requires -enable_rdma to be specified."
+        echo "       Please add -enable_rdma flag when using -rdma_backend."
+        print_usage
+        exit 1
+    fi
+fi
+
 if [ "$SOC_TYPE" = "Ascend950" ]; then
+    if [ -n "$(echo "$COMPILE_OPTIONS" | grep -o '\-DACLSHMEM_RDMA_SUPPORT=ON')" ]; then
+        if [ -z "$RDMA_BACKEND" ]; then
+            echo "Error: -rdma_backend must be specified when SOC_TYPE is Ascend950 and RDMA is enabled."
+            print_usage
+            exit 1
+        fi
+    fi
     fn_build_nlohmann_json
 fi
 

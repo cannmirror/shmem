@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.16)
 project(SHMEM)
 include(CheckCXXCompilerFlag)
 
-# 配置 ccache 
+# 配置 ccache
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
     message(STATUS "ccache found: ${CCACHE_FOUND}")
@@ -85,12 +85,12 @@ set(BISHENG_VERSION_OUTPUT "${BISHENG_STDOUT} ${BISHENG_STDERR}")
 
 if(BISHENG_VERSION_OUTPUT)
     message(STATUS "bisheng -v output: ${BISHENG_VERSION_OUTPUT}")
-    
+
     string(REGEX MATCH "([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])" DATE_MATCH "${BISHENG_VERSION_OUTPUT}")
     if(DATE_MATCH)
         string(REGEX REPLACE "([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])" "\\1\\2\\3" CURRENT_TIMESTAMP "${DATE_MATCH}")
         message(STATUS "Extracted date: ${DATE_MATCH}, timestamp: ${CURRENT_TIMESTAMP}")
-        
+
         if(CURRENT_TIMESTAMP GREATER_EQUAL 20260327)
             set(IS_NEW_VERSION TRUE)
             message(STATUS "Detected NEW version (${CURRENT_TIMESTAMP} >= 20260327)")
@@ -113,7 +113,7 @@ if(IS_NEW_VERSION)
     set(CCE_AICORE_ARCH "")
     set(CCE_AICORE_ARCH_VEC "")
     set(FFTS_COMPILE_FLAG "")
-    
+
     if(SOC_TYPE STREQUAL "Ascend950")
         set(NPU_ARCH dav-3510)
     else()
@@ -138,14 +138,14 @@ else()
         add_compile_definitions(FFTS_CONFIG=1)
     endif()
     set(NPU_ARCH "")
-    set(CMAKE_CCE_COMPILE_OPTIONS	 
-        -xcce	 
-        -Xhost-start -ftrapv -Xhost-end	 
-        "SHELL:-mllvm -cce-aicore-stack-size=0x8000"	 
-        "SHELL:-mllvm -cce-aicore-function-stack-size=0x8000"	 
-        "SHELL:-mllvm -cce-aicore-record-overflow=true"	 
-        "SHELL:-mllvm -cce-aicore-addr-transform" 
-        "SHELL:-mllvm -cce-aicore-dcci-insert-for-scalar=false" 
+    set(CMAKE_CCE_COMPILE_OPTIONS
+        -xcce
+        -Xhost-start -ftrapv -Xhost-end
+        "SHELL:-mllvm -cce-aicore-stack-size=0x8000"
+        "SHELL:-mllvm -cce-aicore-function-stack-size=0x8000"
+        "SHELL:-mllvm -cce-aicore-record-overflow=true"
+        "SHELL:-mllvm -cce-aicore-addr-transform"
+        "SHELL:-mllvm -cce-aicore-dcci-insert-for-scalar=false"
     )
 endif()
 message(STATUS "CMAKE_CCE_COMPILE_OPTIONS: ${CMAKE_CCE_COMPILE_OPTIONS}")
@@ -157,6 +157,28 @@ message(STATUS "USE_EXAMPLES:${USE_EXAMPLES}")
 message(STATUS "ENABLE_ASCENDC_DUMP:${ENABLE_ASCENDC_DUMP}")
 option(ACLSHMEM_RDMA_SUPPORT "ACLSHMEM_RDMA_SUPPORT" OFF)
 message(STATUS "ACLSHMEM_RDMA_SUPPORT:${ACLSHMEM_RDMA_SUPPORT}")
+
+if(DEFINED ACLSHMEM_RDMA_BACKEND AND NOT ACLSHMEM_RDMA_SUPPORT)
+    message(FATAL_ERROR "ACLSHMEM_RDMA_BACKEND requires ACLSHMEM_RDMA_SUPPORT to be ON. Please add -DACLSHMEM_RDMA_SUPPORT=ON to enable RDMA support.")
+endif()
+
+if(ACLSHMEM_RDMA_SUPPORT)
+    if(SOC_TYPE STREQUAL "Ascend950")
+        if(NOT DEFINED ACLSHMEM_RDMA_BACKEND)
+            message(FATAL_ERROR "ACLSHMEM_RDMA_BACKEND is not set. Please specify -rdma_backend with value 'XSCALE' when SOC_TYPE is Ascend950.")
+        endif()
+
+        string(TOUPPER "${ACLSHMEM_RDMA_BACKEND}" RDMA_BACKEND_UPPER)
+        if(RDMA_BACKEND_UPPER STREQUAL "XSCALE")
+            add_compile_definitions(ACLSHMEMI_RDMA_K_BACKEND_XSCALE=1)
+            message(STATUS "ACLSHMEM_RDMA_BACKEND: XSCALE")
+        else()
+            message(FATAL_ERROR "Invalid ACLSHMEM_RDMA_BACKEND value '${ACLSHMEM_RDMA_BACKEND}'. Must be 'XSCALE'.")
+        endif()
+    elseif(DEFINED ACLSHMEM_RDMA_BACKEND)
+        message(FATAL_ERROR "ACLSHMEM_RDMA_BACKEND can only be specified when SOC_TYPE is Ascend950.")
+    endif()
+endif()
 option(ACLSHMEM_SIMT_SUPPORT "ACLSHMEM_SIMT_SUPPORT" OFF)
 message(STATUS "ACLSHMEM_SIMT_SUPPORT:${ACLSHMEM_SIMT_SUPPORT}")
 option(ACLSHMEM_UDMA_SUPPORT "ACLSHMEM_UDMA_SUPPORT" OFF)

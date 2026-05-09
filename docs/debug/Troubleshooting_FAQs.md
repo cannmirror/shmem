@@ -16,7 +16,7 @@
 
 错误示例代码: 
 
-以`example`目录下的`allgather_matmul`为例，以下为非对称共享内存分配分配的简单示例场景：
+以`example`目录下的`allgather_matmul`为例，以下为非对称共享内存分配的简单示例场景：
 
 ```cpp
 // Inappropriate calling of aclshmem_malloc

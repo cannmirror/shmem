@@ -82,7 +82,6 @@ function print_usage()
     echo "  -debug                     Build in debug mode"
     echo "  -examples                  Build with examples"
     echo "  -enable_rdma               Enable RDMA support. For Ascend950, must be used with -rdma_backend"
-    echo "  -enable_rdma               Enable RDMA support"
     echo "  -enable_simt               Enable SIMT support"
     echo "  -python_extension          Build Python extension"
     echo "  -python_example            Build Python example"

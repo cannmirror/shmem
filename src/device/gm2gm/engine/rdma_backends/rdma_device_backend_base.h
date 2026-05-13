@@ -24,17 +24,19 @@
  *      - aclshmemi_roce_post_send
  *      - aclshmemi_roce_ring_cq_doorbell
  *      - aclshmemi_roce_poll_cq
- * 
+ *
  *  2. Coarse-grained operations
  *      - aclshmemi_roce_write
  *      - aclshmemi_roce_read
+ *      - aclshmemi_roce_atomic_fetch_and_add
+ *      - aclshmemi_roce_atomic_compare_and_swap
  * =====================================================================================================
  *  Internal call chain (base -> backend-specialized):
  *      aclshmemi_roce_post_send<B, OP_CODE>()                  // compile-time dispatched entry
  *          -> aclshmemi_roce_post_send_read_write()            // shared post-send helper for READ/WRITE
  *              -> aclshmemi_roce_fill_wqe<B, OP_CODE>()        // compile-time dispatched fill_wqe
  *                  -> aclshmemi_rdma_fill_wqe_write_read()     // shared fill_wqe helper for READ/WRITE
- *          -> aclshmemi_roce_ring_sq_doorbell<B>()             // backend-dispatched doorbell 
+ *          -> aclshmemi_roce_ring_sq_doorbell<B>()             // backend-dispatched doorbell
  * =====================================================================================================
  */
 
@@ -49,10 +51,9 @@
  * @param cur_head               [in] Current head of WQE queue
  * @return uint32_t              [out] total size of WQE in bytes
  */
-template<aclshmemi_rdma_backend_t B, aclshmemi_rdma_opcode_t OP_CODE>
-ACLSHMEM_DEVICE uint32_t aclshmemi_roce_fill_wqe(aclshmemi_rdma_send_wr &wr,
-                                                 __gm__ aclshmemi_rdma_sq_ctx*& sq_context,
-                                                 __gm__ uint8_t* wqe_addr, uint32_t cur_head);
+template <aclshmemi_rdma_backend_t B, aclshmemi_rdma_opcode_t OP_CODE>
+ACLSHMEM_DEVICE uint32_t aclshmemi_roce_fill_wqe(
+    aclshmemi_rdma_send_wr& wr, __gm__ aclshmemi_rdma_sq_ctx*& sq_context, __gm__ uint8_t* wqe_addr, uint32_t cur_head);
 
 /**
  * @brief Ring SQ DB for RDMA operation
@@ -64,10 +65,10 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_roce_fill_wqe(aclshmemi_rdma_send_wr &wr,
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\MTE3 Event.
  */
-template<aclshmemi_rdma_backend_t B>
-ACLSHMEM_DEVICE void aclshmemi_roce_ring_sq_doorbell(__gm__ aclshmemi_rdma_sq_ctx*& sq_context, uint32_t cur_head,
-                                                     AscendC::LocalTensor<uint64_t>& ub_local64,
-                                                     AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+template <aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE void aclshmemi_roce_ring_sq_doorbell(
+    __gm__ aclshmemi_rdma_sq_ctx*& sq_context, uint32_t cur_head, AscendC::LocalTensor<uint64_t>& ub_local64,
+    AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
 
 /**
  * @brief AIV direct RDMA helper function for post send, prepare WQE and ring doorbell.
@@ -83,11 +84,10 @@ ACLSHMEM_DEVICE void aclshmemi_roce_ring_sq_doorbell(__gm__ aclshmemi_rdma_sq_ct
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\MTE3 Event.
  */
-template<aclshmemi_rdma_backend_t B, aclshmemi_rdma_opcode_t OP_CODE>
-ACLSHMEM_DEVICE void aclshmemi_roce_post_send(aclshmemi_rdma_send_wr &wr,
-                                              uint32_t pe, uint32_t qp_idx,
-                                              AscendC::LocalTensor<uint64_t>& ub_local64,
-                                              AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+template <aclshmemi_rdma_backend_t B, aclshmemi_rdma_opcode_t OP_CODE>
+ACLSHMEM_DEVICE void aclshmemi_roce_post_send(
+    aclshmemi_rdma_send_wr& wr, uint32_t pe, uint32_t qp_idx, AscendC::LocalTensor<uint64_t>& ub_local64,
+    AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
 
 /**
  * @brief Ring CQ DB for RDMA operation
@@ -100,10 +100,10 @@ ACLSHMEM_DEVICE void aclshmemi_roce_post_send(aclshmemi_rdma_send_wr &wr,
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\MTE3 Event.
  */
-template<aclshmemi_rdma_backend_t B>
-ACLSHMEM_DEVICE void aclshmemi_roce_ring_cq_doorbell(uint32_t pe, uint32_t qp_idx, uint32_t cur_tail, 
-                                                     AscendC::LocalTensor<uint64_t>& ub_local64,
-                                                     AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+template <aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE void aclshmemi_roce_ring_cq_doorbell(
+    uint32_t pe, uint32_t qp_idx, uint32_t cur_tail, AscendC::LocalTensor<uint64_t>& ub_local64,
+    AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
 
 /**
  * @brief RDMA Poll Completion Queue (CQ) function. Return status: 0 means success, non-zero means error.
@@ -116,10 +116,10 @@ ACLSHMEM_DEVICE void aclshmemi_roce_ring_cq_doorbell(uint32_t pe, uint32_t qp_id
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\MTE3 Event.
  */
-template<aclshmemi_rdma_backend_t B>
-ACLSHMEM_DEVICE uint32_t aclshmemi_roce_poll_cq(uint32_t pe, uint32_t qp_idx, uint32_t target_idx,
-                                                AscendC::LocalTensor<uint64_t>& ub_local64,
-                                                AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+template <aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE uint32_t aclshmemi_roce_poll_cq(
+    uint32_t pe, uint32_t qp_idx, uint32_t target_idx, AscendC::LocalTensor<uint64_t>& ub_local64,
+    AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
 
 /**
  * @brief Asynchronous RDMA Write function.
@@ -134,18 +134,18 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_roce_poll_cq(uint32_t pe, uint32_t qp_idx, ui
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
  */
-template<typename T, aclshmemi_rdma_backend_t B>
-ACLSHMEM_DEVICE void aclshmemi_roce_write(__gm__ T* dst, __gm__ T* src, 
-                                          uint32_t pe, uint32_t qp_idx, uint64_t message_len,
-                                          AscendC::LocalTensor<uint64_t>& ub_local64,
-                                          AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id)
+template <typename T, aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE void aclshmemi_roce_write(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t message_len,
+    AscendC::LocalTensor<uint64_t>& ub_local64, AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id)
 {
     aclshmemi_rdma_send_wr wr = {};
-    wr.remote_addr   = (__gm__ uint8_t*)dst;
-    wr.local_addr    = (__gm__ uint8_t*)src;
-    wr.message_len   = message_len;
+    wr.remote_addr = (__gm__ uint8_t*)dst;
+    wr.local_addr = (__gm__ uint8_t*)src;
+    wr.message_len = message_len;
 
-    aclshmemi_roce_post_send<B, aclshmemi_rdma_opcode_t::OP_RDMA_WRITE>(wr, pe, qp_idx, ub_local64, ub_local32, sync_id);
+    aclshmemi_roce_post_send<B, aclshmemi_rdma_opcode_t::OP_RDMA_WRITE>(
+        wr, pe, qp_idx, ub_local64, ub_local32, sync_id);
 }
 
 /**
@@ -161,19 +161,165 @@ ACLSHMEM_DEVICE void aclshmemi_roce_write(__gm__ T* dst, __gm__ T* src,
  * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
  */
-template<typename T, aclshmemi_rdma_backend_t B>
-ACLSHMEM_DEVICE void aclshmemi_roce_read(__gm__ T* dst, __gm__ T* src,
-                                         uint32_t pe, uint32_t qp_idx, uint64_t message_len,
-                                         AscendC::LocalTensor<uint64_t>& ub_local64,
-                                         AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id)
+template <typename T, aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE void aclshmemi_roce_read(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t message_len,
+    AscendC::LocalTensor<uint64_t>& ub_local64, AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id)
 {
     // Attention: Read need src to be wr.remote_addr.
     aclshmemi_rdma_send_wr wr = {};
-    wr.remote_addr   = (__gm__ uint8_t*)src;
-    wr.local_addr    = (__gm__ uint8_t*)dst;
-    wr.message_len   = message_len;
+    wr.remote_addr = (__gm__ uint8_t*)src;
+    wr.local_addr = (__gm__ uint8_t*)dst;
+    wr.message_len = message_len;
 
     aclshmemi_roce_post_send<B, aclshmemi_rdma_opcode_t::OP_RDMA_READ>(wr, pe, qp_idx, ub_local64, ub_local32, sync_id);
 }
 
-#endif  // ACLSHMEM_RDMA_DEVICE_BACKEND_BASE_H
+/**
+ * @brief Asynchronous RDMA Atomic Fetch and Add function.
+ *
+ * @tparam T                     Data type for the atomic operation.
+ * @tparam IS_MASKED             Flag indicating whether this is a masked atomic operation.
+ * @tparam B                     RDMA Backend type
+ *
+ * @param dst                    [in] destination address in remote HBM
+ * @param src                    [in] reserved field, input could be invalid address, implementation should not use it
+ * @param pe                     [in] PE number of the remote PE.
+ * @param qp_idx                 [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param add_val                [in] value to be added
+ * @param boundary               [in] boundary value for masked FA operation
+ * @param ub_local64             [in] temporary UB local tensor of uint64_t used as workspace
+ * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
+ */
+template <typename T, bool IS_MASKED, aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE T aclshmemi_roce_atomic_fetch_and_add(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t add_val, uint64_t boundary,
+    AscendC::LocalTensor<uint64_t>& ub_local64, AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+
+/**
+ * @brief Asynchronous RDMA Atomic Compare and Swap function.
+ *
+ * @tparam T                     Data type for the atomic operation.
+ * @tparam IS_MASKED             Flag indicating whether this is a masked atomic operation.
+ * @tparam B                     RDMA Backend type
+ *
+ * @param dst                    [in] Destination address in remote HBM
+ * @param src                    [in] reserved field, input could be invalid address, implementation should not use it
+ * @param pe                     [in] PE number of the remote PE
+ * @param qp_idx                 [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param swap_val               [in] Value to be swapped
+ * @param comp_val               [in] Value to be compared
+ * @param swap_mask              [in] Mask to apply to swap_val
+ * @param comp_mask              [in] Mask to apply to comp_val
+ * @param ub_local64             [in] Temporary UB local tensor of uint64_t used as workspace
+ * @param ub_local32             [in] Temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                [in] ID used to Sync S\MTE3 Event
+ */
+template <typename T, bool IS_MASKED, aclshmemi_rdma_backend_t B>
+ACLSHMEM_DEVICE T aclshmemi_roce_atomic_compare_and_swap(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t swap_val, uint64_t comp_val,
+    uint64_t swap_mask, uint64_t comp_mask, AscendC::LocalTensor<uint64_t>& ub_local64,
+    AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+
+/*
+ * Backend Atomic Operations Traits System
+ *
+ * Static polymorphism design for RDMA atomic operations across different backends.
+ *
+ * Naming Convention:
+ *   - aclshmemi_backend_traits<B>: Primary template (undefined, forces specialization)
+ *   - atomic_op_traits<T, IS_MASKED>: Nested traits for type-specific operations
+ *
+ * Structure:
+ *   template <aclshmemi_rdma_backend_t B>
+ *   struct aclshmemi_backend_traits {
+ *       template <typename T, bool IS_MASKED>
+ *       struct atomic_op_traits {
+ *           static uint32_t fill_wqe(...);   // Construct WQE
+ *           static void post_send(...);      // Submit and ring doorbell
+ *       };
+ *   };
+ *
+ * Usage:
+ *   Each backend (e.g., IN_DIE, XSCALE) must provide a full specialization:
+ *
+ *   template <>
+ *   struct aclshmemi_backend_traits<aclshmemi_rdma_backend_t::XSCALE> {
+ *       template <typename T, bool IS_MASKED>
+ *       struct atomic_op_traits {
+ *           template <aclshmemi_rdma_atomic_op_t OP>
+ *           static uint32_t fill_wqe(...) { ... }
+ *           template <aclshmemi_rdma_atomic_op_t OP>
+ *           static void post_send(...) { ... }
+ *       };
+ *   };
+ *
+ * Features:
+ *   - Zero runtime overhead through compile-time dispatch
+ *   - Each backend implements ONE specialization for all T and IS_MASKED combinations
+ */
+
+template <aclshmemi_rdma_backend_t B>
+struct aclshmemi_backend_traits {
+    template <typename T, bool IS_MASKED>
+    struct atomic_op_traits {
+        /**
+         * @brief Construct Work Queue Entry (WQE) for atomic operation.
+         *
+         * @tparam ATOMIC_OP_CODE Atomic operation code (OP_ATOMIC_FA or OP_ATOMIC_CAS)
+         *
+         * @param wr Work request with atomic parameters. Must include:
+         *           - remote_addr: Target address in remote memory
+         *           - local_addr: Local buffer for result data
+         *           - lkey: Local memory key
+         *           - rkey: Remote memory key
+         *           - atomic.masked_common: Atomic operation parameters
+         * @param sq_context Send Queue context for backend configuration
+         * @param wqe_addr HBM address for WQE
+         * @param cur_head Current SQ producer index
+         *
+         * @return uint32_t WQE size in bytes for cache flush operations
+         */
+        template <aclshmemi_rdma_atomic_op_t ATOMIC_OP_CODE>
+        static ACLSHMEM_DEVICE uint32_t fill_wqe(
+            aclshmemi_rdma_send_wr& wr, __gm__ aclshmemi_rdma_sq_ctx*& sq_context, __gm__ uint8_t* wqe_addr,
+            uint32_t cur_head);
+
+        /**
+         * @brief Submit atomic operation WQE and ring doorbell.
+         *
+         * Main entry point for atomic operations. Handles QP context retrieval,
+         * queue capacity management, WQE construction, cache flush, and doorbell ring.
+         *
+         * @tparam ATOMIC_OP_CODE Atomic operation code determining operation type
+         *
+         * @param wr Work request with atomic parameters. Must include:
+         *           - remote_addr: Target address in remote memory
+         *           - local_addr: Local buffer for result data
+         *           - lkey: Local memory key
+         *           - rkey: Remote memory key
+         *           - atomic.masked_common: Atomic operation parameters
+         * @param pe Remote PE number
+         * @param qp_idx Queue Pair index (0 for single-QP configurations)
+         * @param ub_local64 64-bit workspace for doorbell operations
+         * @param ub_local32 32-bit workspace for index updates
+         * @param sync_id Sync ID for S/MTE3 pipeline coordination
+         *
+         */
+        template <aclshmemi_rdma_atomic_op_t ATOMIC_OP_CODE>
+        static ACLSHMEM_DEVICE void post_send(
+            aclshmemi_rdma_send_wr& wr, uint32_t pe, uint32_t qp_idx, AscendC::LocalTensor<uint64_t>& ub_local64,
+            AscendC::LocalTensor<uint32_t>& ub_local32, uint32_t sync_id);
+    };
+};
+
+// The following structure is used to provide compile-time errors when calling unimplemented atomic operations
+template <aclshmemi_rdma_atomic_op_t>
+struct aclshmemi_atomic_op_dependent_false : std::false_type {};
+
+// The following structure is used to provide compile-time errors when calling an unimplemented backend
+template <aclshmemi_rdma_backend_t>
+struct aclshmemi_rdma_backend_dependent_false : std::false_type {};
+
+#endif // ACLSHMEM_RDMA_DEVICE_BACKEND_BASE_H

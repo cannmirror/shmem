@@ -18,8 +18,9 @@ enum class aclshmemi_rdma_backend_t : uint32_t { IN_DIE = 0, XSCALE };
 
 enum class aclshmemi_rdma_opcode_t : uint32_t { OP_RDMA_READ = 0, OP_RDMA_WRITE, OP_RDMA_WRITE_WITH_IMM };
 
-enum class aclshmemi_rdma_db_mode_t : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
+enum class aclshmemi_rdma_atomic_op_t : uint32_t { OP_ATOMIC_FA = 0, OP_ATOMIC_CAS };
 
+enum class aclshmemi_rdma_db_mode_t : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
 struct aclshmemi_rdma_info {
     uint32_t qp_num;  // number of QP per connection
     uint64_t sq_ptr;  // pointer to send queue address array of size [PE_NUM][qp_num]
@@ -44,8 +45,10 @@ struct aclshmemi_rdma_sq_ctx {
     uint64_t head_addr; // work queue head (Producer Index) address
     uint64_t tail_addr; // work queue tail (Consumer Index) address
     aclshmemi_rdma_db_mode_t db_mode;
-    uint64_t db_addr; // doorbell address
-    uint32_t sl;      // service level
+    uint64_t db_addr;  // doorbell address
+    uint32_t sl;       // service level
+    uint64_t amo_addr; // addr for atomic operation
+    uint32_t amo_lkey; // lkey for amo_addr
 };
 
 struct aclshmemi_rdma_cq_ctx {
@@ -72,8 +75,16 @@ struct aclshmemi_rdma_atomic_params {
             uint64_t swap;
         };
         struct {
-            uint64_t compare_add;
-            uint64_t swap;
+            uint64_t swap_add_data;
+            uint64_t compare_data;
+            uint64_t swap_add_mask;
+            uint64_t compare_mask;
+        } masked_common;
+        struct {
+            uint64_t swap_data;
+            uint64_t compare_data;
+            uint64_t swap_mask;
+            uint64_t compare_mask;
         } masked_cas64;
         struct {
             uint64_t add_data;
@@ -164,5 +175,53 @@ ACLSHMEM_DEVICE void aclshmemi_roce_read(
 ACLSHMEM_DEVICE void aclshmemi_roce_quiet(
     uint32_t pe, uint32_t qp_idx, AscendC::LocalTensor<uint64_t> ub_local64, AscendC::LocalTensor<uint32_t> ub_local32,
     uint32_t sync_id);
+
+/**
+ * @brief Asynchronous RDMA Atomic Fetch and Add function.
+ *
+ * @tparam T                     [in] data type of the atomic fetch and add operation
+ * @tparam IS_MASKED             [in] whether the atomic fetch and add operation is masked
+ * @param dst                    [in] destination address in remote HBM
+ * @param src                    [in] Reserved field, not used in atomic fetch and add operation. It is recommended to
+ * pass nullptr when called externally.
+ * @param src                    [in] reserved field, not used in atomic fetch and add operation
+ * @param pe                     [in] PE number of the remote PE.
+ * @param qp_idx                 [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param add_val                [in] add val for atomic fetch and add operation
+ * @param boundary               [in] boundary value for masked atomic fetch and add operation
+ * @param ub_local64             [in] temporary UB local tensor of uint64_t used as workspace
+ * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
+ * @return T 0 for success, non-zero for failure
+ */
+template <typename T, bool IS_MASKED>
+ACLSHMEM_DEVICE T aclshmemi_roce_amo_add(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t add_val, uint64_t boundary,
+    AscendC::LocalTensor<uint64_t> ub_local64, AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id);
+
+/**
+ * @brief Asynchronous RDMA Atomic Compare and Swap function.
+ *
+ * @tparam T                     [in] data type of the atomic compare and swap operation
+ * @tparam IS_MASKED             [in] whether the atomic compare and swap operation is masked
+ * @param dst                    [in] destination address in remote HBM
+ * @param src                    [in] Reserved field, not used in atomic compare and swap operation. It is recommended
+ * to pass nullptr when called externally.
+ * @param pe                     [in] PE number of the remote PE.
+ * @param qp_idx                 [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param swap_val               [in] swap val for atomic compare and swap operation
+ * @param comp_val               [in] compare val for atomic compare and swap operation
+ * @param swap_mask              [in] swap mask for masked atomic compare and swap operation
+ * @param comp_mask              [in] compare mask for masked atomic compare and swap operation
+ * @param ub_local64             [in] temporary UB local tensor of uint64_t used as workspace
+ * @param ub_local32             [in] temporary UB local tensor of uint32_t used as workspace
+ * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
+ * @return T 0 for success, non-zero for failure
+ */
+template <typename T, bool IS_MASKED>
+ACLSHMEM_DEVICE T aclshmemi_roce_amo_cas(
+    __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t swap_val, uint64_t comp_val,
+    uint64_t swap_mask, uint64_t comp_mask, AscendC::LocalTensor<uint64_t> ub_local64,
+    AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id);
 
 #endif // ACLSHMEMI_DEVICE_RDMA_H

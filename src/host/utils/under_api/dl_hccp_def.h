@@ -63,11 +63,11 @@ struct ra_qp_handle {
     int flag;
     unsigned int phy_id;
     unsigned int rdev_index;
-    struct ra_rdma_ops *rdma_ops;  // only ra use
+    struct ra_rdma_ops* rdma_ops; // only ra use
     int support_lite;
-    struct rdma_lite_cq *send_lite_cq;
-    struct rdma_lite_cq *recv_lite_cq;
-    struct rdma_lite_qp *lite_qp;
+    struct rdma_lite_cq* send_lite_cq;
+    struct rdma_lite_cq* recv_lite_cq;
+    struct rdma_lite_qp* lite_qp;
     struct lite_mr_info local_mr[RA_MR_MAX_NUM];
     struct lite_mr_info rem_mr[RA_MR_MAX_NUM];
     pthread_mutex_t qp_mutex;
@@ -78,8 +78,8 @@ struct ra_qp_handle {
     unsigned int recv_wr_num;
     unsigned int poll_recv_cqe_num;
     struct ra_list_head list;
-    struct ra_rdma_handle *rdma_handle;
-    struct rdma_lite_wc *lite_wc;
+    struct ra_rdma_handle* rdma_handle;
+    struct rdma_lite_wc* lite_wc;
     unsigned int mem_idx;
     int sq_sig_all;
     unsigned int udp_sport;
@@ -142,7 +142,7 @@ enum HccpNotifyType {
  * struct of the client socket
  */
 struct HccpSocketConnectInfo {
-    void *handle;                      /**< socket handle */
+    void* handle;                      /**< socket handle */
     HccpIpAddr remoteIp;               /**< IP address of remote socket, [0-7] is reserved for vnic */
     uint16_t port;                     /**< Socket listening port number */
     char tag[HCCP_SOCK_CONN_TAG_SIZE]; /**< tag must ended by '\0' */
@@ -153,8 +153,8 @@ struct HccpSocketConnectInfo {
  * Details about socket after socket is linked
  */
 struct HccpSocketCloseInfo {
-    void *handle; /**< socket handle */
-    void *fd;     /**< fd handle */
+    void* handle; /**< socket handle */
+    void* fd;     /**< fd handle */
     int linger;   /**< 0:use(default l_linger is RS_CLOSE_TIMEOUT), others:disuse */
 };
 
@@ -163,7 +163,7 @@ struct HccpSocketCloseInfo {
  * struct of the listen info
  */
 struct HccpSocketListenInfo {
-    void *handle;       /**< socket handle */
+    void* handle;       /**< socket handle */
     unsigned int port;  /**< Socket listening port number */
     unsigned int phase; /**< refer to enum listen_phase */
     unsigned int err;   /**< errno */
@@ -174,8 +174,8 @@ struct HccpSocketListenInfo {
  * Details about socket after socket is linked
  */
 struct HccpSocketInfo {
-    void *handle;                      /**< socket handle */
-    void *fd;                          /**< fd handle */
+    void* handle;                      /**< socket handle */
+    void* fd;                          /**< fd handle */
     HccpIpAddr remoteIp;               /**< IP address of remote socket */
     int status;                        /**< socket status:0 not connected 1:connected 2:connect timeout 3:connecting */
     char tag[HCCP_SOCK_CONN_TAG_SIZE]; /**< tag must ended by '\0' */
@@ -198,8 +198,8 @@ struct HccpRaGetIfAttr {
 };
 
 struct HccpIfaddrInfo {
-    HccpIpAddr ip;       /* Address of interface */
-    struct in_addr mask; /* Netmask of interface */
+    HccpIpAddr ip;          /* Address of interface */
+    struct in_addr mask;    /* Netmask of interface */
     struct in6_addr maskv6; /* Ipv6 Netmask of interface */
 };
 
@@ -217,7 +217,7 @@ struct HccpSocketWhiteListInfo {
 };
 
 struct HccpMrInfo {
-    void *addr;              /**< starting address of mr */
+    void* addr;              /**< starting address of mr */
     unsigned long long size; /**< size of mr */
     int access;              /**< access of mr, reference to HccpMrAccessFlags */
     unsigned int lkey;       /**< local addr access key */
@@ -250,10 +250,10 @@ struct ibv_qp_cap {
 };
 
 struct ibv_qp_init_attr {
-    void *qp_context;
-    struct ibv_cq *send_cq;
-    struct ibv_cq *recv_cq;
-    struct ibv_srq *srq;
+    void* qp_context;
+    struct ibv_cq* send_cq;
+    struct ibv_cq* recv_cq;
+    struct ibv_srq* srq;
     struct ibv_qp_cap cap;
     enum ibv_qp_type qp_type;
     int sq_sig_all;
@@ -261,7 +261,7 @@ struct ibv_qp_init_attr {
 
 union ai_data_plane_cstm_flag {
     struct {
-        uint32_t cq_cstm : 1;  // 0: hccp poll cq; 1: caller poll cq
+        uint32_t cq_cstm : 1; // 0: hccp poll cq; 1: caller poll cq
         uint32_t reserved : 31;
     } bs;
     uint32_t value;
@@ -275,9 +275,9 @@ struct HccpQpExtAttrs {
     struct ibv_qp_init_attr qp_attr;
     // version control and reserved
     int version;
-    int mem_align;  // 0,1:4KB, 2:2MB
+    int mem_align; // 0,1:4KB, 2:2MB
     uint32_t udp_sport;
-    union ai_data_plane_cstm_flag data_plane_flag;  // only valid in ra_ai_qp_create
+    union ai_data_plane_cstm_flag data_plane_flag; // only valid in ra_ai_qp_create
     uint32_t reserved[29];
 };
 
@@ -314,13 +314,13 @@ struct ai_data_plane_info {
 };
 
 struct HccpAiQpInfo {
-    unsigned long long aiQpAddr;  // refer to struct ibv_qp *
-    unsigned int sqIndex;         // index of sq
-    unsigned int dbIndex;         // index of db
+    unsigned long long aiQpAddr; // refer to struct ibv_qp *
+    unsigned int sqIndex;        // index of sq
+    unsigned int dbIndex;        // index of db
 
     // below cq related info valid when data_plane_flag.bs.cq_cstm was 1
-    unsigned long long ai_scq_addr;  // refer to struct ibv_cq *scq
-    unsigned long long ai_rcq_addr;  // refer to struct ibv_cq *rcq
+    unsigned long long ai_scq_addr; // refer to struct ibv_cq *scq
+    unsigned long long ai_rcq_addr; // refer to struct ibv_cq *rcq
     struct ai_data_plane_info data_plane_info;
 };
 
@@ -333,9 +333,11 @@ struct AiQpRMAWQ {
     uint32_t depth{0};
     uint64_t headAddr{0};
     uint64_t tailAddr{0};
-    DBMode dbMode{DBMode::INVALID_DB};  // 0-hw/1-sw
+    DBMode dbMode{DBMode::INVALID_DB}; // 0-hw/1-sw
     uint64_t dbAddr{0};
     uint32_t sl{0};
+    uint64_t atomicAddr{0}; // device addr for atomic fetch or swapped data
+    uint32_t atomicLkey{0}; // lkey for atomicAddr
 };
 
 struct AiQpRMACQ {
@@ -345,25 +347,25 @@ struct AiQpRMACQ {
     uint32_t depth{0};
     uint64_t headAddr{0};
     uint64_t tailAddr{0};
-    DBMode dbMode{DBMode::INVALID_DB};  // 0-hw/1-sw
+    DBMode dbMode{DBMode::INVALID_DB}; // 0-hw/1-sw
     uint64_t dbAddr{0};
 };
 
 struct RdmaMemRegionInfo {
-    uint64_t size{0};  // size of the memory region
-    uint64_t addr{0};  // start address of the memory region
+    uint64_t size{0}; // size of the memory region
+    uint64_t addr{0}; // start address of the memory region
     uint32_t lkey{0};
-    uint32_t rkey{0};   // key of the memory region
+    uint32_t rkey{0}; // key of the memory region
 };
 
 struct AiQpRMAQueueInfo {
     uint32_t count;
-    struct AiQpRMAWQ *sq;
-    struct AiQpRMAWQ *rq;
-    struct AiQpRMACQ *scq;
-    struct AiQpRMACQ *rcq;
-    RdmaMemRegionInfo *mr;
+    struct AiQpRMAWQ* sq;
+    struct AiQpRMAWQ* rq;
+    struct AiQpRMACQ* scq;
+    struct AiQpRMACQ* rcq;
+    RdmaMemRegionInfo* mr;
 };
-}
+} // namespace shm
 
-#endif  // MF_HYBRID_DL_HCCP_DEF_H
+#endif // MF_HYBRID_DL_HCCP_DEF_H

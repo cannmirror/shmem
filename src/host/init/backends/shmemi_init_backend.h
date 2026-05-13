@@ -10,7 +10,7 @@
 #ifndef SHMEMI_INIT_BACKEND_H
 #define SHMEMI_INIT_BACKEND_H
 
-#include <iostream>
+#include <map>
 #include <mutex>
 
 #include "host/shmem_host_def.h"

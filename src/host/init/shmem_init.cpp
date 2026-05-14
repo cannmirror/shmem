@@ -38,35 +38,35 @@ constexpr uint32_t DEFAULT_RDMA_UB_SIZE = 64;
 constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
 
 // initializer
-#define ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER                                                         \
-    {                                                                                                  \
-        (1 << 16) + sizeof(aclshmem_device_host_state_t),       /* version */                          \
-            (DEFAULT_MY_PE),                                    /* mype */                             \
-            (DEFAULT_N_PES),                                    /* npes */                             \
-            NULL,                                               /* heap_base */                        \
-            NULL,                                               /* host_heap_base */                   \
-            NULL,                                               /* p2p_device_heap_base */             \
-            NULL,                                               /* rdma_device_heap_base */            \
-            NULL,                                               /* sdma_device_heap_base */            \
-            NULL,                                               /* p2p_heap_host_base */               \
-            NULL,                                               /* rdma_heap_host_base */              \
-            NULL,                                               /* sdma_heap_host_base */              \
-            {},                                                 /* topo_list */                        \
-            SIZE_MAX,                                           /* heap_size */                        \
-            {NULL},                                             /* team_pools */                       \
-            0,                                                  /* sync_pool */                        \
-            0,                                                  /* sync_counter */                     \
-            0,                                                  /* core_sync_pool */                   \
-            0,                                                  /* core_sync_counter */                \
-            false,                                              /* aclshmem_is_aclshmem_initialized */ \
-            false,                                              /* aclshmem_is_aclshmem_created */     \
-            {0, DEFAULT_MTE_UB_SIZE, 0},                        /* aclshmem_mte_config */              \
-            {DEFAULT_SDMA_UB_OFFSET, DEFAULT_SDMA_UB_SIZE, 0},  /* aclshmem_sdma_config */             \
-            {DEFAULT_RDMA_UB_OFFSET, DEFAULT_RDMA_UB_SIZE, 0},  /* aclshmem_rdma_config */             \
-            0,                                                  /* qp_info */                          \
-            0,                                                  /* sdma_workspace_addr */              \
-            NULL,                                               /* aclshmem_prof_pe_t */               \
-            0,                                                  /* signal_addr */                      \
+#define ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER                                                    \
+    {                                                                                             \
+        (1 << 16) + sizeof(aclshmem_device_host_state_t),  /* version */                          \
+        (DEFAULT_MY_PE),                                   /* mype */                             \
+        (DEFAULT_N_PES),                                   /* npes */                             \
+        NULL,                                              /* heap_base */                        \
+        NULL,                                              /* host_heap_base */                   \
+        NULL,                                              /* p2p_device_heap_base */             \
+        NULL,                                              /* rdma_device_heap_base */            \
+        NULL,                                              /* sdma_device_heap_base */            \
+        NULL,                                              /* p2p_heap_host_base */               \
+        NULL,                                              /* rdma_heap_host_base */              \
+        NULL,                                              /* sdma_heap_host_base */              \
+        {},                                                /* topo_list */                        \
+        SIZE_MAX,                                          /* heap_size */                        \
+        {NULL},                                            /* team_pools */                       \
+        0,                                                 /* sync_pool */                        \
+        0,                                                 /* sync_counter */                     \
+        0,                                                 /* core_sync_pool */                   \
+        0,                                                 /* core_sync_counter */                \
+        false,                                             /* aclshmem_is_aclshmem_initialized */ \
+        false,                                             /* aclshmem_is_aclshmem_created */     \
+        {0, DEFAULT_MTE_UB_SIZE, 0},                       /* aclshmem_mte_config */              \
+        {DEFAULT_SDMA_UB_OFFSET, DEFAULT_SDMA_UB_SIZE, 0}, /* aclshmem_sdma_config */             \
+        {DEFAULT_RDMA_UB_OFFSET, DEFAULT_RDMA_UB_SIZE, 0}, /* aclshmem_rdma_config */             \
+        0,                                                 /* qp_info */                          \
+        0,                                                 /* sdma_workspace_addr */              \
+        NULL,                                              /* aclshmem_prof_pe_t */               \
+        0,                                                 /* signal_addr */                      \
     }
 
 aclshmem_device_host_state_t g_state = ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER;
@@ -74,7 +74,7 @@ aclshmem_host_state_t g_state_host = {nullptr, DEFAULT_TEVENT, DEFAULT_BLOCK_NUM
 aclshmem_prof_pe_t g_host_profs;
 
 // bootstrap plugin_hdl
-void *plugin_hdl = nullptr;
+void* plugin_hdl = nullptr;
 aclshmemi_bootstrap_handle_t g_boot_handle;
 std::shared_ptr<memory_manager> aclshmemi_memory_manager = nullptr;
 std::shared_ptr<memory_manager> aclshmemi_host_memory_manager = nullptr;
@@ -87,14 +87,13 @@ aclshmemi_init_backend* init_manager = nullptr;
 static std::mutex g_aclshmem_ctx_mutex;
 
 // Instance context used to store global_resources
-struct aclshmem_context
-{
+struct aclshmem_context {
     uint64_t instance_id = 0;
 
     aclshmem_device_host_state_t state = ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER;
     aclshmem_host_state_t host_state = {nullptr, DEFAULT_TEVENT, DEFAULT_BLOCK_NUM};
 
-    void *bootstrap_plugin_hdl = nullptr;
+    void* bootstrap_plugin_hdl = nullptr;
     aclshmemi_bootstrap_handle_t boot_handle;
 
     std::shared_ptr<memory_manager> dev_mem_manager = nullptr;
@@ -104,10 +103,10 @@ struct aclshmem_context
 };
 
 // g_instance_ctx for global use
-aclshmem_instance_ctx *g_instance_ctx = new aclshmem_instance_ctx{0, nullptr};
+aclshmem_instance_ctx* g_instance_ctx = new aclshmem_instance_ctx{0, nullptr};
 
-std::map<uint32_t, aclshmem_instance_ctx*> aclshmem_ctx_domain = { {0, g_instance_ctx} };
-std::map<uint32_t, aclshmem_context*> aclshmem_resource_domain = { {0, new aclshmem_context(0)} };
+std::map<uint32_t, aclshmem_instance_ctx*> aclshmem_ctx_domain = {{0, g_instance_ctx}};
+std::map<uint32_t, aclshmem_context*> aclshmem_resource_domain = {{0, new aclshmem_context(0)}};
 
 int32_t version_compatible()
 {
@@ -115,7 +114,7 @@ int32_t version_compatible()
     return status;
 }
 
-int32_t aclshmemi_state_init_attr(aclshmemx_init_attr_t *attributes)
+int32_t aclshmemi_state_init_attr(aclshmemx_init_attr_t* attributes)
 {
     int32_t status = ACLSHMEM_SUCCESS;
     g_state.mype = attributes->my_pe;
@@ -137,40 +136,41 @@ bool is_valid_data_op_engine_type(data_op_engine_type_t value)
     return int_value > 0 && (int_value & ~valid_mask) == 0;
 }
 
-int32_t check_attr(aclshmemx_init_attr_t *attributes)
+int32_t check_attr(aclshmemx_init_attr_t* attributes)
 {
-    SHM_LOG_DEBUG("check_attr my_pe=" << attributes->my_pe << " n_pes=" << attributes->n_pes << " local_mem_size=" << attributes->local_mem_size
-                                      << " shm_init_timeout=" << attributes->option_attr.shm_init_timeout
-                                      << " control_operation_timeout=" << attributes->option_attr.control_operation_timeout);
+    SHM_LOG_DEBUG(
+        "check_attr my_pe=" << attributes->my_pe << " n_pes=" << attributes->n_pes
+                            << " local_mem_size=" << attributes->local_mem_size
+                            << " shm_init_timeout=" << attributes->option_attr.shm_init_timeout
+                            << " control_operation_timeout=" << attributes->option_attr.control_operation_timeout);
     SHM_VALIDATE_RETURN(attributes->my_pe >= 0, "my_pe is less than zero", ACLSHMEM_INVALID_VALUE);
     SHM_VALIDATE_RETURN(attributes->n_pes > 0, "n_pes is less than or equal to zero", ACLSHMEM_INVALID_VALUE);
     SHM_VALIDATE_RETURN(attributes->n_pes <= ACLSHMEM_MAX_PES, "n_pes is too large", ACLSHMEM_INVALID_VALUE);
-    SHM_VALIDATE_RETURN(attributes->my_pe < attributes->n_pes, "my_pe is greater than or equal to n_pes", ACLSHMEM_INVALID_PARAM);
-    SHM_VALIDATE_RETURN(attributes->local_mem_size > 0, "local_mem_size less than or equal to 0", ACLSHMEM_INVALID_VALUE);
+    SHM_VALIDATE_RETURN(
+        attributes->my_pe < attributes->n_pes, "my_pe is greater than or equal to n_pes", ACLSHMEM_INVALID_PARAM);
+    SHM_VALIDATE_RETURN(
+        attributes->local_mem_size > 0, "local_mem_size less than or equal to 0", ACLSHMEM_INVALID_VALUE);
     SHM_ASSERT_RETURN(attributes->local_mem_size <= ACLSHMEM_MAX_LOCAL_SIZE, ACLSHMEM_INVALID_VALUE);
 
-    SHM_VALIDATE_RETURN(attributes->option_attr.shm_init_timeout != 0, "shm_init_timeout is zero", ACLSHMEM_INVALID_VALUE);
-    SHM_VALIDATE_RETURN(attributes->option_attr.control_operation_timeout != 0, "control_operation_timeout is zero", ACLSHMEM_INVALID_VALUE);
+    SHM_VALIDATE_RETURN(
+        attributes->option_attr.shm_init_timeout != 0, "shm_init_timeout is zero", ACLSHMEM_INVALID_VALUE);
+    SHM_VALIDATE_RETURN(
+        attributes->option_attr.control_operation_timeout != 0, "control_operation_timeout is zero",
+        ACLSHMEM_INVALID_VALUE);
     SHM_VALIDATE_RETURN(attributes->option_attr.data_op_engine_type > 0, "sockFd is invalid", ACLSHMEM_INVALID_VALUE);
-    SHM_ASSERT_RETURN(is_valid_data_op_engine_type(attributes->option_attr.data_op_engine_type), ACLSHMEM_INVALID_VALUE);
+    SHM_ASSERT_RETURN(
+        is_valid_data_op_engine_type(attributes->option_attr.data_op_engine_type), ACLSHMEM_INVALID_VALUE);
     return ACLSHMEM_SUCCESS;
 }
 
-int32_t aclshmemi_control_barrier_all()
-{
-    return init_manager->aclshmemi_control_barrier_all();
-}
+int32_t aclshmemi_control_barrier_all() { return init_manager->aclshmemi_control_barrier_all(); }
 
-int32_t is_alloc_size_symmetric(size_t size)
-{
-    return init_manager->is_alloc_size_symmetric(size);
-}
+int32_t is_alloc_size_symmetric(size_t size) { return init_manager->is_alloc_size_symmetric(size); }
 
 int32_t update_device_state()
 {
-    return init_manager->update_device_state((void *)&g_state, sizeof(aclshmem_device_host_state_t));
+    return init_manager->update_device_state((void*)&g_state, sizeof(aclshmem_device_host_state_t));
 }
-
 
 int32_t aclshmemx_init_status(void)
 {
@@ -184,15 +184,15 @@ int32_t aclshmemx_init_status(void)
         return ACLSHMEM_STATUS_INVALID;
 }
 
-int aclshmemx_set_attr_uniqueid_args(int my_pe, int n_pes, int64_t local_mem_size,
-                                    aclshmemx_uniqueid_t *uid,
-                                    aclshmemx_init_attr_t *aclshmem_attr) {
+int aclshmemx_set_attr_uniqueid_args(
+    int my_pe, int n_pes, int64_t local_mem_size, aclshmemx_uniqueid_t* uid, aclshmemx_init_attr_t* aclshmem_attr)
+{
     /* Save to uid_args */
     SHM_ASSERT_RETURN(local_mem_size <= ACLSHMEM_MAX_LOCAL_SIZE, ACLSHMEM_INVALID_VALUE);
     SHM_ASSERT_RETURN(n_pes <= ACLSHMEM_MAX_PES, ACLSHMEM_INVALID_VALUE);
     SHM_ASSERT_RETURN(my_pe < ACLSHMEM_MAX_PES, ACLSHMEM_INVALID_VALUE);
-    aclshmemi_bootstrap_uid_state_t *uid_args = (aclshmemi_bootstrap_uid_state_t *)(uid);
-    void * comm_args = reinterpret_cast<void *>(uid_args);
+    aclshmemi_bootstrap_uid_state_t* uid_args = (aclshmemi_bootstrap_uid_state_t*)(uid);
+    void* comm_args = reinterpret_cast<void*>(uid_args);
     aclshmem_attr->comm_args = comm_args;
     aclshmem_attr->my_pe = my_pe;
     aclshmem_attr->n_pes = n_pes;
@@ -211,8 +211,9 @@ bool check_support_d2h()
         return false;
     }
     if (major_version <= 1 && minor_version < 15) {
-        SHM_LOG_INFO("The current AscendCL version is "
-            << major_version << "." << minor_version << "." << patch_version << ", which does not support d2h.");
+        SHM_LOG_INFO(
+            "The current AscendCL version is " << major_version << "." << minor_version << "." << patch_version
+                                               << ", which does not support d2h.");
         return false;
     }
     return true;
@@ -221,7 +222,7 @@ bool check_support_d2h()
 int32_t aclshmemi_signal_finalize()
 {
     if (g_state.signal_addr != 0) {
-        aclshmem_free(reinterpret_cast<void *>(g_state.signal_addr));
+        aclshmem_free(reinterpret_cast<void*>(g_state.signal_addr));
         g_state.signal_addr = 0;
     }
     return ACLSHMEM_SUCCESS;
@@ -235,7 +236,7 @@ int32_t aclshmemi_signal_init()
         SHM_LOG_ERROR("malloc signal failed.");
         return ACLSHMEM_INNER_ERROR;
     }
-    auto ret = aclrtMemset((void *)g_state.signal_addr, ACLSHMEM_SIGNAL_SIZE, 0, ACLSHMEM_SIGNAL_SIZE);
+    auto ret = aclrtMemset((void*)g_state.signal_addr, ACLSHMEM_SIGNAL_SIZE, 0, ACLSHMEM_SIGNAL_SIZE);
     if (ret != 0) {
         aclshmemi_signal_finalize();
         SHM_LOG_ERROR("memset signal failed. ret=" << ret);
@@ -244,7 +245,7 @@ int32_t aclshmemi_signal_init()
     return ACLSHMEM_SUCCESS;
 }
 
-static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t *attributes)
+static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t* attributes)
 {
     // 1. Get Port Range From Environment
     const char* env_port_range = std::getenv("SHMEM_INSTANCE_PORT_RANGE");
@@ -278,7 +279,8 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t *attribut
     int max_instance_num = end_port - start_port;
     uint64_t instance_id = attributes->instance_id;
     if (instance_id > static_cast<uint64_t>(max_instance_num)) {
-        SHM_LOG_ERROR("instance_id " << instance_id << " exceeds max_instance_num " << max_instance_num << " in default mode");
+        SHM_LOG_ERROR(
+            "instance_id " << instance_id << " exceeds max_instance_num " << max_instance_num << " in default mode");
         return ACLSHMEM_INVALID_VALUE;
     }
     uint16_t port = start_port + static_cast<uint16_t>(instance_id);
@@ -323,7 +325,7 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t *attribut
     return ACLSHMEM_SUCCESS;
 }
 
-static int aclshmemi_instance_ctx_create(aclshmemx_init_attr_t *attributes)
+static int aclshmemi_instance_ctx_create(aclshmemx_init_attr_t* attributes)
 {
     uint64_t instance_id = attributes->instance_id;
     if (instance_id == 0) {
@@ -332,7 +334,7 @@ static int aclshmemi_instance_ctx_create(aclshmemx_init_attr_t *attributes)
     }
 
     // Check if Repeat
-    if (aclshmem_ctx_domain.find(instance_id) != aclshmem_ctx_domain.end() || 
+    if (aclshmem_ctx_domain.find(instance_id) != aclshmem_ctx_domain.end() ||
         aclshmem_resource_domain.find(instance_id) != aclshmem_resource_domain.end()) {
         SHM_LOG_WARN("Instance " << instance_id << " already exists ! Please don't repeat create !");
         return ACLSHMEM_SUCCESS;
@@ -344,21 +346,23 @@ static int aclshmemi_instance_ctx_create(aclshmemx_init_attr_t *attributes)
     }
 
     // Create aclshmem_instance_ctx
-    aclshmem_instance_ctx *aclshmem_ctx = new aclshmem_instance_ctx{attributes->instance_id, nullptr};
+    aclshmem_instance_ctx* aclshmem_ctx = new aclshmem_instance_ctx{attributes->instance_id, nullptr};
     if (aclshmem_ctx == nullptr) {
         SHM_LOG_ERROR("Failed to allocate memory for aclshmem_instance_ctx.");
         return ACLSHMEM_INNER_ERROR;
     }
     aclshmem_ctx_domain[attributes->instance_id] = aclshmem_ctx;
 
-    aclshmem_context *aclshmem_resource_ctx = new aclshmem_context(attributes->instance_id);
+    aclshmem_context* aclshmem_resource_ctx = new aclshmem_context(attributes->instance_id);
     if (aclshmem_resource_ctx == nullptr) {
         SHM_LOG_ERROR("Failed to allocate memory for aclshmem_context.");
         return ACLSHMEM_INNER_ERROR;
     }
     aclshmem_resource_domain[attributes->instance_id] = aclshmem_resource_ctx;
 
-    SHM_LOG_WARN("PE: " << attributes->my_pe << " USING SHMEM Multi-Instance Mode ! Now Ctx set to Instance " << instance_id << " !");
+    SHM_LOG_WARN(
+        "PE: " << attributes->my_pe << " USING SHMEM Multi-Instance Mode ! Now Ctx set to Instance " << instance_id
+               << " !");
     return ACLSHMEM_SUCCESS;
 }
 
@@ -411,36 +415,36 @@ int aclshmemx_instance_ctx_set(uint64_t instance_id)
 int aclshmemx_instance_ctx_set_impl(uint64_t instance_id)
 {
     if (aclshmem_ctx_domain.find(instance_id) != aclshmem_ctx_domain.end()) {
-        aclshmem_instance_ctx *new_ctx = aclshmem_ctx_domain[instance_id];
-        aclshmem_context *new_context = aclshmem_resource_domain[instance_id];
-        aclshmem_context *current_context = aclshmem_resource_domain[g_instance_ctx->id];
+        aclshmem_instance_ctx* new_ctx = aclshmem_ctx_domain[instance_id];
+        aclshmem_context* new_context = aclshmem_resource_domain[instance_id];
+        aclshmem_context* current_context = aclshmem_resource_domain[g_instance_ctx->id];
 
         // Global_vars write back
-        current_context->state                  = g_state;
-        current_context->host_state             = g_state_host;
-        current_context->bootstrap_plugin_hdl   = plugin_hdl;
-        current_context->boot_handle            = g_boot_handle;
-        current_context->dev_mem_manager        = aclshmemi_memory_manager;
-        current_context->host_mem_manager       = aclshmemi_host_memory_manager;
+        current_context->state = g_state;
+        current_context->host_state = g_state_host;
+        current_context->bootstrap_plugin_hdl = plugin_hdl;
+        current_context->boot_handle = g_boot_handle;
+        current_context->dev_mem_manager = aclshmemi_memory_manager;
+        current_context->host_mem_manager = aclshmemi_host_memory_manager;
 
         // Set Global_vars by new_context
-        g_state                                 = new_context->state;
-        g_state_host                            = new_context->host_state;
-        plugin_hdl                              = new_context->bootstrap_plugin_hdl;
-        g_boot_handle                           = new_context->boot_handle;
-        aclshmemi_memory_manager                = new_context->dev_mem_manager;
-        aclshmemi_host_memory_manager           = new_context->host_mem_manager;
+        g_state = new_context->state;
+        g_state_host = new_context->host_state;
+        plugin_hdl = new_context->bootstrap_plugin_hdl;
+        g_boot_handle = new_context->boot_handle;
+        aclshmemi_memory_manager = new_context->dev_mem_manager;
+        aclshmemi_host_memory_manager = new_context->host_mem_manager;
 
         // Set New aclshmem context
         g_instance_ctx = aclshmem_ctx_domain[instance_id];
-            
+
         return ACLSHMEM_SUCCESS;
     }
     SHM_LOG_ERROR("Context Set failed ! Can't find instance " << instance_id << " !");
     return ACLSHMEM_INNER_ERROR;
 }
 
-int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_init_attr_t *attributes)
+int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_init_attr_t* attributes)
 {
     std::lock_guard<std::mutex> lock(g_aclshmem_ctx_mutex);
     int32_t ret;
@@ -452,9 +456,13 @@ int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_ini
 
     // config init
     SHM_ASSERT_RETURN(attributes != nullptr, ACLSHMEM_INVALID_PARAM);
-    ACLSHMEM_CHECK_RET(aclshmemx_init_status() != ACLSHMEM_STATUS_NOT_INITIALIZED, "SHMEM has been initialized, do not call init interface repeatedly!", ACLSHMEM_INNER_ERROR);
+    ACLSHMEM_CHECK_RET(
+        aclshmemx_init_status() != ACLSHMEM_STATUS_NOT_INITIALIZED,
+        "SHMEM has been initialized, do not call init interface repeatedly!", ACLSHMEM_INNER_ERROR);
     ACLSHMEM_CHECK_RET(aclshmemx_set_log_level(aclshmem_log::ERROR_LEVEL));
-    ACLSHMEM_CHECK_RET(check_attr(attributes), "An error occurred while checking the initialization attributes. Please check the initialization parameters.");
+    ACLSHMEM_CHECK_RET(
+        check_attr(attributes),
+        "An error occurred while checking the initialization attributes. Please check the initialization parameters.");
     ACLSHMEM_CHECK_RET(version_compatible(), "ACLSHMEM Version mismatch.");
     // init bootstrap
     ACLSHMEM_CHECK_RET(aclshmemi_bootstrap_init(bootstrap_flags, attributes));
@@ -500,7 +508,7 @@ int32_t aclshmem_finalize(uint64_t instance_id)
     // When aclshmem_finalize, first set context; otherwise we will finalize unknown instance
     aclshmemx_instance_ctx_set_impl(instance_id);
 
-    SHM_LOG_INFO("The instance : " << instance_id <<  ", The pe: " << aclshmem_my_pe() << " begins to finalize.");
+    SHM_LOG_INFO("The instance : " << instance_id << ", The pe: " << aclshmem_my_pe() << " begins to finalize.");
     if (init_manager == nullptr) {
         SHM_LOG_INFO("init_manager is null finalize success.");
         g_state.is_aclshmem_initialized = false;
@@ -524,8 +532,14 @@ int32_t aclshmem_finalize(uint64_t instance_id)
 #endif
     ACLSHMEM_CHECK_RET(init_manager->release_aclshmem_entity(instance_id));
     if (g_state_host.default_stream != nullptr) {
-        ACLSHMEM_CHECK_RET(aclrtSynchronizeStream(g_state_host.default_stream));
-        ACLSHMEM_CHECK_RET(aclrtDestroyStream(g_state_host.default_stream));
+        auto ret = aclrtSynchronizeStream(g_state_host.default_stream);
+        if (ret != 0) {
+            SHM_LOG_ERROR("Synchronize stream failed. ret=" << ret);
+        }
+        ret = aclrtDestroyStream(g_state_host.default_stream);
+        if (ret != 0) {
+            SHM_LOG_ERROR("Destroy stream failed. ret=" << ret);
+        }
         g_state_host.default_stream = nullptr;
     }
     aclshmemi_bootstrap_finalize();
@@ -542,18 +556,19 @@ int32_t aclshmem_finalize(uint64_t instance_id)
     return ACLSHMEM_SUCCESS;
 }
 
-void aclshmem_info_get_version(int *major, int *minor)
+void aclshmem_info_get_version(int* major, int* minor)
 {
     SHM_ASSERT_RET_VOID(major != nullptr && minor != nullptr);
     *major = ACLSHMEM_MAJOR_VERSION;
     *minor = ACLSHMEM_MINOR_VERSION;
 }
 
-void aclshmem_info_get_name(char *name)
+void aclshmem_info_get_name(char* name)
 {
     SHM_ASSERT_RET_VOID(name != nullptr);
     std::ostringstream oss;
-    oss << "ACLSHMEM v" << ACLSHMEM_VENDOR_MAJOR_VER << "." << ACLSHMEM_VENDOR_MINOR_VER << "." << ACLSHMEM_VENDOR_PATCH_VER;
+    oss << "ACLSHMEM v" << ACLSHMEM_VENDOR_MAJOR_VER << "." << ACLSHMEM_VENDOR_MINOR_VER << "."
+        << ACLSHMEM_VENDOR_PATCH_VER;
     auto version_str = oss.str();
     size_t i;
     for (i = 0; i < ACLSHMEM_MAX_NAME_LEN - 1 && version_str[i] != '\0'; i++) {
@@ -562,17 +577,20 @@ void aclshmem_info_get_name(char *name)
     name[i] = '\0';
 }
 
-int32_t aclshmemx_get_uniqueid(aclshmemx_uniqueid_t *uid)
+int32_t aclshmemx_get_uniqueid(aclshmemx_uniqueid_t* uid)
 {
     int status = aclshmemx_set_log_level(aclshmem_log::ERROR_LEVEL);
 
-    ACLSHMEM_CHECK_RET(aclshmemi_bootstrap_pre_init(ACLSHMEMX_INIT_WITH_UNIQUEID, &g_boot_handle), "Get uniqueid failed during the bootstrap preloading step.");
+    ACLSHMEM_CHECK_RET(
+        aclshmemi_bootstrap_pre_init(ACLSHMEMX_INIT_WITH_UNIQUEID, &g_boot_handle),
+        "Get uniqueid failed during the bootstrap preloading step.");
 
     aclshmemx_uniqueid_t default_uid{};
     default_uid.version = ACLSHMEM_UNIQUEID_VERSION;
     *uid = default_uid;
     if (g_boot_handle.pre_init_ops) {
-        ACLSHMEM_CHECK_RET(g_boot_handle.pre_init_ops->get_unique_id((void *)uid), "Get uniqueid failed during the get uniqueid step.");
+        ACLSHMEM_CHECK_RET(
+            g_boot_handle.pre_init_ops->get_unique_id((void*)uid), "Get uniqueid failed during the get uniqueid step.");
     } else {
         SHM_LOG_ERROR("Pre_init_ops is empty, unique_id cannot be obtained.");
         status = ACLSHMEM_INVALID_PARAM;
@@ -583,7 +601,7 @@ int32_t aclshmemx_get_uniqueid(aclshmemx_uniqueid_t *uid)
 int32_t aclshmemx_set_log_level(int level)
 {
     // use env first, input level secondly, user may change level from env instead call func
-    const char *in_level = std::getenv("SHMEM_LOG_LEVEL");
+    const char* in_level = std::getenv("SHMEM_LOG_LEVEL");
     if (in_level != nullptr) {
         auto tmp_level = std::string(in_level);
         if (tmp_level == "DEBUG") {
@@ -602,7 +620,7 @@ int32_t aclshmemx_set_log_level(int level)
     return aclshmem_log::aclshmem_out_logger::Instance().set_log_level(static_cast<aclshmem_log::log_level>(level));
 }
 
-int32_t aclshmemx_set_conf_store_tls(bool enable, const char *tls_info, const uint32_t tls_info_len)
+int32_t aclshmemx_set_conf_store_tls(bool enable, const char* tls_info, const uint32_t tls_info_len)
 {
     g_boot_handle.tls_enable = enable;
     g_boot_handle.tls_info = tls_info;
@@ -617,8 +635,9 @@ void aclshmem_rank_exit(int status)
     exit(status);
 }
 
-int32_t aclshmemx_set_config_store_tls_key(const char *tls_pk, const uint32_t tls_pk_len,
-    const char *tls_pk_pw, const uint32_t tls_pk_pw_len, const aclshmem_decrypt_handler decrypt_handler)
+int32_t aclshmemx_set_config_store_tls_key(
+    const char* tls_pk, const uint32_t tls_pk_len, const char* tls_pk_pw, const uint32_t tls_pk_pw_len,
+    const aclshmem_decrypt_handler decrypt_handler)
 {
     g_boot_handle.tls_pk = tls_pk;
     g_boot_handle.tls_pk_len = tls_pk_len;
@@ -629,7 +648,7 @@ int32_t aclshmemx_set_config_store_tls_key(const char *tls_pk, const uint32_t tl
     return ACLSHMEM_SUCCESS;
 }
 
-int32_t aclshmemx_set_extern_logger(void (*func)(int level, const char *msg))
+int32_t aclshmemx_set_extern_logger(void (*func)(int level, const char* msg))
 {
     aclshmem_log::aclshmem_out_logger::Instance().set_extern_log_func(func);
     return ACLSHMEM_SUCCESS;
@@ -643,7 +662,7 @@ void aclshmem_global_exit(int status)
     SHM_LOG_WARN("Bootstrap not initialized. Global_exit Do nothing. ");
 }
 
-void aclshmemx_show_prof(aclshmem_prof_pe_t **out_profs, bool verbose)
+void aclshmemx_show_prof(aclshmem_prof_pe_t** out_profs, bool verbose)
 {
     // 如果 verbose 为 false 且 out_profs 为 nullptr，直接返回
     if (!verbose && out_profs == nullptr) {

@@ -113,17 +113,22 @@ function fn_build()
 
 function fn_whl_build()
 {
-  echo "Python extension enabled. Copying and packaging Python wheel..."
+    echo "Python extension enabled. Copying and packaging Python wheel..."
+    export SOC_TYPE=${SOC_TYPE}
+    if [ "$SOC_TYPE" = "Ascend950" ]; then
+        export ACLSHMEM_UDMA_SUPPORT=ON
+    fi
 
-  cd "${PROJECT_ROOT}/src/python"
-  rm -rf shmem.egg-info ${PROJECT_ROOT}/dist
-GIT_COMMIT=`git rev-parse HEAD` || true
-  {
-  echo "commit_id: ${GIT_COMMIT}"
-  } > "${PROJECT_ROOT}/src/python/shmem/VERSION"
+    cd "${PROJECT_ROOT}/src/python"
+    rm -rf shmem.egg-info ${PROJECT_ROOT}/dist
 
-  cd "${PROJECT_ROOT}"
-  python3 setup.py bdist_wheel
+    GIT_COMMIT=`git rev-parse HEAD` || true
+    {
+        echo "commit_id: ${GIT_COMMIT}"
+    } > "${PROJECT_ROOT}/src/python/shmem/VERSION"
+
+    cd "${PROJECT_ROOT}"
+    python3 setup.py bdist_wheel
 }
 
 function make_package()

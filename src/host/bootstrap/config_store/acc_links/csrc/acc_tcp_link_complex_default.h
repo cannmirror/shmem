@@ -31,28 +31,15 @@ struct AccLinkedMessageNode {
 
     AccLinkedMessageNode() = default;
 
-    AccLinkedMessageNode(const AccMsgHeader &h, const AccDataBufferPtr &d, const AccDataBufferPtr &ctx)
-        : header(h),
-          data(d),
-          cbCtx(ctx),
-          dataRemain{d->DataLen()}
-    {
-    }
+    AccLinkedMessageNode(const AccMsgHeader& h, const AccDataBufferPtr& d, const AccDataBufferPtr& ctx)
+        : header(h), data(d), cbCtx(ctx), dataRemain{d->DataLen()}
+    {}
 
-    inline bool HeaderSent() const
-    {
-        return headerRemain == 0;
-    }
+    inline bool HeaderSent() const { return headerRemain == 0; }
 
-    inline bool DataSent() const
-    {
-        return dataRemain == 0;
-    }
+    inline bool DataSent() const { return dataRemain == 0; }
 
-    inline bool Sent() const
-    {
-        return headerRemain == 0 && dataRemain == 0;
-    }
+    inline bool Sent() const { return headerRemain == 0 && dataRemain == 0; }
 
     inline void* HeaderPtrToBeSend() const
     {
@@ -91,9 +78,7 @@ struct AccLinkedMessageNode {
  */
 class AccLinkedMessageQueue : public AccReferable {
 public:
-    explicit AccLinkedMessageQueue(uint32_t queueCap) : sizeCap_(queueCap)
-    {
-    }
+    explicit AccLinkedMessageQueue(uint32_t queueCap) : sizeCap_(queueCap) {}
 
     ~AccLinkedMessageQueue() override
     {
@@ -133,7 +118,7 @@ public:
      * @param d            [in] data buffer ptr
      * @return 0 if successful, ACC_QUEUE_IS_FULL if full
      */
-    Result EnqueueBack(const AccMsgHeader &h, const AccDataBufferPtr &d, const AccDataBufferPtr &cbCtx)
+    Result EnqueueBack(const AccMsgHeader& h, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx)
     {
         ASSERT_RETURN(d.Get() != nullptr, ACC_INVALID_PARAM);
 
@@ -173,7 +158,7 @@ public:
      *
      * @return node ptr if not empty, nullptr if empty
      */
-    AccLinkedMessageNode *DequeueFront()
+    AccLinkedMessageNode* DequeueFront()
     {
         /* check and */
         std::lock_guard<std::mutex> guard(mutex_);
@@ -202,7 +187,7 @@ public:
      * @param node         [in] node to be pushed front
      * @return 0 if successful
      */
-    Result EnqueueFront(AccLinkedMessageNode *node)
+    Result EnqueueFront(AccLinkedMessageNode* node)
     {
         ASSERT_RETURN(node != nullptr, ACC_INVALID_PARAM);
 
@@ -240,11 +225,11 @@ public:
     }
 
 private:
-    uint32_t sizeCap_ = UNO_256; /* cap of the send queue */
-    uint32_t size_ = 0; /* size */
+    uint32_t sizeCap_ = UNO_256;               /* cap of the send queue */
+    uint32_t size_ = 0;                        /* size */
     AccLinkedMessageNode* headNode_ = nullptr; /* headerNode of message */
     AccLinkedMessageNode* tailNode_ = nullptr; /* headerNode of message */
-    std::mutex mutex_; /* send queue mutex */
+    std::mutex mutex_;                         /* send queue mutex */
 };
 using AccLinkedMessageQueuePtr = AccRef<AccLinkedMessageQueue>;
 
@@ -255,25 +240,22 @@ class AccTcpLinkComplexDefault : public AccTcpLinkDefault {
 public:
     AccTcpLinkComplexDefault(int fd, std::string ipPort, uint32_t id, SSL* ssl = nullptr)
         : AccTcpLinkDefault(fd, std::move(ipPort), id, ssl)
-    {
-    }
+    {}
 
-    ~AccTcpLinkComplexDefault() override
-    {
-        UnInitialize();
-    }
+    ~AccTcpLinkComplexDefault() override { UnInitialize(); }
 
     Result Initialize(uint16_t sendQueueCap, int32_t workIndex, AccTcpWorker* worker);
     void UnInitialize();
 
-    Result NonBlockSend(int16_t msgType, const AccDataBufferPtr &d, const AccDataBufferPtr &cbCtx) override;
-    Result NonBlockSend(int16_t msgType, uint32_t seqNo, const AccDataBufferPtr &d,
-                        const AccDataBufferPtr &cbCtx) override;
-    Result NonBlockSend(int16_t msgType, int16_t opCode, uint32_t seqNo, const AccDataBufferPtr &d,
-                        const AccDataBufferPtr &cbCtx) override;
+    Result NonBlockSend(int16_t msgType, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx) override;
+    Result NonBlockSend(
+        int16_t msgType, uint32_t seqNo, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx) override;
+    Result NonBlockSend(
+        int16_t msgType, int16_t opCode, uint32_t seqNo, const AccDataBufferPtr& d,
+        const AccDataBufferPtr& cbCtx) override;
 
-    Result EnqueueAndModifyEpoll(const AccMsgHeader &h, const AccDataBufferPtr &d,
-                                 const AccDataBufferPtr &cbCtx) override;
+    Result EnqueueAndModifyEpoll(
+        const AccMsgHeader& h, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx) override;
 
 protected:
     AccLinkedMessageNode* DequeueFront() noexcept;
@@ -284,16 +266,16 @@ protected:
     ssize_t PollInRecv(void* ptr, ssize_t len) noexcept;
     ssize_t PollOutWrite(void* ptr, ssize_t len) noexcept;
     Result HandlePollIn() noexcept;
-    Result HandlePollOut(AccMsgHeader &header, AccDataBufferPtr &cbCtx) noexcept;
+    Result HandlePollOut(AccMsgHeader& header, AccDataBufferPtr& cbCtx) noexcept;
     Result SendPostProcess(int32_t errorNumber) noexcept;
 
 protected:
-    AccLinkReceiveState receiveState_{}; /* state of receiving message for worker polling only */
-    AccMsgHeader header_{}; /* header to be received for worker polling only */
-    AccDataBufferPtr data_{nullptr}; /* data being received for worker polling only */
+    AccLinkReceiveState receiveState_{};      /* state of receiving message for worker polling only */
+    AccMsgHeader header_{};                   /* header to be received for worker polling only */
+    AccDataBufferPtr data_{nullptr};          /* data being received for worker polling only */
     AccLinkedMessageQueuePtr queue_{nullptr}; /* send message queue */
-    std::atomic<uint32_t> seqNo_{0}; /* seqNo */
-    uint32_t workerIndex_ = 0; /* attached to which worker */
+    std::atomic<uint32_t> seqNo_{0};          /* seqNo */
+    uint32_t workerIndex_ = 0;                /* attached to which worker */
     AccTcpWorker* worker_ = nullptr;
 
     friend class AccTcpWorker;
@@ -345,8 +327,8 @@ inline Result AccTcpLinkComplexDefault::HandlePollIn() noexcept
     /* receive header */
     ssize_t result = 0;
     if (receiveState_.ShouldReceiveHeader()) {
-        result = PollInRecv(reinterpret_cast<void *>(headDataPtr + receiveState_.ReceivedHeaderLen()),
-            receiveState_.headerToBeReceived);
+        result = PollInRecv(
+            reinterpret_cast<void*>(headDataPtr + receiveState_.ReceivedHeaderLen()), receiveState_.headerToBeReceived);
         if (LIKELY((result) > 0)) {
             if (receiveState_.HeaderSatisfied(result)) { /* header is full, continue to receive body */
                 // validate header
@@ -360,10 +342,10 @@ inline Result AccTcpLinkComplexDefault::HandlePollIn() noexcept
             } else { /* header is not fully, need to continue to receive */
                 return ACC_LINK_EAGAIN;
             }
-        } else { /* ECONNRESET is broken during io, SUCCESS is broken during idle time. */
-            const auto errorNumber = errno;  // avoid errno writed by log
+        } else {                            /* ECONNRESET is broken during io, SUCCESS is broken during idle time. */
+            const auto errorNumber = errno; // avoid errno writed by log
             if (errorNumber == ECONNRESET || errorNumber == 0) {
-                LOG_INFO("Link " << id_ << " receive header failed, reset by peer, errno " << errorNumber);
+                LOG_WARN("Link " << id_ << " receive header failed, reset by peer, errno " << errorNumber);
                 return ACC_LINK_ERROR; /* socket is closed by peer, socket is error */
             }
             /* if errno is eagain is normal, need to continue to receive */
@@ -378,7 +360,7 @@ inline Result AccTcpLinkComplexDefault::HandlePollIn() noexcept
 
     /* receive body */
     auto dataPtr = data_->DataIntPtr() + (header_.bodyLen - static_cast<size_t>(receiveState_.bodyToBeReceived));
-    result = PollInRecv(reinterpret_cast<void *>(dataPtr), receiveState_.bodyToBeReceived);
+    result = PollInRecv(reinterpret_cast<void*>(dataPtr), receiveState_.bodyToBeReceived);
     if (LIKELY((result) > 0)) {
         if (receiveState_.BodySatisfied(result)) { /* body is full */
             receiveState_.ResetHeader();
@@ -389,8 +371,8 @@ inline Result AccTcpLinkComplexDefault::HandlePollIn() noexcept
         LOG_INFO("Receive sock " << id_ << " not full body size: " << receiveState_.bodyToBeReceived);
         /* body is not fully received, continue to receive */
         return ACC_LINK_EAGAIN;
-    } else { /* ECONNRESET is broken during io, SUCCESS is broken during idle time. */
-        const auto errorNumber = errno;  // avoid errno writed by log
+    } else {                            /* ECONNRESET is broken during io, SUCCESS is broken during idle time. */
+        const auto errorNumber = errno; // avoid errno writed by log
         if (errorNumber == ECONNRESET || errorNumber == 0) {
             LOG_INFO("Link " << id_ << " receive body failed, reset by peer, errno " << errorNumber);
             return ACC_LINK_ERROR; /* socket is closed by peer, socket is error */
@@ -405,10 +387,10 @@ inline Result AccTcpLinkComplexDefault::HandlePollIn() noexcept
     }
 }
 
-inline Result AccTcpLinkComplexDefault::HandlePollOut(AccMsgHeader &header, AccDataBufferPtr &cbCtx) noexcept
+inline Result AccTcpLinkComplexDefault::HandlePollOut(AccMsgHeader& header, AccDataBufferPtr& cbCtx) noexcept
 {
     ASSERT_RETURN(queue_.Get() != nullptr, ACC_NOT_INITIALIZED);
-    AccLinkedMessageNode *oneMsg = queue_->DequeueFront();
+    AccLinkedMessageNode* oneMsg = queue_->DequeueFront();
     if (UNLIKELY(oneMsg == nullptr)) {
         return ACC_OK;
     }
@@ -479,8 +461,8 @@ inline Result AccTcpLinkComplexDefault::SendPostProcess(int32_t errorNumber) noe
     return ACC_LINK_ERROR;
 }
 
-inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, const AccDataBufferPtr &d,
-                                                     const AccDataBufferPtr &cbCtx)
+inline Result AccTcpLinkComplexDefault::NonBlockSend(
+    int16_t msgType, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx)
 {
     ASSERT_RETURN(msgType >= MIN_MSG_TYPE && msgType < MAX_MSG_TYPE, ACC_INVALID_PARAM);
     ASSERT_RETURN(d.Get() != nullptr, ACC_INVALID_PARAM);
@@ -493,8 +475,8 @@ inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, const AccD
     return EnqueueAndModifyEpoll({msgType, d->DataLen(), seqNo_++}, d, cbCtx);
 }
 
-inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, uint32_t seqNo, const AccDataBufferPtr &d,
-                                                     const AccDataBufferPtr &cbCtx)
+inline Result AccTcpLinkComplexDefault::NonBlockSend(
+    int16_t msgType, uint32_t seqNo, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx)
 {
     ASSERT_RETURN(msgType >= MIN_MSG_TYPE && msgType < MAX_MSG_TYPE, ACC_INVALID_PARAM);
     ASSERT_RETURN(d.Get() != nullptr, ACC_INVALID_PARAM);
@@ -507,8 +489,8 @@ inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, uint32_t s
     return EnqueueAndModifyEpoll({msgType, d->DataLen(), seqNo}, d, cbCtx);
 }
 
-inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, int16_t opCode, uint32_t seqNo,
-                                                     const AccDataBufferPtr &d, const AccDataBufferPtr &cbCtx)
+inline Result AccTcpLinkComplexDefault::NonBlockSend(
+    int16_t msgType, int16_t opCode, uint32_t seqNo, const AccDataBufferPtr& d, const AccDataBufferPtr& cbCtx)
 {
     ASSERT_RETURN(msgType >= MIN_MSG_TYPE && msgType < MAX_MSG_TYPE, ACC_INVALID_PARAM);
     ASSERT_RETURN(d.Get() != nullptr, ACC_INVALID_PARAM);
@@ -519,7 +501,7 @@ inline Result AccTcpLinkComplexDefault::NonBlockSend(int16_t msgType, int16_t op
     }
     return EnqueueAndModifyEpoll({msgType, opCode, d->DataLen(), seqNo}, d, cbCtx);
 }
-}  // namespace acc
-}  // namespace shm
+} // namespace acc
+} // namespace shm
 
-#endif  // ACC_LINKS_ACC_TCP_LINK_COMPLEX_DEFAULT_H
+#endif // ACC_LINKS_ACC_TCP_LINK_COMPLEX_DEFAULT_H

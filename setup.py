@@ -50,6 +50,8 @@ class BuildCppLibs(build_py):
         use_cxx11_abi = os.getenv("USE_CXX11_ABI", "ON")
         compile_options_str = os.getenv("COMPILE_OPTIONS", "")
         use_mssanitizer = os.getenv("USE_MSSANITIZER", "OFF")
+        soc_type = os.getenv("SOC_TYPE", "")
+        enable_udma_support = os.getenv("ACLSHMEM_UDMA_SUPPORT", "OFF")
 
         cmake_cmd = [
             "cmake",
@@ -58,6 +60,8 @@ class BuildCppLibs(build_py):
             f"-DUSE_CXX11_ABI={use_cxx11_abi}",
             "-DCMAKE_INSTALL_PREFIX=../install",
             f"-DUSE_MSSANITIZER={use_mssanitizer}",
+            f"-DSOC_TYPE={soc_type}",
+            f"-DACLSHMEM_UDMA_SUPPORT={enable_udma_support}",
             "-DCMAKE_SKIP_RPATH=TRUE",
         ]
 

@@ -9,7 +9,18 @@
 # -----------------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.16)
-project(SHMEM)
+
+if(NOT DEFINED CMAKE_C_COMPILER)
+    set(CMAKE_C_COMPILER bisheng CACHE FILEPATH "C compiler")
+endif()
+
+if(NOT DEFINED CMAKE_CXX_COMPILER)
+    set(CMAKE_CXX_COMPILER bisheng CACHE FILEPATH "CXX compiler")
+endif()
+
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+
+project(SHMEM LANGUAGES C CXX)
 include(CheckCXXCompilerFlag)
 
 # 配置 ccache
@@ -186,10 +197,6 @@ message(STATUS "ACLSHMEM_UDMA_SUPPORT:${ACLSHMEM_UDMA_SUPPORT}")
 option(PYEXPAND_EXAMPLE "PYEXPAND_EXAMPLE" OFF)
 message(STATUS "PYEXPAND_EXAMPLE:${PYEXPAND_EXAMPLE}")
 message(STATUS "CMAKE_BUILD_TYPE:${CMAKE_BUILD_TYPE}")
-
-set(CMAKE_COMPILER bisheng)
-set(CMAKE_C_COMPILER ${CMAKE_COMPILER})
-set(CMAKE_CXX_COMPILER ${CMAKE_COMPILER})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG_MODE)

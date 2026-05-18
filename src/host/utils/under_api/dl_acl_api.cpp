@@ -37,6 +37,7 @@ rtIpcOpenMemoryFunc DlAclApi::pRtIpcOpenMemory = nullptr;
 rtIpcCloseMemoryFunc DlAclApi::pRtIpcCloseMemory = nullptr;
 aclrtGetSocNameFunc DlAclApi::pAclrtGetSocName = nullptr;
 rtGetLogicDevIdByUserDevIdFunc DlAclApi::pRtGetLogicDevIdByUserDevId = nullptr;
+aclrtGetPhyDevIdByLogicDevIdFunc DlAclApi::pAclrtGetPhyDevIdByLogicDevId = nullptr;
 
 Result DlAclApi::LoadLibrary(const std::string &libDirPath)
 {
@@ -79,6 +80,9 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
     DL_LOAD_SYM(pRtIpcCloseMemory, rtIpcCloseMemoryFunc, rtHandle, "rtIpcCloseMemory");
     DL_LOAD_SYM(pAclrtGetSocName, aclrtGetSocNameFunc, rtHandle, "aclrtGetSocName");
     DL_LOAD_SYM(pRtGetLogicDevIdByUserDevId, rtGetLogicDevIdByUserDevIdFunc, rtHandle, "rtGetLogicDevIdByUserDevId");
+    DL_LOAD_SYM(
+        pAclrtGetPhyDevIdByLogicDevId, aclrtGetPhyDevIdByLogicDevIdFunc, rtHandle,
+        "aclrtGetPhyDevIdByLogicDevId");
 
     gLoaded = true;
     SHM_LOG_INFO("Load " << realPath << " success.");
@@ -110,6 +114,7 @@ void DlAclApi::CleanupLibrary()
     pRtIpcSetMemoryName = nullptr;
     pAclrtGetSocName = nullptr;
     pRtGetLogicDevIdByUserDevId = nullptr;
+    pAclrtGetPhyDevIdByLogicDevId = nullptr;
 
     if (rtHandle != nullptr) {
         dlclose(rtHandle);

@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include "aclshmemi_topo_addr_info_manager.h"
-#include <sys/stat.h>
 
 namespace shm {
 namespace topo {
@@ -21,11 +20,6 @@ aclshmemi_topo_addr_info_manager_t& aclshmemi_topo_addr_info_manager_t::instance
 
 std::optional<size_t> aclshmemi_topo_addr_info_manager_t::get_size(int phy_id)
 {
-    struct stat st;
-    if (stat(ACLSHMEMI_DEFAULT_RANKINFO_FILE_PATH, &st) == 0) {
-        return static_cast<size_t>(st.st_size);
-    }
-
     auto mainboard_id = hal_.get_mainboard_id(phy_id);
     if (!mainboard_id) {
         return std::nullopt;
@@ -41,11 +35,6 @@ std::optional<size_t> aclshmemi_topo_addr_info_manager_t::get_size(int phy_id)
 
 std::optional<std::string> aclshmemi_topo_addr_info_manager_t::get_topo_file_path(int phy_id)
 {
-    struct stat st;
-    if (stat(ACLSHMEMI_DEFAULT_RANKINFO_FILE_PATH, &st) == 0) {
-        return ACLSHMEMI_DEFAULT_RANKINFO_FILE_PATH;
-    }
-
     auto mainboard_id = hal_.get_mainboard_id(phy_id);
     if (!mainboard_id) {
         return std::nullopt;
@@ -73,22 +62,6 @@ std::optional<std::string> aclshmemi_topo_addr_info_manager_t::get_topo_file_pat
 
 std::optional<std::string> aclshmemi_topo_addr_info_manager_t::get_root_info_json(int phy_id)
 {
-    FILE* fp = fopen(ACLSHMEMI_DEFAULT_RANKINFO_FILE_PATH, "r");
-    if (fp != nullptr) {
-        struct stat st;
-        fstat(fileno(fp), &st);
-
-        std::string content;
-        content.resize(st.st_size);
-
-        size_t read_bytes = fread(&content[0], 1, st.st_size, fp);
-        fclose(fp);
-
-        if (read_bytes == static_cast<size_t>(st.st_size)) {
-            return content;
-        }
-    }
-
     auto mainboard_id = hal_.get_mainboard_id(phy_id);
     if (!mainboard_id) {
         return std::nullopt;

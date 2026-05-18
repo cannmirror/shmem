@@ -15,37 +15,106 @@
 #include <exception>
 #include <fstream>
 #include <utility>
+#include <vector>
 
+#include "rootinfo/topo_addr_info.h"
+#include "shmemi_file_util.h"
 #include "shmemi_host_common.h"
 #include "topo_reader.h"
 
 namespace shm {
 namespace transport {
 
-bool TopoReader::LoadJsonFile(const std::string& path, nlohmann::json& data)
+namespace {
+
+bool CheckTopoFilePath(const std::string& path, std::string& realPath)
 {
-    std::ifstream input(path);
-    if (!input.is_open()) {
-        SHM_LOG_ERROR("Open json file failed, the path is " << path);
+    realPath = path;
+    if (utils::FileUtil::IsSymlink(realPath) || !utils::FileUtil::Realpath(realPath) ||
+        !utils::FileUtil::IsFile(realPath) || !utils::FileUtil::CheckFileSize(realPath)) {
+        SHM_LOG_ERROR("Topo file path check failed: " << path);
         return false;
     }
-    try {
-        input >> data;
-        return true;
-    } catch (const std::exception& ex) {
-        SHM_LOG_ERROR("Parse json failed, the path is " << path << ", error: " << ex.what());
-        return false;
-    }
+    return true;
 }
 
-bool TopoReader::ParseRootInfo(RootInfo& out)
+} // namespace
+
+bool TopoReader::ParseRootInfo(uint32_t phyId, RootInfo& out)
 {
+    out = RootInfo{};
     nlohmann::json rootInfoJson;
-    if (!LoadJsonFile(ROOTINFO_PATH, rootInfoJson)) {
-        SHM_LOG_ERROR("Failed to load rootinfo json from " << ROOTINFO_PATH);
+
+    bool shouldFallback = false;
+    std::ifstream rootInfoFile(ROOTINFO_PATH);
+    if (!rootInfoFile.is_open()) {
+        SHM_LOG_WARN("Rootinfo file not found at " << ROOTINFO_PATH
+                                                    << ", fallback to generated rootinfo for phyId " << phyId);
+        shouldFallback = true;
+    } else {
+        try {
+            rootInfoFile >> rootInfoJson;
+        } catch (const std::exception& ex) {
+            SHM_LOG_ERROR("Parse rootinfo file failed, the path is " << ROOTINFO_PATH << ", error: " << ex.what());
+            SHM_LOG_WARN("Rootinfo file parse failed, fallback to generated rootinfo for phyId " << phyId);
+            shouldFallback = true;
+        }
+    }
+
+    if (!shouldFallback) {
+        SHM_LOG_INFO("Load rootinfo from file " << ROOTINFO_PATH);
+        if (ParseRootInfoJson(rootInfoJson, phyId, out)) {
+            return true;
+        }
+        out = RootInfo{};
+        SHM_LOG_WARN("Rootinfo file content is unusable, fallback to generated rootinfo for phyId " << phyId);
+        shouldFallback = true;
+    }
+
+    size_t rootInfoSize = 0;
+    int ret = topo_addr_info_get_size(static_cast<int>(phyId), &rootInfoSize);
+    if (ret != 0 || rootInfoSize == 0) {
+        SHM_LOG_ERROR("Failed to get generated rootinfo size for phyId " << phyId << ", ret = " << ret
+                                                                          << ", size = " << rootInfoSize);
+        return false;
+    }
+    SHM_LOG_INFO("Generated rootinfo size for phyId " << phyId << " is " << rootInfoSize);
+
+    std::vector<char> rootInfoBuffer(rootInfoSize + 1, '\0');
+    size_t actualSize = rootInfoSize;
+    ret = topo_addr_info_get(static_cast<int>(phyId), rootInfoBuffer.data(), &actualSize);
+    if (ret != 0 || actualSize == 0) {
+        SHM_LOG_ERROR("Failed to get generated rootinfo for phyId " << phyId << ", ret = " << ret
+                                                                     << ", actualSize = " << actualSize);
+        return false;
+    }
+    if (actualSize > rootInfoBuffer.size() - 1) {
+        SHM_LOG_ERROR("Generated rootinfo size overflow, actualSize " << actualSize << ", capacity "
+                                                                       << rootInfoBuffer.size());
+        return false;
+    }
+    rootInfoBuffer[actualSize] = '\0';
+
+    try {
+        rootInfoJson = nlohmann::json::parse(rootInfoBuffer.data(), rootInfoBuffer.data() + actualSize);
+#ifdef DEBUG_MODE
+        SHM_LOG_DEBUG("Generated rootinfo json for phyId " << phyId << ":\n" << rootInfoJson.dump(2));
+#endif
+    } catch (const std::exception& ex) {
+        SHM_LOG_ERROR("Failed to parse generated rootinfo json for phyId " << phyId << ", error: " << ex.what());
         return false;
     }
 
+    SHM_LOG_INFO("Use generated rootinfo fallback for phyId " << phyId);
+    if (!ParseRootInfoJson(rootInfoJson, phyId, out)) {
+        SHM_LOG_ERROR("Generated rootinfo content is unusable for phyId " << phyId);
+        return false;
+    }
+    return true;
+}
+
+bool TopoReader::ParseRootInfoJson(const nlohmann::json& rootInfoJson, uint32_t phyId, RootInfo& out)
+{
     if (!rootInfoJson.contains("topo_file_path") || !rootInfoJson["topo_file_path"].is_string()) {
         SHM_LOG_ERROR("Topo file path not found in rootinfo.");
         return false;
@@ -56,8 +125,8 @@ bool TopoReader::ParseRootInfo(RootInfo& out)
         SHM_LOG_ERROR("Rootinfo: rank_list not found.");
         return false;
     }
+
     const auto& rankListJson = rootInfoJson["rank_list"];
-    out.rank_list.reserve(rankListJson.size());
     for (const auto& rankJson : rankListJson) {
         if (!rankJson.contains("device_id") || !rankJson.contains("local_id")) {
             continue;
@@ -70,33 +139,35 @@ bool TopoReader::ParseRootInfo(RootInfo& out)
             return false;
         }
 
-        if (out.rank_list.empty()) {
-            out.device_id_offset = rankInfo.device_id;
+        if (rankInfo.device_id != phyId) {
+            continue;
         }
 
         out.rank_list.push_back(rankInfo);
         out.deviceLocalIdMap[rankInfo.device_id] = rankInfo.local_id;
 
-        // Build portEidMap: localId -> {port -> eidIndex}
         if (!rankJson.contains("level_list") || !rankJson["level_list"].is_array() || rankJson["level_list"].empty()) {
-            SHM_LOG_WARN("Rootinfo: missing level_list for localId " << rankInfo.local_id);
-            continue;
+            SHM_LOG_ERROR("Rootinfo: missing level_list for current phyId " << phyId << ", localId "
+                                                                      << rankInfo.local_id);
+            return false;
         }
+
         const auto& levelListJson = rankJson["level_list"];
         bool foundTopoLevel = false;
         for (const auto& levelJson : levelListJson) {
-            if (levelJson.contains("net_type") && levelJson["net_type"].is_string() &&
-                levelJson["net_type"].get<std::string>() == "TOPO_FILE_DESC") {
+            if (!levelJson.contains("net_type") || !levelJson["net_type"].is_string()) {
+                continue;
+            }
+            const auto& netType = levelJson["net_type"].get_ref<const std::string&>();
+            if (netType == "TOPO_FILE_DESC" || netType == "MESH") {
                 foundTopoLevel = true;
                 if (!levelJson.contains("rank_addr_list") || !levelJson["rank_addr_list"].is_array()) {
-                    SHM_LOG_WARN("Rootinfo: missing rank_addr_list for localId " << rankInfo.local_id);
-                    break;
+                    SHM_LOG_ERROR("Rootinfo: missing rank_addr_list for current phyId " << phyId << ", localId "
+                                                                                          << rankInfo.local_id);
+                    return false;
                 }
                 const auto& rankAddrListJson = levelJson["rank_addr_list"];
-                const uint32_t eidCount = static_cast<uint32_t>(rankAddrListJson.size());
-                if (out.eidCount == 0) {
-                    out.eidCount = eidCount;
-                }
+                out.eidCount = static_cast<uint32_t>(rankAddrListJson.size());
                 uint32_t eidIndex = 0;
                 for (const auto& rankAddrJson : rankAddrListJson) {
                     std::array<uint8_t, URMA_EID_RAW_SIZE> rawAddr{};
@@ -120,24 +191,36 @@ bool TopoReader::ParseRootInfo(RootInfo& out)
             }
         }
         if (!foundTopoLevel) {
-            SHM_LOG_WARN("Rootinfo: missing topo level for localId " << rankInfo.local_id);
-            continue;
+            SHM_LOG_ERROR("Rootinfo: missing topo level for current phyId " << phyId << ", localId "
+                                                                             << rankInfo.local_id);
+            return false;
         }
+
+        if (out.eidCount == 0) {
+            SHM_LOG_ERROR("Rootinfo: invalid eid count for current phyId " << phyId << ", localId "
+                                                                            << rankInfo.local_id);
+            return false;
+        }
+
+        SHM_LOG_INFO("Parse rootinfo success for phyId " << phyId << ", localId " << rankInfo.local_id
+                                                          << ", eidCount " << out.eidCount);
+        return true;
     }
 
-    if (out.rank_list.empty()) {
-        SHM_LOG_ERROR("Rootinfo: no valid rank entries parsed.");
-        return false;
-    }
-    SHM_LOG_INFO("Temporary rootinfo device_id offset inferred as " << out.device_id_offset);
-    return true;
+    SHM_LOG_ERROR("Rootinfo: no rank entry found for phyId " << phyId);
+    return false;
 }
 
 bool TopoReader::ParseTopoInfo(const std::string& path, TopoInfo& out)
 {
-    std::ifstream topoFile(path);
+    std::string realPath;
+    if (!CheckTopoFilePath(path, realPath)) {
+        return false;
+    }
+
+    std::ifstream topoFile(realPath);
     if (!topoFile.is_open()) {
-        SHM_LOG_ERROR("Failed to open topo file: " << path);
+        SHM_LOG_ERROR("Failed to open topo file: " << realPath);
         return false;
     }
     nlohmann::json topoInfoJson;
@@ -147,6 +230,7 @@ bool TopoReader::ParseTopoInfo(const std::string& path, TopoInfo& out)
         SHM_LOG_ERROR("Topo parse failed: " << e.what());
         return false;
     }
+    SHM_LOG_INFO("Read topo json from " << realPath);
 
     if (!topoInfoJson.contains("edge_list") || !topoInfoJson["edge_list"].is_array()) {
         SHM_LOG_ERROR("Topo parse failed: edge_list not found.");
@@ -242,25 +326,6 @@ bool TopoReader::GetLocalId(const RootInfo& root, uint32_t deviceId, uint32_t& l
     }
     SHM_LOG_ERROR("RootInfo is invalid or incomplete, failed to find localId for deviceId " << deviceId);
     return false;
-}
-
-bool TopoReader::GetLocalIdWithDeviceIdOffset(const RootInfo& root, uint32_t deviceId, uint32_t& localId)
-{
-    const uint32_t rootInfoDeviceId = deviceId + root.device_id_offset;
-    const auto it = root.deviceLocalIdMap.find(rootInfoDeviceId);
-    if (it != root.deviceLocalIdMap.end()) {
-        localId = it->second;
-        return true;
-    }
-
-    SHM_LOG_ERROR(
-        "Temporary rootinfo offset lookup failed, local deviceId "
-        << deviceId << ", device_id_offset " << root.device_id_offset << ", rootinfo deviceId " << rootInfoDeviceId);
-    return false;
-}
-
-uint32_t TopoReader::GetDeviceIdOffset(const RootInfo& root) {
-    return root.device_id_offset;
 }
 
 bool TopoReader::GetEidCount(const RootInfo& root, uint32_t& count)

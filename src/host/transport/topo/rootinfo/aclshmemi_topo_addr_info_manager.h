@@ -21,8 +21,6 @@
 namespace shm {
 namespace topo {
 
-constexpr const char ACLSHMEMI_DEFAULT_RANKINFO_FILE_PATH[] = "/etc/hccl_rootinfo.json";
-
 class aclshmemi_topo_addr_info_manager_t {
 public:
     static aclshmemi_topo_addr_info_manager_t& instance();

@@ -35,11 +35,11 @@ struct RankInfo {
 
 struct RootInfo {
     std::string topo_file_path;
+    // The parsed view is scoped to the current device/phyId.
     std::vector<RankInfo> rank_list;
     // deviceId -> localId
     std::unordered_map<uint32_t, uint32_t> deviceLocalIdMap;
-    uint32_t device_id_offset{0};
-    // eid size, shared by all devices in one rootinfo
+    // eid count for the current device only
     uint32_t eidCount{0};
     // localId -> port -> eidIndex
     std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> portEidMap;
@@ -61,20 +61,17 @@ struct TopoInfo {
 class TopoReader {
 public:
     static constexpr const char* ROOTINFO_PATH = "/etc/hccl_rootinfo.json";
-
-    static bool LoadJsonFile(const std::string& path, nlohmann::json& data);
-    static bool ParseRootInfo(RootInfo& out);
+    static bool ParseRootInfo(uint32_t phyId, RootInfo& out);
     static bool ParseTopoInfo(const std::string& path, TopoInfo& out);
     static bool GetLocalEidRouteForPeer(
         const RootInfo& root, const TopoInfo& topo, uint32_t myLocalId, uint32_t peerLocalId, uint32_t& localEidIndex,
         std::array<uint8_t, URMA_EID_RAW_SIZE>& localEidRaw);
     static bool GetLocalId(const RootInfo& root, uint32_t deviceId, uint32_t& localId);
-    static bool GetLocalIdWithDeviceIdOffset(const RootInfo& root, uint32_t deviceId, uint32_t& localId);
-    static uint32_t GetDeviceIdOffset(const RootInfo& root);
 
     static bool GetEidCount(const RootInfo& root, uint32_t& count);
 
 private:
+    static bool ParseRootInfoJson(const nlohmann::json& rootInfoJson, uint32_t phyId, RootInfo& out);
     static bool ParseRankAddrRaw(
         const nlohmann::json& rankAddrJson, uint32_t localId, uint32_t eidIndex,
         std::array<uint8_t, URMA_EID_RAW_SIZE>& raw);

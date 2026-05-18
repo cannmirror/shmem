@@ -55,7 +55,11 @@ int DlDcmiApi::LoadLibrary() {
     pDcmiv2GetMainboardId = (dcmiv2GetMainboardIdFunc)dlsym(dcmiHandle, "dcmiv2_get_mainboard_id");
     pDcmiv2GetDevicePcieInfo = (dcmiv2GetDevicePcieInfoFunc)dlsym(dcmiHandle, "dcmiv2_get_device_pcie_info");
     pDcmiv2GetDeviceInfo = (dcmiv2GetDeviceInfoFunc)dlsym(dcmiHandle, "dcmiv2_get_device_info");
-    pGetLogicIdFromPhyId = (getLogicIdFromPhyIdFunc)dlsym(dcmiHandle, "dcmiv2_get_dev_id_from_chip_phyid");
+    pGetLogicIdFromPhyId = (getLogicIdFromPhyIdFunc)dlsym(dcmiHandle, "dcmiv2_get_dev_id_by_chip_phy_id");
+
+    if (pGetLogicIdFromPhyId == NULL) {
+        pGetLogicIdFromPhyId = (getLogicIdFromPhyIdFunc)dlsym(dcmiHandle, "dcmiv2_get_dev_id_from_chip_phyid");
+    }
 
     if ((pDcmiInit == nullptr) ||
         (pDcmiv2GetUrmaDeviceCnt == nullptr) ||

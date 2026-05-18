@@ -314,10 +314,22 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
     TopoInfo topoInfo;
     uint32_t localId = 0;
     uint32_t eidCount = 0;
-    if (!TopoReader::ParseRootInfo(rootInfo)) {
+    int32_t phyId = -1;
+
+    auto ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(static_cast<int32_t>(deviceId), &phyId);
+    SHM_ASSERT_LOG_AND_RETURN(
+        ret == 0 && phyId >= 0,
+        "AclrtGetPhyDevIdByLogicDevId() return=" << ret << ", input deviceId=" << deviceId
+                                                   << ", output phyId="
+                                               << phyId,
+        false);
+
+    if (!TopoReader::ParseRootInfo(phyId, rootInfo)) {
         SHM_LOG_ERROR("Failed to parse the rootinfo file.");
         return false;
     }
+    phyId_ = static_cast<uint32_t>(phyId);
+    SHM_LOG_INFO("Resolved phy id from current device mapping, deviceId=" << deviceId << ", phyId=" << phyId);
     if (!TopoReader::ParseTopoInfo(rootInfo.topo_file_path, topoInfo)) {
         SHM_LOG_ERROR("Failed to parse the topology file at path " << rootInfo.topo_file_path);
         return false;
@@ -329,14 +341,13 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
     }
 
     rootInfo_ = rootInfo;
-    if (!RaInit(deviceId + TopoReader::GetDeviceIdOffset(rootInfo_))) {
+    if (!RaInit(phyId_)) {
         SHM_LOG_ERROR("RaInit failed.");
         return false;
     }
 
-    
-    if (!TopoReader::GetLocalIdWithDeviceIdOffset(rootInfo, deviceId, localId)) {
-        SHM_LOG_ERROR("Failed to find localId for deviceId: " << deviceId);
+    if (!TopoReader::GetLocalId(rootInfo, phyId_, localId)) {
+        SHM_LOG_ERROR("Failed to find localId for phyId: " << phyId_);
         return false;
     }
     if (!TopoReader::GetEidCount(rootInfo, eidCount)) {
@@ -376,7 +387,7 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
         localRouteByPeer[peer] = static_cast<int32_t>(eidIndex);
 
         void* ctxHandle = nullptr;
-        if (!RaCtxInit(deviceId + TopoReader::GetDeviceIdOffset(rootInfo_), eidIndex, eidRaw, ctxHandle)) {
+        if (!RaCtxInit(phyId_, eidIndex, eidRaw, ctxHandle)) {
             SHM_LOG_ERROR("RaCtxInit failed for peer " << peer << " with EID index " << eidIndex);
             return false;
         }
@@ -658,13 +669,13 @@ void UdmaTransportManager::CleanupResources()
 
     if (raInitialized_) {
         RaInitConfig deinitConfig{};
-        deinitConfig.phyId = deviceId_ + TopoReader::GetDeviceIdOffset(rootInfo_);
+        deinitConfig.phyId = phyId_;
         deinitConfig.nicPosition = NETWORK_OFFLINE;
         deinitConfig.hdcType = HDC_SERVICE_TYPE_RDMA_V2;
         deinitConfig.enableHdcAsync = 1;
         auto ret = shm::DlHccpV2Api::RaDeinit(&deinitConfig);
         if (ret != 0) {
-            SHM_LOG_WARN("RaDeinit failed, ret = " << ret << ", device id: " << deviceId_);
+            SHM_LOG_WARN("RaDeinit failed, ret = " << ret << ", phy id: " << phyId_);
         }
         SHM_LOG_INFO("RaDeinit success.");
     }

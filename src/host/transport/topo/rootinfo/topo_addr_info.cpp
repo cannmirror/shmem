@@ -16,7 +16,6 @@
 #include <iomanip>
 #include <memory>
 #include <securec.h>
-#include <sys/stat.h>
 
 #include "aclshmemi_hal.h"
 #include "aclshmemi_product_strategy.h"
@@ -24,70 +23,7 @@
 
 namespace {
 constexpr int MAX_NPU_COUNT_LIMIT = 64; // 与 ACLSHMEMI_MAX_NPU_COUNT 一致
-}
-
-constexpr const char* DEFAULT_RANKINFO_FILE_PATH = "/etc/hccl_rootinfo.json";
 constexpr int DEFAULT_RANKINFO_SIZE = 4096;
-
-static int pass_through(char* rank_info, size_t* buf_size)
-{
-    FILE* fp = fopen(DEFAULT_RANKINFO_FILE_PATH, "r");
-    if (fp == NULL) {
-        SHM_LOG_DEBUG("topo_addr_info: pass_through failed, file " << DEFAULT_RANKINFO_FILE_PATH << " not found");
-        return -1;
-    }
-    struct stat st;
-    fstat(fileno(fp), &st);
-    if ((size_t)st.st_size > (*buf_size)) {
-        fclose(fp);
-        SHM_LOG_DEBUG(
-            "topo_addr_info: pass_through failed, file size " << (size_t)st.st_size << " exceeds buffer " << *buf_size);
-        return -1;
-    }
-
-    size_t read_bytes = fread(rank_info, 1, st.st_size, fp);
-    if (read_bytes != (size_t)st.st_size) {
-        fclose(fp);
-        SHM_LOG_DEBUG(
-            "topo_addr_info: pass_through failed, fread incomplete, expected "
-            << (size_t)st.st_size << " bytes but read " << read_bytes << " bytes");
-        return -1;
-    }
-
-    *buf_size = (size_t)st.st_size;
-    fclose(fp);
-    SHM_LOG_INFO(
-        "topo_addr_info: pass_through succeeded, read " << *buf_size << " bytes from " << DEFAULT_RANKINFO_FILE_PATH);
-    return 0;
-}
-
-static int pass_through_topo_file_path(char* file_path, size_t buf_size)
-{
-    FILE* fp = fopen(DEFAULT_RANKINFO_FILE_PATH, "r");
-    if (fp == NULL) {
-        return -1;
-    }
-
-    struct stat st;
-    if (fstat(fileno(fp), &st) != 0) {
-        fclose(fp);
-        return -1;
-    }
-
-    if ((size_t)st.st_size >= buf_size) {
-        fclose(fp);
-        return -1;
-    }
-
-    size_t len = fread(file_path, 1, st.st_size, fp);
-    if (len != (size_t)st.st_size) {
-        fclose(fp);
-        return -1;
-    }
-
-    file_path[len] = '\0';
-    fclose(fp);
-    return 0;
 }
 
 int topo_addr_info_get_size(int phy_id, size_t* size)
@@ -95,13 +31,6 @@ int topo_addr_info_get_size(int phy_id, size_t* size)
     if (size == NULL) {
         SHM_LOG_ERROR("topo_addr_info_get_size failed: size param is NULL");
         return -1;
-    }
-
-    struct stat st;
-    if (stat(DEFAULT_RANKINFO_FILE_PATH, &st) == 0) {
-        (*size) = st.st_size;
-        SHM_LOG_INFO("topo_addr_info_get_size: using file " << DEFAULT_RANKINFO_FILE_PATH << ", size=" << *size);
-        return 0;
     }
 
     auto& hal = shm::topo::aclshmemi_hal_t::instance();
@@ -134,12 +63,6 @@ int topo_addr_info_get_topo_file_path(int phy_id, char* file_path, size_t buf_si
         return -1;
     }
 
-    int ret = pass_through_topo_file_path(file_path, buf_size);
-    if (ret == 0) {
-        SHM_LOG_INFO("topo_addr_info_get_topo_file_path: pass_through succeeded, path=" << file_path);
-        return ret;
-    }
-
     auto& hal = shm::topo::aclshmemi_hal_t::instance();
     auto mainboard_id = hal.get_mainboard_id(phy_id);
     if (!mainboard_id) {
@@ -167,19 +90,19 @@ int topo_addr_info_get_topo_file_path(int phy_id, char* file_path, size_t buf_si
     if (topo_path.size() >= buf_size) {
         SHM_LOG_ERROR(
             "topo_addr_info_get_topo_file_path failed: path size " << topo_path.size() << " >= buffer size "
-                                                                   << buf_size);
+                                                                    << buf_size);
         return -1;
-}
+    }
 
-int snprintf_ret = snprintf_s(file_path, buf_size, buf_size - 1, "%s", topo_path.c_str());
-if (snprintf_ret < 0) {
-    SHM_LOG_ERROR("topo_addr_info_get_topo_file_path failed: snprintf_s error");
-    return -1;
-}
-SHM_LOG_INFO(
-    "topo_addr_info_get_topo_file_path succeeded: phy_id=" << phy_id << ", mainboard_id=0x" << std::hex
-                                                           << *mainboard_id << ", path=" << file_path);
-return 0;
+    int snprintf_ret = snprintf_s(file_path, buf_size, buf_size - 1, "%s", topo_path.c_str());
+    if (snprintf_ret < 0) {
+        SHM_LOG_ERROR("topo_addr_info_get_topo_file_path failed: snprintf_s error");
+        return -1;
+    }
+    SHM_LOG_INFO(
+        "topo_addr_info_get_topo_file_path succeeded: phy_id=" << phy_id << ", mainboard_id=0x" << std::hex
+                                                                << *mainboard_id << ", path=" << file_path);
+    return 0;
 }
 
 int topo_addr_info_get(int phy_id, char* rank_info, size_t* buf_size)
@@ -188,13 +111,6 @@ int topo_addr_info_get(int phy_id, char* rank_info, size_t* buf_size)
         SHM_LOG_ERROR("topo_addr_info_get failed: rank_info=" << rank_info << ", buf_size=" << buf_size);
         return -1;
     }
-
-    if (pass_through(rank_info, buf_size) == 0) {
-        SHM_LOG_INFO("topo_addr_info_get: pass_through succeeded, phy_id=" << phy_id << ", size=" << *buf_size);
-        return 0;
-    }
-
-    SHM_LOG_DEBUG("topo_addr_info_get: pass_through failed, trying dynamic generation for phy_id=" << phy_id);
 
     auto& hal = shm::topo::aclshmemi_hal_t::instance();
     auto mainboard_id = hal.get_mainboard_id(phy_id);
@@ -225,18 +141,18 @@ int topo_addr_info_get(int phy_id, char* rank_info, size_t* buf_size)
             "topo_addr_info_get failed: json size " << json_str.size() << " >= buffer size " << *buf_size
                                                     << " for phy_id=" << phy_id);
         return -1;
-}
+    }
 
-int snprintf_ret = snprintf_s(rank_info, *buf_size, *buf_size - 1, "%s", json_str.c_str());
-if (snprintf_ret < 0) {
-    SHM_LOG_ERROR("topo_addr_info_get failed: snprintf_s error");
-    return -1;
-}
-*buf_size = json_str.size();
-SHM_LOG_INFO(
-    "topo_addr_info_get succeeded: phy_id=" << phy_id << ", mainboard_id=0x" << std::hex << *mainboard_id
-                                            << ", json_size=" << std::dec << *buf_size);
-return 0;
+    int snprintf_ret = snprintf_s(rank_info, *buf_size, *buf_size - 1, "%s", json_str.c_str());
+    if (snprintf_ret < 0) {
+        SHM_LOG_ERROR("topo_addr_info_get failed: snprintf_s error");
+        return -1;
+    }
+    *buf_size = json_str.size();
+    SHM_LOG_INFO(
+        "topo_addr_info_get succeeded: phy_id=" << phy_id << ", mainboard_id=0x" << std::hex << *mainboard_id
+                                                << ", json_size=" << std::dec << *buf_size);
+    return 0;
 }
 
 int topo_addr_info_get_all(char* rank_info, size_t* buf_size)
@@ -245,13 +161,6 @@ int topo_addr_info_get_all(char* rank_info, size_t* buf_size)
         SHM_LOG_ERROR("topo_addr_info_get_all failed: rank_info=" << rank_info << ", buf_size=" << buf_size);
         return -1;
     }
-
-    if (pass_through(rank_info, buf_size) == 0) {
-        SHM_LOG_INFO("topo_addr_info_get_all: pass_through succeeded, size=" << *buf_size);
-        return 0;
-    }
-
-    SHM_LOG_DEBUG("topo_addr_info_get_all: pass_through failed, trying dynamic generation for all phy_ids");
 
     auto& hal = shm::topo::aclshmemi_hal_t::instance();
     auto npu_count = hal.get_npu_count();
@@ -324,17 +233,17 @@ int topo_addr_info_get_all(char* rank_info, size_t* buf_size)
         SHM_LOG_ERROR(
             "topo_addr_info_get_all failed: merged json size " << json_str.size() << " >= buffer size " << *buf_size);
         return -1;
-}
+    }
 
-int snprintf_ret = snprintf_s(rank_info, *buf_size, *buf_size - 1, "%s", json_str.c_str());
-if (snprintf_ret < 0) {
-    SHM_LOG_ERROR("topo_addr_info_get_all failed: snprintf_s error");
-    return -1;
-}
-*buf_size = json_str.size();
-SHM_LOG_INFO(
-    "topo_addr_info_get_all succeeded: npu_count=" << *npu_count << ", successful_phy_ids=" << successful_phy_ids
-                                                   << ", total_ranks=" << merged_root_info.ranks.size()
-                                                   << ", json_size=" << *buf_size);
+    int snprintf_ret = snprintf_s(rank_info, *buf_size, *buf_size - 1, "%s", json_str.c_str());
+    if (snprintf_ret < 0) {
+        SHM_LOG_ERROR("topo_addr_info_get_all failed: snprintf_s error");
+        return -1;
+    }
+    *buf_size = json_str.size();
+    SHM_LOG_INFO(
+        "topo_addr_info_get_all succeeded: npu_count=" << *npu_count << ", successful_phy_ids=" << successful_phy_ids
+                                                        << ", total_ranks=" << merged_root_info.ranks.size()
+                                                        << ", json_size=" << *buf_size);
     return 0;
 }

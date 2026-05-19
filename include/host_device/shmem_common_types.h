@@ -426,7 +426,7 @@ typedef struct {
     void *default_stream;       ///< Default ACL runtime stream (aclrtStream type) on the host, used for asynchronous task scheduling
     int8_t default_event_id;    ///< Default event ID on the host, used for stream synchronization
     uint32_t default_block_num; ///< Default block count on the host, used for memory/task block management
-    aclrtNotify notify_arr[ACLSHMEM_MAX_AIV_PER_NPU];
+    void *notify_arr[ACLSHMEM_MAX_AIV_PER_NPU];
 } aclshmem_host_state_t;
 
 /**@} */ // end of group_structs

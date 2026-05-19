@@ -135,6 +135,23 @@ void aclshmem_free(void *ptr)
 
     SHM_LOG_DEBUG("aclshmem_free " << ret);
 }
+
+void *aclshmemx_get_heap_base(aclshmem_mem_type_t mem_type)
+{
+    if (mem_type == HOST_SIDE) {
+        if (g_state.host_heap_base == nullptr) {
+            SHM_LOG_ERROR("Host Memory Heap Not Initialized.");
+            return nullptr;
+        }
+        return g_state.host_heap_base;
+    }
+    if (g_state.heap_base == nullptr) {
+        SHM_LOG_ERROR("Memory Heap Not Initialized.");
+        return nullptr;
+    }
+    return g_state.heap_base;
+}
+
 bool support_host_mem_type(aclshmem_mem_type_t mem_type)
 {
 #ifndef HAS_ACLRT_MEM_FABRIC_HANDLE

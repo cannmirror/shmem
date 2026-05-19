@@ -99,6 +99,22 @@ ACLSHMEM_HOST_API void *aclshmemx_align(size_t alignment, size_t size, aclshmem_
  * @param mem_type      [in] Allocation location of the symmetric memory (Host/Device)
  */
 ACLSHMEM_HOST_API void aclshmemx_free(void *ptr, aclshmem_mem_type_t mem_type = DEVICE_SIDE);
+
+/**
+ * @brief Returns the start address (heap_base) of the local symmetric memory heap.
+ *        If <i>mem_type</i> is DEVICE_SIDE, returns the device heap base address.
+ *        If <i>mem_type</i> is HOST_SIDE, returns the host heap base address.
+ *        Must be called after ACLSHMEM initialization, otherwise returns NULL.
+ *
+ * @param mem_type      [in] Allocation location of symmetric memory (Host/Device)
+ * @return Pointer to the start address of the symmetric memory heap, or NULL if not initialized.
+ * @note Thread safety: This function is thread-safe for reading heap_base after initialization.
+ *       The heap_base value is set during initialization and does not change afterwards.
+ * @note Remote visibility: The returned address is local-only, not directly accessible by remote PEs.
+ * @note Failure conditions: Returns NULL if ACLSHMEM is not initialized or the heap has not been allocated.
+ */
+ACLSHMEM_HOST_API void *aclshmemx_get_heap_base(aclshmem_mem_type_t mem_type = DEVICE_SIDE);
+
 #ifdef __cplusplus
 }
 #endif

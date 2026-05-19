@@ -11,7 +11,9 @@
 #define UTILS_H
 
 #include <acl/acl.h>
+#include <algorithm>
 #include <climits>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <sys/file.h>

@@ -82,6 +82,8 @@ else()
     add_compile_definitions(FFTS_CONFIG=1)
 endif()
 
+option(ACLSHMEM_HCCS_SIO_LINK "ACLSHMEM_HCCS_SIO_LINK" OFF)
+
 option(USE_EXAMPLES "USE_EXAMPLES" OFF)
 option(ENABLE_ASCENDC_DUMP "ENABLE_ASCENDC_DUMP" OFF)
 message(STATUS "USE_UNIT_TEST:${USE_UNIT_TEST}")
@@ -213,6 +215,33 @@ if(HAS_ACLRT_MEM_FABRIC_HANDLE AND ENABLE_CANN_BUILD)
     add_definitions(-DHAS_ACLRT_MEM_FABRIC_HANDLE)
 else()
     message(STATUS "aclrtMemExportToShareableHandleV2 symbol not found, disabling ACLRT_MEM_FABRIC_HANDLE support")
+endif()
+
+# Check if aclrtMemMapSelectedLink symbol exists in the ACL library
+file(WRITE ${CMAKE_BINARY_DIR}/check_aclrt_mem_map_selected_link.cpp "
+#include <acl/acl.h>
+int main() {
+    void *ptr = nullptr;
+    aclrtMemMapSelectedLink(ptr, 0, ptr, 0);
+    return 0;
+}")
+
+try_compile(HAS_ACLRT_MEM_MAP_SELECTED_LINK
+    ${CMAKE_BINARY_DIR}
+    ${CMAKE_BINARY_DIR}/check_aclrt_mem_map_selected_link.cpp
+    LINK_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES}
+    CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${CMAKE_REQUIRED_INCLUDES}" "-DLINK_DIRECTORIES=${ASCEND_HOME_PATH}/lib64"
+    OUTPUT_VARIABLE COMPILE_OUTPUT
+)
+
+file(REMOVE ${CMAKE_BINARY_DIR}/check_aclrt_mem_map_selected_link.cpp)
+
+if(HAS_ACLRT_MEM_MAP_SELECTED_LINK)
+    set(ACLSHMEM_HCCS_SIO_LINK ON)
+    message(STATUS "aclrtMemMapSelectedLink symbol found, enabling ACLSHMEM_HCCS_SIO_LINK support")
+else()
+    set(ACLSHMEM_HCCS_SIO_LINK OFF)
+    message(STATUS "aclrtMemMapSelectedLink symbol not found, disabling ACLSHMEM_HCCS_SIO_LINK support")
 endif()
 
 # 添加子目录

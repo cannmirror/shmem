@@ -403,6 +403,18 @@ Arguments:
     pe(int): PE number
     )");
 
+    m.def(
+        "aclshmemx_get_heap_base", [](aclshmem_mem_type_t mem_type) { return (intptr_t)aclshmemx_get_heap_base(mem_type); },
+        py::call_guard<py::gil_scoped_release>(), py::arg("mem_type") = DEVICE_SIDE,
+        R"(
+Returns the start address (heap_base) of the local symmetric memory heap.
+
+Arguments:
+    mem_type(int): Allocation location of symmetric memory (Host/Device), default is DEVICE_SIDE(0)
+Returns:
+    Pointer to the start address of the symmetric memory heap, or 0 if not initialized.
+    )");
+
     m.def("my_pe", &aclshmem_my_pe, py::call_guard<py::gil_scoped_release>(), R"(Get my PE number.)");
 
     m.def(

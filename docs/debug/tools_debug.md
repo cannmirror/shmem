@@ -36,7 +36,7 @@ bash scripts/build.sh -examples -mssanitizer
 用mssanitizer工具拉起allgather样例进行内存检测
 ```sh
 cd examples/allgather
-bash run.sh -pes 2 -tool mssanitizer
+mssanitizer -- bash run.sh -pes 2
 ```
 ### 内存越界日志
 当内存发生越界时工具会先打屏越界地址，越界内存大小、所属kernel，核号、卡号等信息。

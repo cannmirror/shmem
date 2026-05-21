@@ -114,11 +114,18 @@ int32_t MemEntityDefault::UnReserveMemorySpace() noexcept
         return ACLSHMEM_NOT_INITED;
     }
 
+    if (transportManager_) {
+        transportManager_->CloseDevice();
+        transportManager_ = nullptr;
+    }
+
     if (hbmSegment_ != nullptr) {
         hbmSegment_->UnReserveMemorySpace();
+        hbmGva_ = nullptr;
     }
     if (dramSegment_ != nullptr) {
         dramSegment_->UnReserveMemorySpace();
+        dramGva_ = nullptr;
     }
     return ACLSHMEM_SUCCESS;
 }

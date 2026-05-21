@@ -103,6 +103,13 @@ int FixedRanksQpManager::Startup(void *rdma) noexcept
 void FixedRanksQpManager::Shutdown() noexcept
 {
     CloseServices();
+    if (qpInfo_ != nullptr) {
+        auto ret = DlAclApi::AclrtFree(qpInfo_);
+        if (ret != 0) {
+            SHM_LOG_WARN(rankId_ << " free qpInfo device memory failed: " << ret);
+        }
+        qpInfo_ = nullptr;
+    }
 }
 
 int FixedRanksQpManager::WaitingConnectionReady() noexcept
@@ -192,6 +199,7 @@ int FixedRanksQpManager::StartServerSide() noexcept
         if (ret != ACLSHMEM_SUCCESS) {
             SHM_LOG_ERROR(rankId_ << " wait connection AI qp ready failed: " << ret);
             serverConnectResult = ret;
+            return;
         }
 
         serverConnectResult = ACLSHMEM_SUCCESS;
@@ -207,19 +215,21 @@ void FixedRanksQpManager::InitClientConnectThread()
         auto ret = WaitConnectionsReady(clientConnections_);
         if (ret != ACLSHMEM_SUCCESS) {
             SHM_LOG_ERROR(rankId_ << " client wait connections failed: " << ret);
+            clientConnectResult = ret;
             CloseClientConnections();
-            return ret;
+            return;
         }
 
         ret = CreateQpWaitingReady(clientConnections_, CONN_QP_AI_CORE, CONN_CLIENT_SIDE);
         if (ret != ACLSHMEM_SUCCESS) {
             SHM_LOG_ERROR(rankId_ << " client create qp for AI CORE failed: " << ret);
+            clientConnectResult = ret;
             CloseClientConnections();
-            return ret;
+            return;
         }
 
         clientConnectResult = ACLSHMEM_SUCCESS;
-        return 0;
+        return;
     });
 }
 
@@ -334,7 +344,8 @@ int FixedRanksQpManager::WaitConnectionsReady(std::unordered_map<uint32_t, Conne
     IpType type{};
     uint32_t cnt = 0;
     auto start = std::chrono::steady_clock::now();
-    auto timeout = start + std::chrono::minutes(2);
+    constexpr auto TIMEOUT_MINUTES = 2;
+    auto timeout = start + std::chrono::minutes(TIMEOUT_MINUTES);
     SHM_LOG_DEBUG(rankId_ << " begin wait connections, size=" << connections.size());
 
     std::vector<HccpSocketInfo> socketInfos;
@@ -367,8 +378,23 @@ int FixedRanksQpManager::WaitConnectionsReady(std::unordered_map<uint32_t, Conne
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     auto role = (&connections == &clientConnections_) ? 1 : 0;
+    std::string roleStr = (role == 1) ? "client" : "server";
 
     do {
+        auto now = std::chrono::steady_clock::now();
+        if (now >= timeout) {
+            std::string pendingRanks;
+            for (const auto& info : socketInfos) {
+                auto it = addr2index.find(type == IpV4 ? net_addr_t::from_ipv4(info.remoteIp.addr) 
+                                                        : net_addr_t::from_ipv6(info.remoteIp.addr6));
+                if (it != addr2index.end()) {
+                    pendingRanks += " rank[" + std::to_string(it->second) + "]";
+                }
+            }
+            SHM_LOG_ERROR(rankId_ << " " << roleStr << " wait connections timeout after " << TIMEOUT_MINUTES 
+                << " minutes. Pending connections:" << pendingRanks);
+            return ACLSHMEM_TIMEOUT_ERROR;
+        }
         uint32_t getSize = socketInfos.size() < RA_MAX_BATCH_NUM ? socketInfos.size() : RA_MAX_BATCH_NUM;
         auto ret = DlHccpApi::RaGetSockets(role, socketInfos.data(), getSize, cnt);
         if (ret != 0) {
@@ -379,10 +405,12 @@ int FixedRanksQpManager::WaitConnectionsReady(std::unordered_map<uint32_t, Conne
         if (cnt == 0) {
             continue;
         }
+        bool progress = false;
         for (auto i = 0U; i < getSize; i++) {
             if (socketInfos[i].status != 1) {
                 continue;
             }
+            progress = true;
             net_addr_t addr;
             char ipStr[INET6_ADDRSTRLEN];
             char* result {};
@@ -419,6 +447,10 @@ int FixedRanksQpManager::WaitConnectionsReady(std::unordered_map<uint32_t, Conne
 
             pos->second.socketFd = socketInfos[i].fd;
             SHM_LOG_INFO(rankId_ << " connect to (" << rankId << ") ready.");
+        }
+        if (progress) {
+            start = std::chrono::steady_clock::now();
+            timeout = start + std::chrono::minutes(TIMEOUT_MINUTES);
         }
         socketInfos.erase(
             std::remove_if(socketInfos.begin(), socketInfos.end(),
@@ -693,14 +725,24 @@ void FixedRanksQpManager::CloseConnections(std::unordered_map<uint32_t, Connecti
         }
     }
 
-    for (auto it = connections.begin(); it != connections.end(); ++it) {
-        auto ret = DlHccpApi::RaSocketDeinit(it->second.socketHandle);
-        if (ret != 0) {
-            SHM_LOG_INFO(rankId_ << " deinit socket to server: " << it->first << " return: " << ret);
+    if (&connections == &serverConnections_) {
+        if (serverSocketHandle_ != nullptr) {
+            auto ret = DlHccpApi::RaSocketDeinit(serverSocketHandle_);
+            if (ret != 0) {
+                SHM_LOG_INFO(rankId_ << " server deinit socket return: " << ret);
+            }
+            serverSocketHandle_ = nullptr;
+            SHM_LOG_INFO(rankId_ << " as server close connection done, size is " << 1);
         }
+    } else {
+        for (auto it = connections.begin(); it != connections.end(); ++it) {
+            auto ret = DlHccpApi::RaSocketDeinit(it->second.socketHandle);
+            if (ret != 0) {
+                SHM_LOG_INFO(rankId_ << " deinit socket to server: " << it->first << " return: " << ret);
+            }
+        }
+        SHM_LOG_INFO(rankId_ << " as client close connection done, size is " << connections.size());
     }
-
-    SHM_LOG_INFO(rankId_ << " close connection done, size is " << connections.size());
     connections.clear();
 }
 }

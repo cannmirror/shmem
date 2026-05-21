@@ -102,6 +102,29 @@ static bool is_link_local_addr(const sockaddr_t* addr) {
         return false;
     }
 }
+
+static bool aclshmemi_parse_port(const std::string &portStr, uint16_t &port)
+{
+    constexpr int maxPort = 65535;
+    try {
+        size_t parsedLen = 0;
+        int portInt = std::stoi(portStr, &parsedLen);
+        if (parsedLen != portStr.size()) {
+            SHM_LOG_ERROR("Invalid port format: " << portStr);
+            return false;
+        }
+        if (portInt < 0 || portInt > maxPort) {
+            SHM_LOG_ERROR("Invalid port value: " << portInt << ", must be in range [0, " << maxPort << "]");
+            return false;
+        }
+        port = static_cast<uint16_t>(portInt);
+        return true;
+    } catch (const std::exception &e) {
+        SHM_LOG_ERROR("Invalid port format: " << e.what());
+        return false;
+    }
+}
+
 static int32_t aclshmemi_get_uid_magic(aclshmemi_bootstrap_uid_state_t *innerUId)
 {
     std::ifstream urandom("/dev/urandom", std::ios::binary);
@@ -255,16 +278,20 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
     std::string ipPortStr = ipPort;
     
     if (ipPort[0] == '[') {
-        size_t bracket_end = ipPortStr.find_last_of(']');
-        if (bracket_end == std::string::npos || ipPortStr.length() - bracket_end <= 1) {
+        size_t bracketEnd = ipPortStr.find_last_of(']');
+        if (bracketEnd == std::string::npos) {
             SHM_LOG_ERROR("Invalid IPv6 format: no closing ']'");
             return ACLSHMEM_INVALID_PARAM;
         }
+        if (bracketEnd + 1 >= ipPortStr.size() || ipPortStr[bracketEnd + 1] != ':') {
+            SHM_LOG_ERROR("Invalid IPv6 format: missing ':' after ']'");
+            return ACLSHMEM_INVALID_PARAM;
+        }
 
-        std::string ip_with_scope = ipPortStr.substr(1, bracket_end - 1);
-        size_t scope_sep = ip_with_scope.find('%');
+        std::string ipWithScope = ipPortStr.substr(1, bracketEnd - 1);
+        size_t scopeSep = ipWithScope.find('%');
         std::string ipStr;
-        std::string if_name;
+        std::string ifName;
 
         std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr6), 
                   reinterpret_cast<char*>(&uid_args->addr.addr.addr6) + sizeof(struct sockaddr_in6), 
@@ -272,24 +299,28 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
         uid_args->addr.type = ADDR_IPv6;
         uid_args->addr.addr.addr6.sin6_family = AF_INET6;
 
-        if (scope_sep != std::string::npos) {
-            ipStr = ip_with_scope.substr(0, scope_sep);
-            if_name = ip_with_scope.substr(scope_sep + 1);
-            uid_args->addr.addr.addr6.sin6_scope_id = if_nametoindex(if_name.c_str());
+        if (scopeSep != std::string::npos) {
+            ipStr = ipWithScope.substr(0, scopeSep);
+            ifName = ipWithScope.substr(scopeSep + 1);
+            uid_args->addr.addr.addr6.sin6_scope_id = if_nametoindex(ifName.c_str());
             if (uid_args->addr.addr.addr6.sin6_scope_id == 0) {
-                SHM_LOG_INFO("Interface " << if_name.c_str() << "not found, scope_id set to 0");
+                SHM_LOG_INFO("Interface " << ifName.c_str() << "not found, scope_id set to 0");
             }
         } else {
-            ipStr = ip_with_scope;
+            ipStr = ipWithScope;
             uid_args->addr.addr.addr6.sin6_scope_id = 0;
         }
 
-        std::string portStr = ipPortStr.substr(bracket_end + 2);
+        std::string portStr = ipPortStr.substr(bracketEnd + 2);
         if (portStr.empty()) {
             SHM_LOG_ERROR("IPv6 port is empty");
             return ACLSHMEM_INVALID_PARAM;
         }
-        uint16_t port = static_cast<uint16_t>(std::stoi(portStr));
+        
+        uint16_t port = 0;
+        if (!aclshmemi_parse_port(portStr, port)) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
         uid_args->addr.addr.addr6.sin6_port = htons(port);
         uid_args->addr.addr.addr6.sin6_flowinfo = 0;
 
@@ -298,22 +329,25 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
             return ACLSHMEM_NOT_INITED;
         }
     } else {
-        size_t colon_pos = ipPortStr.find_last_of(':');
-        if (colon_pos == std::string::npos || ipPortStr.length() - colon_pos <= 1) {
+        size_t colonPos = ipPortStr.find_last_of(':');
+        if (colonPos == std::string::npos || ipPortStr.length() - colonPos <= 1) {
             SHM_LOG_ERROR("Invalid IPv4 format: no colon separator");
             return ACLSHMEM_INVALID_PARAM;
         }
 
-        std::string ipStr = ipPortStr.substr(0, colon_pos);
-        std::string portStr = ipPortStr.substr(colon_pos + 1);
+        std::string ipStr = ipPortStr.substr(0, colonPos);
+        std::string portStr = ipPortStr.substr(colonPos + 1);
 
         std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4), 
                   reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in), 
                   0);
         uid_args->addr.type = ADDR_IPv4;
         uid_args->addr.addr.addr4.sin_family = AF_INET;
-
-        uint16_t port = static_cast<uint16_t>(std::stoi(portStr));
+        
+        uint16_t port = 0;
+        if (!aclshmemi_parse_port(portStr, port)) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
         uid_args->addr.addr.addr4.sin_port = htons(port);
 
         if (inet_pton(AF_INET, ipStr.c_str(), &uid_args->addr.addr.addr4.sin_addr) <= 0) {

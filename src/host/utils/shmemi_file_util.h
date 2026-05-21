@@ -16,6 +16,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <iomanip>
 #include "shmemi_logger.h"
 
 #define PATH_MAX_LIMIT 4096L
@@ -111,6 +112,24 @@ public:
      * @return true if it is a directory
      */
     static bool IsDir(const std::string &path);
+
+    /**
+     * @brief Check if the path is owned by current user or root
+     *        Security check to prevent loading libraries from untrusted paths
+     *
+     * @param path         [in] path to check
+     * @return true if owned by current user or root
+     */
+    static bool IsOwnedByCurrentUserOrRoot(const std::string &path);
+
+    /**
+     * @brief Check if the path has secure permissions (no write permission for group/others)
+     *        Security check to prevent tampering with libraries
+     *
+     * @param path         [in] path to check
+     * @return true if permissions are secure
+     */
+    static bool HasSecurePermissions(const std::string &path);
 
     /**
      * @brief Find whether the path exceed the max size or not
@@ -238,7 +257,13 @@ inline size_t FileUtil::GetFileSize(const std::string &path)
         return 0;
     }
 
-    size_t fileSize = static_cast<size_t>(ftell(fp));
+    long fileSizeLong = ftell(fp);
+    if (fileSizeLong == -1L) {
+        SHM_LOG_ERROR("ftell() failed for file: " << realFilePath);
+        CloseFile(fp);
+        return 0;
+    }
+    size_t fileSize = static_cast<size_t>(fileSizeLong);
     if (fseek(fp, 0, SEEK_END) != 0) {
         CloseFile(fp);
         return 0;
@@ -289,6 +314,47 @@ inline bool FileUtil::IsDir(const std::string &path)
         return false;
     }
     return S_ISDIR(buf.st_mode);
+}
+
+inline bool FileUtil::IsOwnedByCurrentUserOrRoot(const std::string &path)
+{
+    struct stat buf;
+    if (stat(path.c_str(), &buf) != 0) {
+        SHM_LOG_ERROR("stat failed for path: " << path);
+        return false;
+    }
+    
+    uid_t currentUid = getuid();
+    uid_t pathOwner = buf.st_uid;
+    
+    if (pathOwner == currentUid || pathOwner == 0) {
+        return true;
+    }
+    
+    SHM_LOG_ERROR("Path owner check failed: path=" << path 
+                  << ", owner_uid=" << pathOwner 
+                  << ", current_uid=" << currentUid);
+    return false;
+}
+
+inline bool FileUtil::HasSecurePermissions(const std::string &path)
+{
+    struct stat buf;
+    if (stat(path.c_str(), &buf) != 0) {
+        SHM_LOG_ERROR("stat failed for path: " << path);
+        return false;
+    }
+    
+    mode_t mode = buf.st_mode;
+    
+    if ((mode & S_IWGRP) || (mode & S_IWOTH)) {
+        SHM_LOG_ERROR("Insecure permissions: path=" << path 
+                      << ", mode=" << std::oct << mode 
+                      << " (group or others have write permission)");
+        return false;
+    }
+    
+    return true;
 }
 
 inline bool FileUtil::CheckFileSize(const std::string &path, uint32_t maxSize)

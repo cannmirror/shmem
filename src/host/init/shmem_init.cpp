@@ -108,6 +108,24 @@ aclshmem_instance_ctx* g_instance_ctx = new aclshmem_instance_ctx{0, nullptr};
 std::map<uint32_t, aclshmem_instance_ctx*> aclshmem_ctx_domain = {{0, g_instance_ctx}};
 std::map<uint32_t, aclshmem_context*> aclshmem_resource_domain = {{0, new aclshmem_context(0)}};
 
+namespace {
+bool aclshmemi_parse_port_strict(const std::string& port_str, uint16_t& port)
+{
+    constexpr int max_port = 65535;
+    try {
+        size_t parsed_len = 0;
+        int port_int = std::stoi(port_str, &parsed_len);
+        if (parsed_len != port_str.size() || port_int < 0 || port_int > max_port) {
+            return false;
+        }
+        port = static_cast<uint16_t>(port_int);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+}
+
 int32_t version_compatible()
 {
     int32_t status = ACLSHMEM_SUCCESS;
@@ -263,11 +281,14 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t* attribut
 
     uint16_t start_port;
     uint16_t end_port;
-    try {
-        start_port = static_cast<uint16_t>(std::stoi(env_port_range_str.substr(0, env_pos)));
-        end_port = static_cast<uint16_t>(std::stoi(env_port_range_str.substr(env_pos + 1, env_port_range_str.size())));
-    } catch (const std::exception& e) {
-        SHM_LOG_ERROR("Invalid SHMEM_INSTANCE_PORT_RANGE format: " << e.what());
+    std::string start_port_str = env_port_range_str.substr(0, env_pos);
+    std::string end_port_str = env_port_range_str.substr(env_pos + 1, env_port_range_str.size());
+    if (!aclshmemi_parse_port_strict(start_port_str, start_port)) {
+        SHM_LOG_ERROR("Invalid start_port value: " << start_port_str << ", must be in range [0, 65535]");
+        return ACLSHMEM_INVALID_VALUE;
+    }
+    if (!aclshmemi_parse_port_strict(end_port_str, end_port)) {
+        SHM_LOG_ERROR("Invalid end_port value: " << end_port_str << ", must be in range [0, 65535]");
         return ACLSHMEM_INVALID_VALUE;
     }
     if (end_port < start_port) {
@@ -300,10 +321,9 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t* attribut
     }
 
     uint16_t input_port;
-    try {
-        input_port = static_cast<uint16_t>(std::stoi(ip_port_str.substr(pos + 1, ip_port_str.size())));
-    } catch (const std::exception& e) {
-        SHM_LOG_ERROR("Invalid ip_port format: " << e.what());
+    std::string input_port_str = ip_port_str.substr(pos + 1, ip_port_str.size());
+    if (!aclshmemi_parse_port_strict(input_port_str, input_port)) {
+        SHM_LOG_ERROR("Invalid input_port value: " << input_port_str << ", must be in range [0, 65535]");
         return ACLSHMEM_INVALID_VALUE;
     }
     if (input_port != 0) {

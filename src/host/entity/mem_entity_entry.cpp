@@ -53,10 +53,22 @@ static inline int hybm_load_library()
     SHM_VALIDATE_RETURN(path != nullptr, "Environment ASCEND_HOME_PATH not set.", ACLSHMEM_INNER_ERROR);
 
     std::string libPath = std::string(path).append("/lib64");
+    
     if (!shm::utils::FileUtil::Realpath(libPath) || !shm::utils::FileUtil::IsDir(libPath)) {
-        SHM_LOG_ERROR("Environment ASCEND_HOME_PATH check failed.");
+        SHM_LOG_ERROR("Environment ASCEND_HOME_PATH check failed: realpath or isdir validation failed.");
         return ACLSHMEM_INNER_ERROR;
     }
+    
+    if (!shm::utils::FileUtil::IsOwnedByCurrentUserOrRoot(libPath)) {
+        SHM_LOG_ERROR("Security check failed: ASCEND_HOME_PATH/lib64 is not owned by current user or root.");
+        return ACLSHMEM_INNER_ERROR;
+    }
+    
+    if (!shm::utils::FileUtil::HasSecurePermissions(libPath)) {
+        SHM_LOG_ERROR("Security check failed: ASCEND_HOME_PATH/lib64 has insecure permissions.");
+        return ACLSHMEM_INNER_ERROR;
+    }
+    
     auto ret = DlApi::LoadLibrary(libPath);
     SHM_LOG_ERROR_RETURN_IT_IF_NOT_OK(ret, "load library from path failed: " << ret);
     return 0;

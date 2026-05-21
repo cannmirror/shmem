@@ -25,6 +25,7 @@
 #include "shmemi_host_def.h"
 #include "shmemi_log_defs.h"
 #include "../shmemi_logger.h"
+#include "../shmemi_file_util.h"
 
 namespace aclshmem_log {
 static bool get_log_to_stdout_from_env_cfg()
@@ -81,6 +82,40 @@ private:
 
         aclshmem_log_dir = normalize_path(log_root);
         make_dir_recursive(aclshmem_log_dir);
+        if (!validate_log_dir()) {
+            aclshmem_log_dir = "";
+        }
+    }
+
+    bool validate_log_dir() {
+        std::string real_log_dir = aclshmem_log_dir;
+        if (!shm::utils::FileUtil::Realpath(real_log_dir)) {
+            std::cout << "aclshmem_log: failed to get realpath for log directory: " << aclshmem_log_dir << std::endl;
+            return false;
+        }
+        
+        struct stat dir_stat;
+        if (stat(real_log_dir.c_str(), &dir_stat) != 0) {
+            std::cout << "aclshmem_log: stat failed for log directory: " << real_log_dir << std::endl;
+            return false;
+        }
+
+        uid_t current_uid = getuid();
+        if (dir_stat.st_uid != current_uid && dir_stat.st_uid != 0) {
+            std::cout << "aclshmem_log: security check failed, log directory is not owned by current user or root: "
+                      << real_log_dir << ", owner_uid=" << dir_stat.st_uid << ", current_uid=" << current_uid
+                      << std::endl;
+            return false;
+        }
+        
+        if ((dir_stat.st_mode & S_IWGRP) || (dir_stat.st_mode & S_IWOTH)) {
+            std::cout << "aclshmem_log: security check failed, log directory has insecure permissions: "
+                      << real_log_dir << ", mode=" << std::oct << dir_stat.st_mode << std::dec << std::endl;
+            return false;
+        }
+        
+        aclshmem_log_dir = real_log_dir;
+        return true;
     }
 
     void delete_oldest_files() {
@@ -187,16 +222,21 @@ private:
 };
 
 std::string get_home_dir() {
-    int bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize == -1) {
-        return "";
+    long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    constexpr size_t fallback_bufsize = 16 * 1024;
+    size_t buffer_size = fallback_bufsize;
+    if (bufsize > 0 && bufsize <= 1024 * 1024) {
+        buffer_size = static_cast<size_t>(bufsize);
+    } else {
+        std::cerr << "aclshmem_log: Invalid sysconf(_SC_GETPW_R_SIZE_MAX) value: " << bufsize
+                  << ", fallback to " << buffer_size << std::endl;
     }
 
-    char buffer[bufsize];
-    memset(buffer, 0, bufsize); 
+    std::vector<char> buffer(buffer_size);
+    memset(buffer.data(), 0, buffer_size);
     struct passwd pwd;
     struct passwd* result = nullptr;
-    if (getpwuid_r(getuid(), &pwd, buffer, bufsize, &result) != 0 || !result) {
+    if (getpwuid_r(getuid(), &pwd, buffer.data(), buffer_size, &result) != 0 || !result) {
         return "";
     }
     return std::string(pwd.pw_dir);

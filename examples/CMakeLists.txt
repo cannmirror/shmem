@@ -151,6 +151,17 @@ function(aclshmem_add_collective_example NAME)
 
 endfunction()
 
+set(ACLSHMEM_CATLASS_FUSION_EXAMPLES
+    allgather_matmul
+    allgather_matmul_with_gather_result
+    allgather_matmul_padding
+    dispatch_gmm_combine
+    matmul_allreduce
+    matmul_reduce_scatter
+    matmul_reduce_scatter_padding
+    dynamic_tiling
+)
+
 foreach(EXAMPLE
     kv_shuffle
     allgather
@@ -171,6 +182,10 @@ foreach(EXAMPLE
     udma_demo
     udma_atomic_add
 )
+    if(SOC_TYPE STREQUAL "Ascend950" AND ${EXAMPLE} IN_LIST ACLSHMEM_CATLASS_FUSION_EXAMPLES)
+        message(STATUS "Skip example '${EXAMPLE}' on Ascend950 (catlass not yet supported)")
+        continue()
+    endif()
     add_subdirectory(${EXAMPLE})
 endforeach()
 

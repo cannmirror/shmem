@@ -8,14 +8,72 @@ shmem后续会适配[msprof算子调优工具](https://www.hiascend.com/document
 shmem已适配[mssanitizer内存检测工具](https://www.hiascend.com/document/detail/zh/mindstudio/830/ODtools/Operatordevelopmenttools/atlasopdev_16_0039.html)，以下功能的相关接口暂不支持该工具的使用：
 - SDMA/RDMA/UDMA相关接口和用例不支持使用mssanitizer进行内存检测
 
-**该功能依赖对应 CANN 版本能力，预计社区版 9.0.0-beta.2 支持**
-**提前尝鲜可自行编译[mssanitizer](https://gitcode.com/Ascend/mssanitizer?source_module=search_project)工具，并将编译产物替换CANN包内部`tools/mssanitizer`**
+**该功能依赖对应 CANN 版本能力，预计社区版 9.1.0 支持**
 
-使能mssanitizer工具能力，在shmem/目录编译:
+如果当前使用的 CANN 版本不支持 mssanitizer，可按以下步骤从源码安装：
+
+### 一、安装 mssanitizer
+
+参考：[mssanitizer 安装指南](https://gitcode.com/Ascend/mssanitizer/blob/master/docs/zh/install_guide/mssanitizer_install_guide.md)
+
+获取源码并编译出包：
+
+```sh
+git clone https://gitcode.com/Ascend/mssanitizer.git
+cd mssanitizer
+python build.py
+```
+
+安装 run 包：
+
+```sh
+cd output
+chmod +x mindstudio-sanitizer_*.run
+./mindstudio-sanitizer_*.run --run
+```
+
+如果已设置 `ASCEND_HOME_PATH` 环境变量，安装至 `$ASCEND_HOME_PATH`；否则安装至默认路径 `$HOME/Ascend`。
+
+### 二、安装 mstx
+
+参考：[mstx 安装指南](https://gitcode.com/Ascend/mstx/blob/master/docs/zh/install_guide/mstx_install_guide.md)
+
+安装编译依赖：
+
+- openEuler / CentOS 环境：
+
+```sh
+yum install python3-devel
+```
+
+- Ubuntu 环境：
+
+```sh
+apt-get install python3-dev
+```
+
+获取 mstx 源码并安装 whl 包：
+
+```sh
+git clone https://gitcode.com/Ascend/mstx.git
+cd mstx
+cd output
+pip3 install --upgrade mstx-xxxxx.whl --target ${ASCEND_HOME_PATH}/tools/mstx/
+```
+
+
+### 三、shmem 使能mssanitizer工具能力
+
+在shmem/目录编译:
 ```sh
 bash scripts/build.sh -mssanitizer
 ```
-为算子工程在编译时添加`-g --cce-enable-sanitizer`编译选项。
+
+不同芯片型号的编译选项有所差异：
+- **Ascend950**：内存检测所有功能不需要 `--cce-enable-sanitizer` 编译选项，编译时仅添加 `-g` 即可，mssanitizer 功能正常生效。
+- **其他芯片型号（如 Ascend910B）**：编译时需添加 `-g --cce-enable-sanitizer` 编译选项以启用 mssanitizer 插桩。
+
+当前构建脚本会根据 `SOC_TYPE` 自动选择对应的编译选项，无需手动配置。
 
 工具默认开启内存检测能力，即--tool memcheck，一般情况按如下方式拉起可执行文件即可。
 ```sh

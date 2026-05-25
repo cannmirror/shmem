@@ -69,9 +69,13 @@ else()
 endif()
 
 if(USE_MSSANITIZER)
-    set(SANITIZER_FLAGS
-        -g --cce-enable-sanitizer
-    )
+    if(SOC_TYPE STREQUAL "Ascend950")
+        set(SANITIZER_FLAGS -g)
+    else()
+        set(SANITIZER_FLAGS
+            -g --cce-enable-sanitizer
+        )
+    endif()
 else()
     set(SANITIZER_FLAGS)
 endif()

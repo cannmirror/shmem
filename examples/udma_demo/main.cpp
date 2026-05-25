@@ -49,7 +49,7 @@ int init_acl_shmem(
     test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
 
     attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_UDMA;
-    status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
+    status |= aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
     ptr = static_cast<uint8_t*>(aclshmem_malloc(1024));
     return status;
@@ -252,6 +252,10 @@ int main(int argc, char* argv[])
         status = test_aclshmem_team_all_gather(pe_id, n_pes, local_mem_size);
     }
 
-    std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
-    return 0;
+    if (status != 0) {
+        std::cout << "[FAILED] demo run failed in pe " << pe_id << ", status=" << status << std::endl;
+    } else {
+        std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
+    }
+    return status;
 }

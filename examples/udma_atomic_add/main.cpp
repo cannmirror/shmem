@@ -47,7 +47,7 @@ int test_aclshmem_udma_atomic_add(int pe_id, int n_pes, uint64_t local_mem_size)
     test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
 
     attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_UDMA;
-    status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
+    status |= aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
     uint8_t *ptr = static_cast<uint8_t *>(aclshmem_malloc(1024));
 
@@ -110,8 +110,10 @@ int main(int argc, char *argv[])
     f_npu = atoi(argv[argIdx++]);
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     status = test_aclshmem_udma_atomic_add(pe_id, n_pes, local_mem_size);
-    if (status == 0) {
-        std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl; 
+    if (status != 0) {
+        std::cout << "[FAILED] demo run failed in pe " << pe_id << ", status=" << status << std::endl;
+    } else {
+        std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
     }
     return status;
 }

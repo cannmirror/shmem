@@ -26,4 +26,4 @@ export SHMEM_INSTANCE_PORT_RANGE=1024:2047
 
 ## Profiling相关
 SHMEM提供Profiling打点工具，通过采集系统时钟周期数并转换为实际时间，精准量化不同Block（计算核）、不同Frame（埋点 ID）下的MTE搬运性能，详细介绍请参考[在示例中使用Profiling工具](../debug/profiling.md).
-* `SHMEM_CYCLE_PROF_PE`: 用于设置需要进行Profiling采集的pe，pe_id设置范围【0，PEs-1】，需要取消采集请`unset SHMEM_CYCLE_PROF_PE`。
+* `SHMEM_CYCLE_PROF_PE`: 用于设置需要进行Profiling采集的pe，pe_id设置范围[0，PEs-1]，需要取消采集请`unset SHMEM_CYCLE_PROF_PE`。

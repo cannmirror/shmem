@@ -1,19 +1,19 @@
 
-# CATCOC介绍
+# CATCCOS介绍(原名CATCOC)
 
 ## 分层设计
-**CATCOC延续 [CATLASS](https://gitee.com/ascend/catlass) 自上而下的分层架构，并在各个层级中新增了对远程访存的支持，从而进一步增强了系统的分层计算与通信能力。**
+**[CATCCOS](https://gitcode.com/cann/catccos) 延续 [CATLASS](https://gitcode.com/cann/catlass) 自上而下的分层架构，并在各个层级中新增了对远程访存的支持，从而进一步增强了系统的分层计算与通信能力。**
 
 ![image](images/overview.png)
 
 ### 新增远程访存支持，扩展分层计算能力
-- **Kernel 层**：实现支持通算融合的完整算子，将Matmul计算扩展至多卡并行计算场景。
-- **Block 层**：定义了单个AICore的通信逻辑，可与Catlass中单个AICore的计算逻辑结合，实现灵活的细粒度通算融合组合。
-- **Tile 层**：提供常用步骤的抽象，基于底层的基础 SHMEM 操作构建。
+- **Kernel 层**：实现支持通信与计算融合的完整算子，将Matmul计算扩展至多卡并行计算（使用多块 NPU 同时进行计算）场景。
+- **Block 层**：定义了单个AICore（AI Compute Core）的通信逻辑，可与CATLASS中单个AICore的计算逻辑结合，实现灵活的细粒度通算融合组合。
+- **Tile 层**：提供常用步骤的抽象，基于底层的基础 [SHMEM](https://gitcode.com/cann/shmem) 操作构建。
 
 
 ## 快速使用
-以matmul_reduce_scatter为例，快速使用catcoc通算融合算子：
+以matmul_reduce_scatter为例，快速使用CATCCOS通算融合算子：
 
 1. **编译Shmem项目与例子**  
    在 `shmem/` 根目录下执行编译脚本：
@@ -39,7 +39,7 @@
      修改该文件以定义测试用例的输入维度。
 
 ## 开发计算通信融合算子
-以matmul_reduce_scatter为例，本节展示如何基于catcoc快速开发计算通信融合算子。
+以matmul_reduce_scatter为例，本节展示如何基于CATCCOS快速开发计算通信融合算子。
 
 ### Matmul-ReduceScatter流水示意
 
@@ -273,7 +273,7 @@ private:
 * 模板特化：MatMul + ReduceScatter核函数中Matmul计算逻辑（AIC）实现
 *
 * 功能说明：
-* 在每个AIC上执行局部矩阵乘法（MatMul），并将结果用于后续的ReduceScatter通信阶段。
+* 在每个AIC上执行局部矩阵乘法（MatMul），并将结果用于后续的ReduceScatter（归约后分散）通信阶段。
 * 支持多阶段流水（WORKSPACE_STAGES），提升吞吐
 *
 */
@@ -589,7 +589,7 @@ void operator()<AscendC::AIV>(Params &params)
 
 #### 📌 实例化matmul_reduce_scatter kernel
 
-创建example文件夹 `mkdir -p examples\matmul_reduce_scatter`，创建文件 `matmul_reduce_scatter.cpp`
+创建example文件夹 `mkdir -p examples/matmul_reduce_scatter`，创建文件 `matmul_reduce_scatter.cpp`
 
 通过以下三部分实现MatmulReduceScatter的实例化与调用逻辑
 

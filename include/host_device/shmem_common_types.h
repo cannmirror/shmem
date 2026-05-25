@@ -33,7 +33,7 @@ extern "C" {
  * @brief A macro that identifies a function on the device side.
 */
 #define ACLSHMEM_DEVICE __attribute__((always_inline)) __aicore__ __inline__
-/**@} */ // end of group_enums
+/**@} */ // end of group_macros
 /**
  * @addtogroup group_enums
  * @{

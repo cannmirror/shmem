@@ -101,22 +101,22 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 3. 调整环境变量`SHMEM_UID_SESSION_ID`及实际执行文件所使用的ip及端口号
 
 ### 未通过环境变量配置ip/port，使用默认eth查询ip信息失败
-#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAM`均未配置时使用`eth:inet4`查询本地ip地址，查询失败时错误日志如下: 
+#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时使用`eth:inet4`查询本地ip地址，查询失败时错误日志如下: 
 
 ![session_id_sock_ifnam_not_set](./images/trouble-shooting/session_id_sock_ifnam_not_set.png)
 
-#### A: 应手动配置`SHMEM_UID_SESSION_ID`或`SHMEM_UID_SOCK_IFNAM`
+#### A: 应手动配置`SHMEM_UID_SESSION_ID`或`SHMEM_UID_SOCK_IFNAME`
 配置示例:
 - SHMEM_UID_SESSION_ID: 
 
     `SHMEM_UID_SESSION_ID=127.0.0.1:1234`
-- SHMEM_UID_SOCK_IFNAM: 
+- SHMEM_UID_SOCK_IFNAME: 
 
-    `SHMEM_UID_SOCK_IFNAM=[6666:6666:6666:6666:6666:6666:6666:6666]:886`
+    `SHMEM_UID_SOCK_IFNAME=[6666:6666:6666:6666:6666:6666:6666:6666]:886`
 
-    `SHMEM_UID_SOCK_IFNAM=enpxxxx:inet4` 取ipv4
+    `SHMEM_UID_SOCK_IFNAME=enpxxxx:inet4` 取ipv4
 
-    `SHMEM_UID_SOCK_IFNAM=enpxxxx:inet6` 取ipv6
+    `SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6` 取ipv6
 
 注意: 同时配置时只读取`SHMEM_UID_SESSION_ID`
 

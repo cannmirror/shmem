@@ -66,11 +66,11 @@ git commit --no-verify -m "your message"
 
 | 工具 | 语言 | 功能 | 配置文件 |
 |------|------|------|----------|
-| ruff | Python | 代码格式化 + Lint | `pre-commit/pyproject.toml` |
-| pylint | Python | 代码质量检查 | `pre-commit/pyproject.toml` |
-| bandit | Python | 安全漏洞检查 | `pre-commit/pyproject.toml` |
+| ruff | Python | 代码格式化 + Lint | `tools/pre-commit/pyproject.toml` |
+| pylint | Python | 代码质量检查 | `tools/pre-commit/pyproject.toml` |
+| bandit | Python | 安全漏洞检查 | `tools/pre-commit/pyproject.toml` |
 | codespell | 通用 | 拼写检查 | `.pre-commit-config.yaml` |
-| typos | 通用 | 拼写检查 | `pre-commit/typos.toml` |
+| typos | 通用 | 拼写检查 | `tools/pre-commit/typos.toml` |
 | clang-format | C/C++ | 代码格式化 | `.clang-format` |
 
 ## 配置文件说明
@@ -81,15 +81,15 @@ git commit --no-verify -m "your message"
 
 ### Python 工具配置
 
-[`pre-commit/pyproject.toml`](../pre-commit/pyproject.toml) - ruff、pylint、bandit 的规则配置
+[`tools/pre-commit/pyproject.toml`](../../tools/pre-commit/pyproject.toml) - ruff、pylint、bandit 的规则配置
 
 ### C++ 格式化配置
 
-[`.clang-format`](../.clang-format) - clang-format 的格式化规则
+[`.clang-format`](../../.clang-format) - clang-format 的格式化规则
 
 ### 拼写检查白名单
 
-[`pre-commit/typos.toml`](../pre-commit/typos.toml) - typos 工具的误报白名单
+[`tools/pre-commit/typos.toml`](../../tools/pre-commit/typos.toml) - typos 工具的误报白名单
 
 ## 常见问题
 

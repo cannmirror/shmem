@@ -16,7 +16,7 @@ include目录下的头文件是按照如下文件层级进行组织的
 include/
 ├── shmem.h                                 // shmem所有对外API汇总
 ├── device/                                 // device侧头文件
-│   ├── shmem_def.h                         // device侧定义的公共标展接口
+│   ├── shmem_def.h                         // device侧定义的公共标准接口
 │   ├── ub2gm/                              // device侧aicore驱动ub2gm数据面低阶接口，扩展接口+x
 │   │   ├── shmem_device_rma.h              // aicore ub2gm 远端内存访问 RMA 接口
 │   │   └── engine/                         // aicore 直驱ub2gm 低阶接口，扩展接口+x

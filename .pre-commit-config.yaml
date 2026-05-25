@@ -21,15 +21,15 @@ repos:
       - id: check-json
 
   # -------------------------- Python 核心检查 --------------------------
-  # Ruff：指定读取 pre-commit/pyproject.toml
+  # Ruff：指定读取 tools/pre-commit/pyproject.toml
   - repo: https://gitcode.com/gh_mirrors/ru/ruff-pre-commit
     rev: v0.14.14
     hooks:
       - id: ruff-check
-        args: ["--config", "pre-commit/pyproject.toml", "--output-format", "github", "--fix"]
+        args: ["--config", "tools/pre-commit/pyproject.toml", "--output-format", "github", "--fix"]
         types: [python]
       - id: ruff-format
-        args: ["--config", "pre-commit/pyproject.toml"]
+        args: ["--config", "tools/pre-commit/pyproject.toml"]
         types: [python]
 
   # codespell
@@ -44,17 +44,17 @@ repos:
             "*.py,*.cpp,*.hpp,*.c,*.h",
           ]
 
-  # pylint：指定 pre-commit/pyproject.toml
+  # pylint：指定 tools/pre-commit/pyproject.toml
   - repo: https://gitcode.com/gh_mirrors/pyl/pylint
     rev: v4.0.5
     hooks:
       - id: pylint
         name: pylint (Python code quality check)
         types: [python]
-        args: ["--rcfile=pre-commit/pyproject.toml"]
+        args: ["--rcfile=tools/pre-commit/pyproject.toml"]
         verbose: false
 
-  # Bandit：指定 pre-commit/pyproject.toml
+  # Bandit：指定 tools/pre-commit/pyproject.toml
   - repo: https://gitcode.com/gh_mirrors/ba/bandit
     rev: 1.9.4
     hooks:
@@ -62,7 +62,7 @@ repos:
         name: bandit (Python 安全漏洞检查)
         types: [python]
         args: [
-          "--config=pre-commit/pyproject.toml",
+          "--config=tools/pre-commit/pyproject.toml",
           "--quiet",
         ]
 
@@ -71,7 +71,7 @@ repos:
     rev: v1.32.0
     hooks:
       - id: typos
-        args: ["--force-exclude", "--config", "pre-commit/typos.toml"]
+        args: ["--force-exclude", "--config", "tools/pre-commit/typos.toml"]
 
   #--------------- C++ 核心检查 ---------------------------------------------
   - repo: https://gitcode.com/pre-commit-clang/mirrors-clang-format

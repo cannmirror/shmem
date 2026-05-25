@@ -113,7 +113,7 @@ ACLSHMEM_HOST_API int32_t aclshmemx_set_config_store_tls_key(const char *tls_pk,
 /**
  * @brief exit all ranks.
  *
- * @param status [in] name
+ * @param status [in] exit status code
  */
 ACLSHMEM_HOST_API void aclshmem_global_exit(int status);
 #define shmem_global_exit aclshmem_global_exit

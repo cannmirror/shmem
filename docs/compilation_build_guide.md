@@ -113,7 +113,7 @@ bash scripts/build.sh -enable_rdma -rdma_backend XSCALE
    - `release.sh`：全自动构建与打包脚本
    - `set_env.sh`：SHMEM的环境变量设置文件
 ### run.sh脚本使用
-UT测试用例运行脚本。
+UT（单元测试）测试用例运行脚本。
 ```sh
 bash scripts/run.sh
 ```
@@ -127,11 +127,11 @@ bash scripts/run.sh
 -test_filter    # gtest_filter
 
 # 例如
-bash run.sh -ranks 4 -fnpu 2 -gnpus 4 -test_filter ScalarP # 会在2-6卡
+bash scripts/run.sh -ranks 4 -fnpu 2 -gnpus 4 -test_filter ScalarP # 会在2-6卡
 
 ```
 ### install.sh
-打包生成的run包安装卸载依赖的脚本，提供安装卸载功能。
+打包生成的run包的安装/卸载脚本，提供安装和卸载的功能。
 安装目录
 ```
 ${INSTALL_PATH}
@@ -143,6 +143,7 @@ ${INSTALL_PATH}
                 |--lib      (so库)
             |--scripts      (卸载脚本)
 ```
+注：`INSTALL_PATH`表示用户设置的安装目录。
 ### uninstall.sh
 卸载脚本，可以卸载对应路径安装的shmem库或通过run包的--uninstall卸载默认路径下的shmem。
 

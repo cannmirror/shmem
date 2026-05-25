@@ -2,7 +2,7 @@
 
 ## 示例概述
 
-shmem_perftest是一个用于**测试shmem MTE（Memory Transfer Engine）性能**的参数化测试示例，支持多种测试类型、多种数据类型和灵活的参数配置。该示例通过SHMEMI_PROF_START/END宏采集性能数据，测试不同核数和数据量下的MTE传输带宽，帮助用户评估MTE数据传输性能。**该脚本测试结果仅做参考，性能以实际场景为准**
+shmem_perftest是一个用于**测试shmem MTE（Memory Transfer Engine）性能**的参数化测试示例，支持多种测试类型、多种数据类型和灵活的参数配置。该示例通过[SHMEMI_PROF_START/END](../../../src/device/utils/prof/shmemi_prof.h)宏采集性能数据，测试不同核数和数据量下的MTE传输带宽，帮助用户评估MTE数据传输性能。**该脚本测试结果仅做参考，性能以实际场景为准**
 
 ## 测试目的
 

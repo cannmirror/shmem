@@ -51,7 +51,7 @@ int32_t ret = aclshmemx_set_conf_store_tls(true, tls_info, strlen(tls_info));
 | SHMEM_HOME_PATH| shmem安装路径     |
 | VERSION        | 编译whl包默认版本号 |
 | ASCEND_RT_VISIBLE_DEVICES | 指定哪些Device对当前进程可见，支持一次指定一个或多个Device ID。通过该环境变量，可实现不修改应用程序即可调整所用Device的功能。 |
-| SHMEM_CYCLE_PROF_PE  |  用于设置需要进行Profiling采集的pe，pe_id设置范围【0，PEs-1】，需要取消采集请`unset SHMEM_CYCLE_PROF_PE` |
+| SHMEM_CYCLE_PROF_PE  |  用于设置需要进行Profiling采集的pe，pe_id设置范围[0，PEs-1]，需要取消采集请`unset SHMEM_CYCLE_PROF_PE` |
 
 
 ## 运行用户建议

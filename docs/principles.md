@@ -1,7 +1,7 @@
 # SHMEM原理概述
 
 ## SHMEM初始化流程介绍
-<p style="text-indent: 2em;">shmem的初始化接口<code>int aclshmemx_init_attr(aclshmemx_init_attr_t *attributes)</code>会根据传入的参数完成shmem功能所需资源的初始化。其中包含多进程间信息的同步以及建链、虚拟内存及device上物理内存的分配和映射、host和device间state信息同步以及初始化共享内存管理、team管理、同步管理功能所需要的资源。这些资源信息都会记录在一个 <code>aclshmem_device_host_state_t</code> 的state里。</p>
+<p style="text-indent: 2em;">shmem的初始化接口<code>int aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_init_attr_t *attributes)</code>会根据传入的参数完成shmem功能所需资源的初始化。其中包含多进程间信息的同步以及建链、虚拟内存及device上物理内存的分配和映射、host和device间state信息同步以及初始化共享内存管理、team管理、同步管理功能所需要的资源。这些资源信息都会记录在一个 <code>aclshmem_device_host_state_t</code> 的state里。</p>
 
 初始化流程如下图所示，参数设置及参数校验相关内容不做具体介绍。
 
@@ -30,7 +30,7 @@ href=https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/API/appdev
 ![image](images/principles/4.png)
 
 ### 共享内存管理初始化
-<p style="text-indent: 2em;">基于heap_base和heap_size初始化一个memory_manager用于后续共享内存管理。heap_base为当前rank的共内存首地址，heap_size为用户申请的当前rank的共享内存大小。</p>
+<p style="text-indent: 2em;">基于heap_base和heap_size初始化一个memory_manager用于后续共享内存管理。heap_base为当前rank的共享内存首地址，heap_size为用户申请的当前rank的共享内存大小。</p>
 
 
 * `aclshmem_malloc`内部采用first fit找到第一个满足要求的chunk，从该chunk中分离出对应大小的chunk，剩余空间（如果有）则作为新的空闲chunk。
@@ -54,12 +54,12 @@ href=https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/API/appdev
 ![image](images/principles/6.png)
 
 ### 同步管理初始化
-<p style="text-indent: 2em;">该部分仅获取一个ffts地址，后续可通过<code>shmemx_get_ffts_config</code>获得，在算子内通过<code>shmemx_set_ffts_config</code>设置，用于runtime同步，AscendC层面会影响的<code>SyncAll</code>、<code>CrossCoreSetFlag</code>和<code>CrossCoreWaitFlag</code>接口，shmem层面会影响到barrier相关接口。（</ode>shmemx_set_ffts_config</code>开销较小，建议算子内都调用一次该接口）。</p>
+<p style="text-indent: 2em;">该部分仅获取一个ffts地址，后续可通过<code>shmemx_get_ffts_config</code>获得，在算子内通过<code>shmemx_set_ffts_config</code>设置，用于runtime同步，AscendC层面会影响的<code>SyncAll</code>、<code>CrossCoreSetFlag</code>和<code>CrossCoreWaitFlag</code>接口，shmem层面会影响到barrier相关接口。（</code>shmemx_set_ffts_config</code>开销较小，建议算子内都调用一次该接口）。</p>
 
 ![image](images/principles/7.png)
 
 ## SHMEM通信域（Team）介绍
-<p style="text-indent: 2em;">Team是shmem的通信域概念，在相关接口中可以通过`team_id`访问，初始化后会有一个默认的全局通信域，其<code>team_id</code>是<code> ACLSHMEM_TEAM_WORLD = 0</code>。team的信息存储在在state的team_pools里，team_pools是一个aclshmemx_team_t的数组。aclshmemx_team_t内会存储当前team的id（team相关接口使用的索引）、当前进程在该team内的rank id、该team内的起始rank、rank间步长、rank数量等相关信息。</p>
+<p style="text-indent: 2em;">Team是shmem的通信域概念，在相关接口中可以通过`team_id`访问，初始化后会有一个默认的全局通信域，其<code>team_id</code>是<code> ACLSHMEM_TEAM_WORLD = 0</code>。team的信息存储在state的team_pools里，team_pools是一个aclshmemx_team_t的数组。aclshmemx_team_t内会存储当前team的id（team相关接口使用的索引）、当前进程在该team内的rank id、该team内的起始rank、rank间步长、rank数量等相关信息。</p>
 
 **aclshmemx_team_t内存储的mype和size是team内部的信息，aclshmem_device_host_state_t里存储的mype和npes是全局的信息。**
 例如：对4个rank初始化shmem，前两卡和后两卡各为一个team。此时这四个rank的state里的mype分别是0,1,2,3。npes则都是4。但team_pools里的mype则分别是0，1，0，1。size为2。

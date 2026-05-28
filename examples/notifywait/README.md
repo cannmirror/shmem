@@ -1,8 +1,8 @@
 # NotifyWait机制使用说明
 ## 环境要求和准备
 SDMA功能在9.0.0及以上版本（尝鲜版）新增支持。需要下载并安装以下cann和ops软件包：
-- toolkit包（[x86_64](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260225000323937/x86_64/Ascend-cann-toolkit_9.0.0_linux-x86_64.run)/[aarch64](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260225000323937/aarch64/Ascend-cann-toolkit_9.0.0_linux-aarch64.run)）
-- ops-legacy包（根据硬件平台下载对应版本：[A2 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260225_newest/cann-910b-ops-legacy_9.0.0_linux-x86_64.run)/[A2 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260225_newest/cann-910b-ops-legacy_9.0.0_linux-aarch64.run)/[A3 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260225_newest/cann-A3-ops-legacy_9.0.0_linux-x86_64.run)/[A3 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260225_newest/cann-A3-ops-legacy_9.0.0_linux-aarch64.run)）
+- toolkit包（[CANN master obp镜像网站](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/)）
+- ops-legacy包（根据硬件平台下载对应版本：[A2 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-x86_64.run)/[A2 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-aarch64.run)/[A3 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-x86_64.run)/[A3 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-aarch64.run)）
 ## example执行说明
 1.在`shmem/`目录编译软件包并安装：
 ```bash

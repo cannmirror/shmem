@@ -70,6 +70,7 @@ private:
     uint64_t totalVirtualSize_{0UL};
     uint64_t allocatedSize_{0UL};
     uint16_t sliceCount_{0};
+    bool singleReservation_{false};
 
     std::map<uint16_t, MemSliceStatus> slices_;
     std::map<uint16_t, std::string> exportMap_;

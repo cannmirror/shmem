@@ -41,12 +41,14 @@ bash run.sh -mode mpi -pesize 2
 bash run.sh -mode uid -pesize 2
 ```
 
-2，3流程执行前需要自行安装并导入MPI环境变量
-
+执行 uid_multi 流程，4 pe
 ```bash
-# mpich安装在默认路径时可参考，需根据实际情况替换。
-export PATH=/usr/local/mpich/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
+# enpxxx需要替换为ip addr指令获得的网卡
+export SHMEM_UID_SOCK_IFNAME=enpxxxxxxx:inet4
+
+bash run.sh -mode uid_multi -pesize 4
+
+unset SHMEM_UID_SOCK_IFNAME
 ```
 
 执行 uid_default 流程，2 pe

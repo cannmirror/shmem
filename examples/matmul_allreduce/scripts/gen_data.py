@@ -9,6 +9,8 @@
 # -----------------------------------------------------------------------------------------------------------
 import os
 import numpy as np
+import torch
+import torch_npu
 
 
 def gen_random_data(size, dtype):
@@ -38,17 +40,16 @@ def gen_golden_data():
 
     os.makedirs(data_dir, exist_ok=True)
     out_data_type = np.float32 if args.out_data_type == 0 else np.float16
-    l0c_dtype = np.float32  # Use float32 for more precise matmul calculation
+    l0c_dtype = np.float32
 
     golden = np.zeros((m, n), dtype=l0c_dtype)
+    torch_output = torch.zeros((m, n), dtype=torch.float16).npu()
     np.random.seed(42)
 
     for i in range(args.pe_size):
-        # Using float16 for a and b as in the original script
         a_gm = gen_random_data((m, k), np.float16)
         b_gm = gen_random_data((k, n), np.float16)
 
-        # Save per-pe data
         a_gm_path = os.path.join(data_dir, f"pe_{i}_a.bin")
         b_gm_path = os.path.join(data_dir, f"pe_{i}_b.bin")
         print(f'{a_gm_path=}')
@@ -56,12 +57,19 @@ def gen_golden_data():
         a_gm.tofile(a_gm_path)
         b_gm.tofile(b_gm_path)
 
-        # Calculate matmul for this pe and add to golden
         matrix_c = np.matmul(a_gm.astype(l0c_dtype), b_gm.astype(l0c_dtype))
         golden += matrix_c
 
-    # Convert to target data type and save golden data
-    golden = golden.astype(out_data_type)
+        a_torch = torch.from_numpy(a_gm).npu()
+        b_torch = torch.from_numpy(b_gm).npu()
+        matrix_c_torch = torch.matmul(a_torch, b_torch)
+        torch_output += matrix_c_torch
+
+    cpu_output = torch_output.cpu().numpy()
+    cpu_output_path = os.path.join(data_dir, "torch_output.bin")
+    print(f'{cpu_output_path=}')
+    cpu_output.tofile(cpu_output_path)
+
     golden_path = os.path.join(data_dir, "golden.bin")
     print(f'{golden_path=}')
     golden.tofile(golden_path)

@@ -26,6 +26,7 @@ PARENT_PATH=${PROJECT_ROOT}/examples/dynamic_tiling/
 export WARM_UP_TIMES=10
 export PERF_TEST_CYCLE_TIMES=3
 export SEARCH_PARAMS=0
+export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:${ASCEND_HOME_PATH}/lib64:$LD_LIBRARY_PATH
 
 CSV_FILE="${SCRIPT_DIR}/test_shapes.csv"
 
@@ -101,12 +102,12 @@ if [ "$TEST_TYPE" = "0" ]; then
         wait
 
         if [ "$COMM_TYPE" = "1" ]; then
-            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} ${K}
+            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} ${K} ./output/torch_output.bin
         elif [ "$COMM_TYPE" = "4" ]; then
-            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} ${K}
-            python3 ${UTILS_PATH}/verify_result.py ./output/output_gather_a.bin ./output/gather_a.bin ${DATA_TYPE} ${M} ${N} ${K}
+            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} ${K} ./output/torch_output.bin
+            python3 ${UTILS_PATH}/verify_result.py ./output/output_gather_a.bin ./output/gather_a.bin ${DATA_TYPE} ${M} ${N} ${K} --op_type CV_FUSION
         else
-            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} $((K * RANK_SIZE))
+            python3 ${UTILS_PATH}/verify_result.py ./output/output.bin ./output/golden.bin ${DATA_TYPE} ${M} ${N} $((K * RANK_SIZE)) ./output/torch_output.bin
         fi
 
         ret=$?

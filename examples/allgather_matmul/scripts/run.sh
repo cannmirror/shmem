@@ -49,8 +49,8 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r M K N; do
     wait
 
     # Verify output
-    python3 ${UTILS_PATH}/verify_result.py ${DATA_DIR}/aclshmem_output.bin ${DATA_DIR}/golden.bin 1 ${M} ${N} ${K}
-    [[ $? -ne 0 ]] || exit 1
+    python3 ${UTILS_PATH}/verify_result.py ${DATA_DIR}/aclshmem_output.bin ${DATA_DIR}/golden.bin 1 ${M} ${N} ${K} ${DATA_DIR}/torch_output.bin
+    [[ $? -ne 0 ]] && exit 1
 done
 
 cd ${CURRENT_DIR}

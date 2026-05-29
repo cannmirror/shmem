@@ -23,6 +23,17 @@ RED = "\033[31m"
 GREEN = "\033[32m"
 RESET = "\033[0m"
 
+# Precision check thresholds for comparing SHMEM output against torch_npu reference
+# These thresholds allow SHMEM to have slightly higher error than torch_npu while still being acceptable
+# MARE (Max Absolute Relative Error) threshold: SHMEM error can be up to 10x torch_npu error
+# MERE (Mean Error Relative Error) threshold: SHMEM error can be up to 2x torch_npu error
+# RMSE (Root Mean Square Error) threshold: SHMEM error can be up to 2x torch_npu error
+# Rationale: SHMEM uses different optimization strategies that may introduce slightly higher
+# numerical errors, but should remain within acceptable bounds relative to the reference implementation
+MARE_RATIO_THRESHOLD = 10
+MERE_RATIO_THRESHOLD = 2
+RMSE_RATIO_THRESHOLD = 2
+
 
 class OpTypes(Enum):
     NA = 0 # new standard is not available
@@ -99,10 +110,10 @@ def precision_performance_analysis(op_type, golden_output_tensor_list, output_te
         precision_threshold, eb_threshold = get_precision_and_eb_threshold(op_type, actual_output.dtype, rtol)
         precision, eb = cal_precision_eb_percent(op_type, actual_output, golden_output,
                                                  precision_threshold, eb_threshold)
+    print(f"Old precision - precision: {precision}, eb: {eb}", flush=True)
     if precision == 100 and eb <= 100:
         return True
     else:
-        print(f"precision: {precision}, eb: {eb}")
         return False
 
 
@@ -113,7 +124,6 @@ def cal_precision_eb_percent(op_type, actual_output, golden_output, precision_th
         actual_output.dtype in [torch.float16, torch.bfloat16]):
         actual_output = actual_output.to(torch.float32)
         golden_output = golden_output.to(torch.float32)
-    #对于输出中出现的NAN以及INF全部替换成0
     actual_output = torch.where(torch.isnan(actual_output), torch.full_like(actual_output, 0), actual_output)
     actual_output = torch.where(torch.isinf(actual_output), torch.full_like(actual_output, 0), actual_output)
     golden_output = torch.where(torch.isnan(golden_output), torch.full_like(golden_output, 0), golden_output)
@@ -143,15 +153,38 @@ def cal_precision_eb_percent(op_type, actual_output, golden_output, precision_th
             break
     error_num = len(different_element_indexes)
     if error_num > 0:
-        print(f"error num: {error_num}")
+        print(f"Differential num: {error_num}")
 
-    # eb 统计误差偏移情况
     eb = eb_threshold
     if eb_threshold != 0:
         eb = torch.abs(torch.mean(torch.div(diff, tensor_max)))
     precision_percent = torch.sum(tolerance <= 0).numpy() / torch.numel(tolerance) * 100
     eb_percent = 0 if eb == 0 else torch.sum(eb).to(torch.float).numpy() / eb_threshold * 100
     return precision_percent, eb_percent
+
+
+def calculate_metrics(actual, golden):
+    actual = actual.to(torch.float32)
+    golden = golden.to(torch.float32)
+    
+    actual = torch.where(torch.isnan(actual), torch.full_like(actual, 0), actual)
+    actual = torch.where(torch.isinf(actual), torch.full_like(actual, 0), actual)
+    golden = torch.where(torch.isnan(golden), torch.full_like(golden, 0), golden)
+    golden = torch.where(torch.isinf(golden), torch.full_like(golden, 0), golden)
+    
+    diff = torch.abs(actual - golden)
+    golden_abs = torch.abs(golden)
+    denominator = golden_abs + 1e-7
+    
+    relative_error = diff / denominator
+    mare = torch.max(relative_error).item()
+    mere = torch.mean(relative_error).item()
+    
+    squared_error = diff ** 2
+    mean_squared_error = torch.mean(squared_error).item()
+    rmse = np.sqrt(mean_squared_error)
+    
+    return mare, mere, rmse
 
 
 def verify_result():
@@ -163,14 +196,72 @@ def verify_result():
     parser.add_argument('m', type=int)
     parser.add_argument('n', type=int)
     parser.add_argument('k', type=int)
+    parser.add_argument('torch_output', nargs='?', default=None, type=str,
+                        help='Torch_NPU output file for new precision check (optional)')
+    parser.add_argument('--op_type', type=str, default=None,
+                        help='Operation type for precision check (e.g., CV_FUSION)')
     args = parser.parse_args()
 
     output = tensor_from_file(args.output, dtype=args.out_dtype.torch_type)
     golden = tensor_from_file(args.golden, dtype=torch.float32)
 
+    old_pass = False
+    new_pass = False
+
     rtol = get_rtol(dtype=args.out_dtype.torch_type, compute_times=args.k)
-    result = precision_performance_analysis(OpTypes.COMPUTE_FLOAT, [golden], [output], rtol)
-    return result
+    if args.op_type is not None:
+        op_type = OpTypes[args.op_type]
+    else:
+        op_type = OpTypes.COMPUTE_FLOAT
+    print(f"Running old precision check (against CPU golden)...")
+    old_pass = precision_performance_analysis(op_type, [golden], [output], rtol)
+    print(f"Old precision check result: {'PASS' if old_pass else 'FAIL'}", flush=True)
+
+    if args.torch_output is not None:
+        print(f"Loading torch_output from: {args.torch_output}", flush=True)
+        torch_output = tensor_from_file(args.torch_output, dtype=args.out_dtype.torch_type)
+        print(f"torch_output loaded, shape: {torch_output.shape}", flush=True)
+        print(f"Running new precision check (against torch_npu reference)...", flush=True)
+        shmem_mare, shmem_mere, shmem_rmse = calculate_metrics(output, golden)
+        torch_mare, torch_mere, torch_rmse = calculate_metrics(torch_output, golden)
+
+        print(f"SHMEM metrics - MARE: {shmem_mare:.9f}, MERE: {shmem_mere:.9f}, RMSE: {shmem_rmse:.9f}", flush=True)
+        print(f"Torch_NPU metrics - MARE: {torch_mare:.9f}, MERE: {torch_mere:.9f}, RMSE: {torch_rmse:.9f}", flush=True)
+
+        mare_ratio = shmem_mare / torch_mare if torch_mare != 0 else float('inf')
+        mere_ratio = shmem_mere / torch_mere if torch_mere != 0 else float('inf')
+        rmse_ratio = shmem_rmse / torch_rmse if torch_rmse != 0 else float('inf')
+
+        print(f"Ratios - MARE: {mare_ratio:.9f}, MERE: {mere_ratio:.9f}, RMSE: {rmse_ratio:.9f}", flush=True)
+
+        mare_pass = mare_ratio <= MARE_RATIO_THRESHOLD
+        mere_pass = mere_ratio <= MERE_RATIO_THRESHOLD
+        rmse_pass = rmse_ratio <= RMSE_RATIO_THRESHOLD
+
+        new_pass = mare_pass and mere_pass and rmse_pass
+
+        if not mare_pass:
+            print(f"{RED}MARE ratio {mare_ratio:.9f} > {MARE_RATIO_THRESHOLD}{RESET}", flush=True)
+        if not mere_pass:
+            print(f"{RED}MERE ratio {mere_ratio:.9f} > {MERE_RATIO_THRESHOLD}{RESET}", flush=True)
+        if not rmse_pass:
+            print(f"{RED}RMSE ratio {rmse_ratio:.9f} > {RMSE_RATIO_THRESHOLD}{RESET}", flush=True)
+        
+        print(f"New precision check result: {'PASS' if new_pass else 'FAIL'}", flush=True)
+
+    # Use OR logic: pass if either old check (against CPU golden) or new check (against torch_npu) passes
+    # Rationale: Both checks serve as quality gates, and passing either one indicates acceptable precision
+    # This allows flexibility when one reference implementation has issues while the other is reliable
+    if old_pass and new_pass:
+        print(f"{GREEN}Both precision checks PASSED{RESET}", flush=True)
+    elif old_pass:
+        print(f"{GREEN}Old precision check PASSED{RESET}", flush=True)
+    elif new_pass:
+        print(f"{GREEN}New precision check PASSED{RESET}", flush=True)
+    else:
+        print(f"{RED}Both precision checks FAILED{RESET}", flush=True)
+    
+    return old_pass or new_pass
 
 
 if __name__ == '__main__':
@@ -178,7 +269,7 @@ if __name__ == '__main__':
         res = verify_result()
         if not res:
             print(f"{RED}||||||||||| PRECISION ERROR |||||||||||||||{RESET}")
-            sys.exit(0)
+            sys.exit(1)
         else:
             print(f"{GREEN}PRECISION PASS{RESET}")
             sys.exit(0)

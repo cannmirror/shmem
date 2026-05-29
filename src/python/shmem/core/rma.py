@@ -16,7 +16,7 @@ import shmem._pyshmem as _pyshmem
 from shmem.core.utils import Buffer, AclshmemInvalid
 from shmem.core.direct import ComparisonType, SignalOp
 
-__all__ = ['put_signal', 'signal_op', 'signal_wait', 'put', 'get']
+__all__ = ['put_signal', 'signal_op', 'signal_wait', 'put', 'get', 'quiet']
 
 logger = logging.getLogger("aclshmem")
 
@@ -24,35 +24,69 @@ logger = logging.getLogger("aclshmem")
 def put_signal(dst: Buffer, src: Buffer, signal_var: Buffer, signal_val: int, signal_operation: SignalOp,
                remote_pe: int=-1, stream=None) -> None:
     """
-    Perform a put-with-signal operation on an NPU stream.
+    Synchronous (blocking) interface. Copy contiguous data from the local PE to a
+    symmetric memory address on the specified PE, and update a remote signal variable
+    on completion.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
 
     Args:
-        dst (Buffer): Symmetric memory buffer on the local PE (destination).
-        src (Buffer): Symmetric memory buffer containing the source data.
-        signal_var (Buffer): Symmetric memory buffer used as the signal variable.
-        signal_operation (SignalOp): Operation applied to update the signal variable.
-        remote_pe (int): PE number of the remote processing element.
-        stream: Reserved parameter. **Ignored** in ACLSHMEM and always treated as ``None``.
+        dst (Buffer):
+            [in] Symmetric address of the destination data on the remote PE.
+        src (Buffer):
+            [in] Local memory of the source data.
+        signal_var (Buffer):
+            [in] Symmetric address of the signal word to be updated on the remote PE.
+        signal_val (int):
+            [in] The value used to update the signal variable.
+        signal_operation (SignalOp):
+            [in] Operation used to update the signal variable with signal_val.
+            Supported: ``SignalOp.SIGNAL_SET`` / ``SignalOp.SIGNAL_ADD``.
+        remote_pe (int):
+            [in] PE number of the remote PE. Defaults to -1.
+        stream:
+            [in] Reserved parameter, ignored. The underlying call uses the default
+            stream internally.
+
+    Returns:
+        None: This function has no return value.
     """
     _pyshmem.aclshmemx_putmem_signal(
-        dst.addr, src.addr, signal_var.length, signal_var.addr, signal_val, signal_operation, remote_pe
+        dst.addr, src.addr, src.length, signal_var.addr, signal_val, signal_operation, remote_pe
     )
 
 
 def signal_op(signal_var: Buffer, signal_val: int, signal_operation: SignalOp, remote_pe: int=-1,
               stream: int=None) -> None:
     """
-    Performs an atomic operation on a remote signal variable at the specified PE,
-    with the operation executed on the given stream.
+    Non-blocking interface. Performs an atomic operation on a remote signal variable
+    at the specified PE, with the operation executed on the given stream. The caller
+    must synchronize the stream to observe the result.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
 
     Args:
-        signal_var (Buffer): Symmetric memory buffer containing the signal variable,
-                             accessible by the remote PE.
-        signal_val (int): Value to be used in the remote atomic signal operation.
-        signal_operation (SignalOp): Atomic operation to apply on the remote signal variable.
-        remote_pe (int): PE number of the remote processing element.
-        stream (int): ACL Stream object used for execution ordering.
-                      Must be a valid stream created via ACL runtime.
+        signal_var (Buffer):
+            [in] Local address of the signal variable that is accessible at the target PE.
+        signal_val (int):
+            [in] The value to be used in the atomic operation.
+        signal_operation (SignalOp):
+            [in] The operation to perform on the remote signal.
+            Supported: ``SignalOp.SIGNAL_SET`` / ``SignalOp.SIGNAL_ADD``.
+        remote_pe (int):
+            [in] The PE number on which the remote signal variable is to be updated.
+            Defaults to -1.
+        stream (int):
+            [in] ACL stream object used for execution ordering. Must be a valid stream
+            created via ACL runtime. Passing ``None`` raises ``AclshmemInvalid``.
+
+    Returns:
+        None: This function has no return value.
+
+    Raises:
+        AclshmemInvalid: If ``stream`` is ``None``.
     """
     if stream is None:
         logger.error("Signal operations without an explicit stream are not supported.")
@@ -60,49 +94,114 @@ def signal_op(signal_var: Buffer, signal_val: int, signal_operation: SignalOp, r
     _pyshmem.aclshmemx_signal_op_on_stream(signal_var.addr, signal_val, signal_operation, remote_pe, stream)
 
 
-def signal_wait(signal_var: Buffer, signal_val: int, signal_operation: ComparisonType, stream: int=None) -> None:
+def signal_wait(signal_var: Buffer, signal_val: int, signal_operation: ComparisonType, stream: int) -> None:
     """
-    Wait until a symmetric signal variable meets a specified condition.
+    Waits until a symmetric signal variable satisfies a given condition. The wait
+    is performed on the specified stream; the call returns immediately on the host.
+    When the stream is synchronized, the condition
+    ``signal_var`` ``cmp`` ``signal_val`` is guaranteed to be true.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
 
     Args:
-        signal_var (Buffer): Symmetric memory buffer containing the signal variable,
-                             which is accessible across PEs.
-        signal_val (int): Value to compare the signal variable against.
-        signal_operation (ComparisonType): Comparison operation used to evaluate the condition
-                                    (e.g., EQUAL, NOT_EQUAL, LESS_THAN, etc.).
-        stream (int): ACL Stream object used for execution ordering.
-                      Must be a valid stream created via the ACL runtime.
+        signal_var (Buffer):
+            [in] Local address of the source signal variable.
+        signal_val (int):
+            [in] The value against which the object pointed to by signal_var will be
+            compared.
+        signal_operation (ComparisonType):
+            [in] The comparison operator used to evaluate the condition.
+            Supported: ``ComparisonType.CMP_EQ`` / ``CMP_NE`` / ``CMP_GT`` /
+            ``CMP_GE`` / ``CMP_LT`` / ``CMP_LE``.
+        stream (int):
+            [in] ACL stream object used for execution ordering. Must be a valid
+            stream created via ACL runtime.
+
+    Returns:
+        None: This function has no return value.
     """
     if stream is None:
-        logger.error("signal_wait operations without an explicit stream are not supported.")
-        raise AclshmemInvalid("signal_wait operations without an explicit stream are not supported.")
-
-    _pyshmem.aclshmemx_signal_wait_until_on_stream(signal_var.addr, signal_operation, signal_val, stream)
+        logger.error("Signal wait operations without an explicit stream are not supported.")
+        raise AclshmemInvalid("Signal wait operations without an explicit stream are not supported.")
+    _pyshmem.aclshmemx_signal_wait_until_on_stream(
+        signal_var.addr, signal_operation, signal_val, stream
+    )
 
 
 def put(dst: Buffer, src: Buffer, remote_pe: int=-1, stream: int=None) -> None:
     """
-    Copy contiguous data from the local PE to a symmetric memory address on a remote PE.
+    Non-blocking interface. Copy contiguous data from the local PE to a symmetric
+    memory address on a remote PE, ordered on the given stream. The caller must
+    synchronize the stream to ensure the transfer is complete.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
 
     Args:
-        dst (Buffer): Symmetric destination buffer on the remote PE.
-        src (Buffer): Local source buffer containing the data to send.
-        remote_pe (int): PE number of the target processing element.
-        stream (int): ACL Stream used to order the copy operation.
-                      Must be a valid stream created via the ACL runtime.
+        dst (Buffer):
+            [in] Symmetric address of the destination data on the remote PE.
+        src (Buffer):
+            [in] Local memory of the source data.
+        remote_pe (int):
+            [in] PE number of the remote PE. Defaults to -1.
+        stream (int):
+            [in] ACL stream object used for execution ordering. Passing ``0`` or
+            ``None`` uses the default stream.
+
+    Returns:
+        None: This function has no return value.
     """
     _pyshmem.aclshmemx_putmem_on_stream(dst.addr, src.addr, src.length, remote_pe, stream)
 
 def get(dst: Buffer, src: Buffer, remote_pe: int=-1, stream: int=None) -> None:
     """
-    Copy contiguous data from symmetric memory on a remote PE to a local buffer.
+    Non-blocking interface. Copy contiguous data from symmetric memory on a remote PE
+    to a local buffer, ordered on the given stream. The caller must synchronize the
+    stream to ensure the transfer is complete.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
 
     Args:
-        dst (Buffer): Local destination buffer where data will be written.
-        src (Buffer): Symmetric source buffer on the remote PE.
-        remote_pe (int): PE number of the source processing element.
-        stream (int): ACL Stream used to order the copy operation.
-                      Must be a valid stream created via the ACL runtime.
+        dst (Buffer):
+            [in] Local memory of the destination data.
+        src (Buffer):
+            [in] Symmetric address of the source data on the remote PE.
+        remote_pe (int):
+            [in] PE number of the remote PE. Defaults to -1.
+        stream (int):
+            [in] ACL stream object used for execution ordering. Passing ``0`` or
+            ``None`` uses the default stream.
+
+    Returns:
+        None: This function has no return value.
     """
     _pyshmem.aclshmemx_getmem_on_stream(dst.addr, src.addr, src.length, remote_pe, stream)
+
+
+def quiet(stream: int) -> None:
+    """
+    Ensures completion of all previously issued operations on symmetric data
+    objects on the given stream. The quiet is queued on the specified stream;
+    the caller must synchronize the stream to observe completion from the host.
+
+    .. note::
+        Currently only MTE (Memory Transfer Engine) is supported.
+
+    Args:
+        stream (int):
+            [in] ACL stream on which to queue the quiet operation. Must be a
+            valid stream created via ACL runtime.
+
+    Returns:
+        None: This function has no return value.
+
+    Raises:
+        AclshmemInvalid: If ``stream`` is ``None``.
+    """
+    if stream is None:
+        logger.error("quiet operations without an explicit stream are not supported.")
+        raise AclshmemInvalid("quiet operations without an explicit stream are not supported.")
+    _pyshmem.aclshmemx_quiet_on_stream(stream)
 

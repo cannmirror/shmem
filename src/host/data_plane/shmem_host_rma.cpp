@@ -349,3 +349,16 @@ void aclshmemx_putmem_on_stream(void* dst, void* src, size_t elem_size, int32_t 
         SHM_LOG_ERROR("aclshmemx_putmem_on_stream failed");
     }
 }
+
+void aclshmemx_quiet_on_stream(aclrtStream stream)
+{
+    if (stream == nullptr) {
+        stream = g_state_host.default_stream;
+    }
+    int ret = aclshmemi_prepare_and_post_rma("aclshmemx_quiet_on_stream", ACLSHMEMI_OP_QUIET, NO_NBI,
+                                          nullptr, nullptr, 0, 0, 0, nullptr, 0, 0, 1, 1,
+                                          stream, g_state_host.default_block_num);
+    if (ret != 0) {
+        SHM_LOG_ERROR("aclshmemx_quiet_on_stream failed");
+    }
+}

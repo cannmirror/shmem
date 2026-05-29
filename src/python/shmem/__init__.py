@@ -27,7 +27,7 @@ libs_path = current_dir
 required_so_files = [
     "libshmem_utils.so",
     "aclshmem_bootstrap_config_store.so",
-    "libshmem.so", 
+    "libshmem.so",
 ]
 
 for lib in required_so_files:
@@ -105,7 +105,7 @@ def aclshmem_create_tensor(shape, dtype: torch.dtype=torch.float32, device_id=0)
 
     if data_ptr == 0:
         raise RuntimeError("aclshmem_malloc failed")
-    
+
     device = torch.device(f"npu:{device_id}")
     tensor = construct_tensor_from_ptr(data_ptr, shape, dtype, device)
     return tensor

@@ -582,6 +582,20 @@ ACLSHMEM_HOST_API int aclshmemx_set_sdma_config(uint64_t offset, uint32_t ub_siz
 ACLSHMEM_HOST_API int aclshmemx_set_rdma_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id);
 #define shmem_rdma_set_ub_params aclshmemx_set_rdma_config
 
+/**
+ * @brief Ensures completion of all previously issued operations on symmetric data objects
+ *        issued by the calling PE. The quiet is queued on the given stream; the caller must
+ *        synchronize the stream to observe completion from the host.
+ *
+ * @param stream            [in] ACL stream on which to queue the quiet operation. Passing NULL uses the default stream.
+ *
+ * @note Quiet operations are scoped to the issuing context: quiet called from the host ensures completion
+ *       of host-issued operations; quiet called from a device kernel ensures completion of operations
+ *       issued by that kernel.
+ */
+ACLSHMEM_HOST_API void aclshmemx_quiet_on_stream(aclrtStream stream);
+#define shmemx_quiet_on_stream aclshmemx_quiet_on_stream
+
 #ifdef __cplusplus
 }
 #endif

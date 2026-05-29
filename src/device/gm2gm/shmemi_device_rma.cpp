@@ -14,6 +14,7 @@
 #include "shmemi_device_common.h"
 #include "gm2gm/engine/shmem_device_rdma.hpp"
 #include "device/gm2gm/shmem_device_rma.h"
+#include "shmemi_device_mo.h"
 
 using namespace std;
 
@@ -116,6 +117,11 @@ ACLSHMEM_GLOBAL void k_aclshmem_getmem(GM_ADDR dst, GM_ADDR src, size_t elem_siz
     aclshmem_getmem(dst, src, elem_size, pe);
 }
 
+ACLSHMEM_GLOBAL void k_aclshmemi_quiet()
+{
+    aclshmemi_quiet();
+}
+
 // kernel function calling entrance
 int32_t aclshmemi_prepare_and_post_rma(const char *api_name, aclshmemi_op_t desc, bool is_nbi, uint8_t *dst, uint8_t *src,
                                     size_t n_elems, size_t elem_bytes, int pe, uint8_t *sig_addr, int32_t signal,
@@ -133,6 +139,10 @@ int32_t aclshmemi_prepare_and_post_rma(const char *api_name, aclshmemi_op_t desc
             case ACLSHMEMI_OP_PUT_SIGNAL:
                 aclshmemi_putmem_signal_nbi<<<block_size, 0, acl_strm>>>(dst, src, n_elems * elem_bytes, sig_addr,
                                                                       signal, sig_op, pe);
+                break;
+            case ACLSHMEMI_OP_QUIET:
+                k_aclshmemi_quiet<<<block_size, 0, acl_strm>>>();
+                break;
             default:
                 break;
         }
@@ -149,6 +159,10 @@ int32_t aclshmemi_prepare_and_post_rma(const char *api_name, aclshmemi_op_t desc
                 case ACLSHMEMI_OP_PUT_SIGNAL:
                     aclshmemi_putmem_signal<<<block_size, 0, acl_strm>>>(dst, src, n_elems * elem_bytes, sig_addr, signal,
                                                                     sig_op, pe);
+                    break;
+                case ACLSHMEMI_OP_QUIET:
+                    k_aclshmemi_quiet<<<block_size, 0, acl_strm>>>();
+                    break;
                 default:
                     break;
             }
@@ -163,6 +177,9 @@ int32_t aclshmemi_prepare_and_post_rma(const char *api_name, aclshmemi_op_t desc
                     break;
                 case ACLSHMEMI_OP_GET:
                     aclshmemi_getbits<<<block_size, 0, acl_strm>>>(dst, src, copy_params, pe);
+                    break;
+                case ACLSHMEMI_OP_QUIET:
+                    k_aclshmemi_quiet<<<block_size, 0, acl_strm>>>();
                     break;
                 default:
                     break;

@@ -234,6 +234,13 @@ void DefineShmemSignalOp(py::module_ &m)
         .value("SIGNAL_ADD", ACLSHMEM_SIGNAL_ADD);
 }
 
+void DefineShmemMemType(py::module_ &m)
+{
+    py::enum_<aclshmem_mem_type_t>(m, "MemType")
+        .value("HOST_SIDE", HOST_SIDE)
+        .value("DEVICE_SIDE", DEVICE_SIDE);
+}
+
 void DefineShmemCmpOp(py::module_ &m)
 {
     py::enum_<aclshmem_cmp_op_type_t>(m, "CmpOp")
@@ -258,6 +265,7 @@ PYBIND11_MODULE(_pyshmem, m)
     DefineShmemInitStatus(m);
     DefineShmemUniqueId(m);
     DefineShmemSignalOp(m);
+    DefineShmemMemType(m);
     DefineShmemCmpOp(m);
     DefineShmemMemType(m);
 
@@ -317,7 +325,7 @@ Returns:
 
     m.def("set_conf_store_tls_key", &shm::aclshmem_set_conf_store_tls_key_with_decrypt,
           py::call_guard<py::gil_scoped_release>(), py::arg("tls_pk"), py::arg("tls_pk_pw"),
-          py::arg("py_decrypt_func"), R"(
+          py::arg("py_decrypt_func").none(), R"(
 Set the TLS private key and password, and register a decrypt key password handler.
 Parameters:
     tls_pk (string): the content of tls private key string
@@ -418,8 +426,12 @@ Arguments:
     )");
 
     m.def(
-        "aclshmemx_get_heap_base", [](aclshmem_mem_type_t mem_type) { return (intptr_t)aclshmemx_get_heap_base(mem_type); },
-        py::call_guard<py::gil_scoped_release>(), py::arg("mem_type") = DEVICE_SIDE,
+        "aclshmemx_get_heap_base",
+        [](py::object mem_type) {
+            aclshmem_mem_type_t mt = mem_type.is_none() ? DEVICE_SIDE : mem_type.cast<aclshmem_mem_type_t>();
+            return (intptr_t)aclshmemx_get_heap_base(mt);
+        },
+        py::call_guard<py::gil_scoped_release>(), py::arg("mem_type") = py::none(),
         R"(
 Returns the start address (heap_base) of the local symmetric memory heap.
 
@@ -928,7 +940,7 @@ ACLSHMEM_SIZE_FUNC(PYBIND_ACLSHMEM_GET_SIZE_NBI)
         },
         py::call_guard<py::gil_scoped_release>(), py::arg("dst"), py::arg("src"), py::arg("elem_size"), py::arg("sig"),
         py::arg("signal"), py::arg("sig_op"), py::arg("pe"), R"(
-    Synchronous interface. Copy contiguous data on symmetric memory from the specified PE to address on the local PE
+    Synchronous interface. Copy contiguous data on symmetric memory from the local PE to address on the specified PE
 
     Arguments:
         dst                [in] Pointer on symmetric address of the destination data on remote PE.
@@ -1022,7 +1034,9 @@ ACLSHMEM_SIZE_FUNC(PYBIND_ACLSHMEM_GET_SIZE_NBI)
         },
         py::call_guard<py::gil_scoped_release>(), py::arg("sig_addr"), py::arg("cmp"), py::arg("cmp_val"),
         py::arg("stream"), R"(
-    Wait until a symmetric signal variable meets a specified condition.
+    Waits until a symmetric signal variable satisfies a given condition. The wait
+    is performed on the specified stream; the call returns immediately on the host.
+    When the stream is synchronized, the condition is guaranteed to be true.
 
     Arguments:
         sig_addr             [in] Local address of the source signal variable.
@@ -1030,7 +1044,7 @@ ACLSHMEM_SIZE_FUNC(PYBIND_ACLSHMEM_GET_SIZE_NBI)
                                   ACLSHMEM_CMP_EQ/ACLSHMEM_CMP_NE/ACLSHMEM_CMP_GT/
                                   ACLSHMEM_CMP_GE/ACLSHMEM_CMP_LT/ACLSHMEM_CMP_LE.
         cmp_val              [in] The value against which the object pointed to by sig_addr will be compared.
-        stream               [in] Used stream(use default stream if stream == NULL).
+        stream               [in] ACL stream used for execution ordering. Use default stream if stream == NULL.
         )");
 
 #define PYBIND_ACLSHMEM_PUT_SIZE_SIGNAL(BITS)                                                                         \
@@ -1100,6 +1114,23 @@ Exit all ranks process by broadcast all ranks to exit();
 
 Arguments:
     status(int): the status which is provided to exit();
+    )");
+
+    m.def("aclshmemx_quiet_on_stream",
+        [](intptr_t stream) {
+            aclrtStream acl_stream = nullptr;
+            if (stream != 0) {
+                acl_stream = reinterpret_cast<aclrtStream>(stream);
+            }
+            aclshmemx_quiet_on_stream(acl_stream);
+        },
+        py::call_guard<py::gil_scoped_release>(), py::arg("stream"), R"(
+Ensures completion of all previously issued operations on symmetric data objects
+issued by the calling PE. The quiet is queued on the given stream; the caller
+must synchronize the stream to observe completion from the host.
+
+Arguments:
+    stream               [in] ACL stream on which to queue the quiet operation.
     )");
 
     m.def("my_pe", &aclshmem_team_my_pe, py::call_guard<py::gil_scoped_release>(), py::arg("team"), R"(

@@ -49,6 +49,7 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${CMAKE_CURRENT_SOURCE_DIR}
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
@@ -78,6 +79,7 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${CMAKE_CURRENT_SOURCE_DIR}
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
@@ -114,6 +116,7 @@ function(aclshmem_add_collective_example NAME)
         ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
         ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
         ${PROJECT_SOURCE_DIR}/examples/${NAME}
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${PROJECT_SOURCE_DIR}/examples/utils
         ${PROJECT_SOURCE_DIR}/src/device/
         ${PROJECT_SOURCE_DIR}/src/device_simt/
@@ -129,6 +132,7 @@ function(aclshmem_add_collective_example NAME)
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
+            ${CMAKE_CURRENT_SOURCE_DIR}
             ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
@@ -164,6 +168,8 @@ set(ACLSHMEM_CATLASS_FUSION_EXAMPLES
 )
 
 foreach(EXAMPLE
+    combine
+    dispatch
     kv_shuffle
     aclgraph_demo
     allgather

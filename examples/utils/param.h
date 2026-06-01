@@ -20,5 +20,8 @@ static constexpr int INDEX6 = 6;
 static constexpr int INDEX7 = 7;
 static constexpr int INDEX8 = 8;
 static constexpr int INDEX9 = 9;
+static constexpr int INDEX10 = 10;
+static constexpr int INDEX11 = 11;
+static constexpr int INDEX12 = 12;
 
 #endif // PARAM_H

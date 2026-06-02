@@ -424,7 +424,7 @@ bool RdmaTransportManager::RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceI
     HccpRaGetIfAttr config;
     config.phyId = deviceId;
     config.nicPosition = NETWORK_OFFLINE;
-    config.isAll = true;
+    config.isAll = false;
 
     auto ret = DlHccpApi::RaGetIfNum(config, count);
     if (ret != 0 || count == 0) {
@@ -440,6 +440,9 @@ bool RdmaTransportManager::RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceI
     }
 
     for (auto &info : infos) {
+        SHM_LOG_DEBUG(deviceId << " found interface: ifname=" << info.ifname 
+                      << ", scopeId=" << info.scopeId 
+                      << ", family=" << info.family);
         if (info.family == AF_INET) {
             deviceIp.ip.ipv4 = retiredIp.ip.ipv4 = info.ifaddr.ip.addr;
             deviceIp.type = IpV4;

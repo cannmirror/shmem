@@ -8,7 +8,9 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 aclshmem_add_fusion_example(hccs_sio_link main.cpp kernels/hccs_sio_link_kernel.cpp kernels/hccs_sio_link_perf_kernel.cpp)
-target_include_directories(hccs_sio_link PRIVATE
-    ${PROJECT_SOURCE_DIR}/examples/hccs_sio_link/kernels
-    ${PROJECT_SOURCE_DIR}/examples/hccs_sio_link/utils
-)
+if(USE_EXAMPLES)
+    target_include_directories(hccs_sio_link PRIVATE
+        ${PROJECT_SOURCE_DIR}/examples/hccs_sio_link/kernels
+        ${PROJECT_SOURCE_DIR}/examples/hccs_sio_link/utils
+    )
+endif()

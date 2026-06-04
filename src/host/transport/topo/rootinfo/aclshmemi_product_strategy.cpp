@@ -26,6 +26,20 @@ static std::string build_topo_file_path(const std::string& driver_path, const st
     return driver_path + "/" + TOPO_FILE_DIR_PATH + "/" + topo_filename;
 }
 
+static const char* card_topo_filename(uint32_t mainboard_id)
+{
+    switch (mainboard_id) {
+        case ACLSHMEMI_MAIN_BOARD_ID_CARD_NOMESH:
+            return "atlas_350_1.json";
+        case ACLSHMEMI_MAIN_BOARD_ID_CARD_2PMESH:
+            return "atlas_350_2.json";
+        case ACLSHMEMI_MAIN_BOARD_ID_CARD_4PMESH:
+            return "atlas_350_3.json";
+        default:
+            return "atlas_350_1.json";
+    }
+}
+
 static const aclshmemi_ub_entity_rule_t g_ub_rules[] = {
     {ACLSHMEMI_MAIN_BOARD_ID_SERVER_TYPE1, 1, 0, 3, {4, 5, 6, 7}},
     {ACLSHMEMI_MAIN_BOARD_ID_SERVER_TYPE1, 1, 1, 2, {5, 6}},
@@ -67,7 +81,8 @@ std::optional<aclshmemi_root_info_t> aclshmemi_card_product_t::get_root_info(int
     aclshmemi_root_info_t root_info;
     aclshmemi_root_info_init(root_info);
     std::string driver_path = hal.get_driver_install_path();
-    aclshmemi_root_info_set_topo_file_path(root_info, build_topo_file_path(driver_path, "atlas_300a.json"));
+    aclshmemi_root_info_set_topo_file_path(root_info,
+        build_topo_file_path(driver_path, card_topo_filename(mainboard_id)));
 
     UEList ue_list;
     memset_s(&ue_list, sizeof(ue_list), 0, sizeof(ue_list));

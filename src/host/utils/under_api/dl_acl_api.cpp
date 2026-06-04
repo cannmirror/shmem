@@ -80,9 +80,10 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
     DL_LOAD_SYM(pRtIpcCloseMemory, rtIpcCloseMemoryFunc, rtHandle, "rtIpcCloseMemory");
     DL_LOAD_SYM(pAclrtGetSocName, aclrtGetSocNameFunc, rtHandle, "aclrtGetSocName");
     DL_LOAD_SYM(pRtGetLogicDevIdByUserDevId, rtGetLogicDevIdByUserDevIdFunc, rtHandle, "rtGetLogicDevIdByUserDevId");
-    DL_LOAD_SYM(
-        pAclrtGetPhyDevIdByLogicDevId, aclrtGetPhyDevIdByLogicDevIdFunc, rtHandle,
-        "aclrtGetPhyDevIdByLogicDevId");
+    pAclrtGetPhyDevIdByLogicDevId = (aclrtGetPhyDevIdByLogicDevIdFunc)dlsym(rtHandle, "aclrtGetPhyDevIdByLogicDevId");
+    if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+        SHM_LOG_WARN("Optional symbol aclrtGetPhyDevIdByLogicDevId is not loaded.");
+    }
 
     gLoaded = true;
     SHM_LOG_INFO("Load " << realPath << " success.");

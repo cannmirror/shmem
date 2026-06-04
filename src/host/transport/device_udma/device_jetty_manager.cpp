@@ -527,7 +527,7 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
     auto tempMemInfo = ((ACLSHMEMUBmemInfo*)hostInfo.memPtr)[rankId_];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.token_value_valid: " << tempMemInfo.token_value_valid);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.rmt_jetty_type: " << tempMemInfo.rmt_jetty_type);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.target_hint: " << tempMemInfo.target_hint);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.target_hint: " << static_cast<int>(tempMemInfo.target_hint));
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.tpn: " << tempMemInfo.tpn);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.tid: " << tempMemInfo.tid);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.rmt_token_value: " << tempMemInfo.rmt_token_value);

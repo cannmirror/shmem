@@ -13,6 +13,8 @@ SHMEM_UID_SOCK_IFNAME配置示例：
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet4  取ipv4
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
 
+以上两个环境变量均未配置时自动搜索可用网口（IPv4/IPv6均可，跳过lo/docker/veth/br-/virbr/tun/tap等虚拟网口）。
+
 ## 多实例相关
 由于每个实例都有独立的bootstrap，每个bootstrap构建时需要提供一个可用端口
 

@@ -31,6 +31,10 @@ constexpr int MAX_IFCONFIG_LENGTH = 23;
 constexpr int MAX_IP = 48;
 constexpr int DEFAULT_IFNAME_LNEGTH = 4;
 
+// Invalid IPv4 address prefixes
+constexpr uint32_t IPV4_APIPA_PREFIX = 0xA9FE;     // 169.254.x.x (APIPA/Link-local)
+constexpr uint32_t IPV4_LOOPBACK_PREFIX = 0x7F;    // 127.x.x.x (Loopback)
+
 inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t *innerUId)
 {
     std::ifstream urandom("/dev/urandom", std::ios::binary);
@@ -163,25 +167,35 @@ inline int32_t parse_interface_with_type(const char *ipInfo, char *IP, sa_family
 {
     const char *delim = ":";
     const char *sep = strchr(ipInfo, delim[0]);
-    if (sep != nullptr) {
-        size_t leftLen = sep - ipInfo;
-        if (leftLen >= MAX_IFCONFIG_LENGTH - 1 || leftLen == 0) {
-            return ACLSHMEM_INVALID_VALUE;
-        }
-        size_t actualCopyLen = std::min(strlen(ipInfo), static_cast<size_t>(leftLen));
-        std::copy(ipInfo, ipInfo + actualCopyLen, IP);
-        if (actualCopyLen < leftLen) {
-            std::fill(IP + actualCopyLen, IP + leftLen, '\0');
-        }
-        sockType = (strcmp(sep + 1, "inet6") != 0) ? AF_INET : AF_INET6;
-        flag = true;
+    if (sep == nullptr) {
+        SHM_LOG_ERROR("Invalid interface format: missing ':' separator in " << ipInfo);
+        return ACLSHMEM_INVALID_VALUE;
     }
+    
+    size_t leftLen = sep - ipInfo;
+    if (leftLen >= MAX_IFCONFIG_LENGTH - 1 || leftLen == 0) {
+        SHM_LOG_ERROR("Invalid interface name length: " << leftLen);
+        return ACLSHMEM_INVALID_VALUE;
+    }
+    
+    size_t actualCopyLen = std::min(strlen(ipInfo), static_cast<size_t>(leftLen));
+    std::copy(ipInfo, ipInfo + actualCopyLen, IP);
+    if (actualCopyLen < leftLen) {
+        std::fill(IP + actualCopyLen, IP + leftLen, '\0');
+    }
+    sockType = (strcmp(sep + 1, "inet6") != 0) ? AF_INET : AF_INET6;
+    flag = true;
     return ACLSHMEM_SUCCESS;
 }
 
 inline int32_t aclshmemi_auto_get_ip(struct sockaddr *ifaAddr, char *local, sa_family_t &sockType)
 {
+    sa_family_t prevFamily = sockType;
     sockType = ifaAddr->sa_family;
+    if (prevFamily != sockType) {
+        SHM_LOG_INFO("auto-select: address family switched from " << (prevFamily == AF_INET ? "AF_INET" : "AF_INET6")
+            << " to " << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
+    }
     if (sockType == AF_INET) {
         auto localIp = reinterpret_cast<struct sockaddr_in *>(ifaAddr)->sin_addr;
         if (inet_ntop(sockType, &localIp, local, MAX_IP) == nullptr) {
@@ -200,7 +214,54 @@ inline int32_t aclshmemi_auto_get_ip(struct sockaddr *ifaAddr, char *local, sa_f
     return ACLSHMEM_INVALID_PARAM;
 }
 
-inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool flag, char *ifaName, size_t ifaLen)
+inline bool aclshmemi_is_valid_ip(struct sockaddr *ifaAddr)
+{
+    if (ifaAddr == nullptr) {
+        return false;
+    }
+    
+    if (ifaAddr->sa_family == AF_INET) {
+        auto *addr = reinterpret_cast<struct sockaddr_in *>(ifaAddr);
+        uint32_t ip = ntohl(addr->sin_addr.s_addr);
+        
+        // Check for invalid IPv4 addresses
+        if (ip == 0) {
+            SHM_LOG_DEBUG("invalid IPv4: 0.0.0.0");
+            return false;
+        }
+        if ((ip >> 16) == IPV4_APIPA_PREFIX) {
+            SHM_LOG_DEBUG("invalid IPv4: APIPA address 169.254.x.x");
+            return false;
+        }
+        if ((ip >> 24) == IPV4_LOOPBACK_PREFIX) {
+            SHM_LOG_DEBUG("invalid IPv4: loopback address 127.x.x.x");
+            return false;
+        }
+        return true;
+    } else if (ifaAddr->sa_family == AF_INET6) {
+        auto *addr6 = reinterpret_cast<struct sockaddr_in6 *>(ifaAddr);
+        
+        // Check for invalid IPv6 addresses
+        if (IN6_IS_ADDR_UNSPECIFIED(&addr6->sin6_addr)) {
+            SHM_LOG_DEBUG("invalid IPv6: unspecified address ::");
+            return false;
+        }
+        if (IN6_IS_ADDR_LOOPBACK(&addr6->sin6_addr)) {
+            SHM_LOG_DEBUG("invalid IPv6: loopback address ::1");
+            return false;
+        }
+        // Check for link-local address (fe80::/10)
+        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
+            SHM_LOG_DEBUG("invalid IPv6: link-local address fe80::/10");
+            return false;
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool flag, char *ifaName, size_t ifaLen, bool autoSelect = false)
 {
     if (ifa->ifa_addr == nullptr || ifa->ifa_netmask == nullptr || ifa->ifa_name == nullptr) {
         SHM_LOG_DEBUG("loop ifa_addr/ifa_netmask/ifa_name is nullptr");
@@ -212,16 +273,41 @@ inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool 
         SHM_LOG_DEBUG("sa family is not match, get " << ifa->ifa_addr->sa_family << ", expect " << sockType);
         return false;
     }
+    if (autoSelect && !flag) {
+        SHM_LOG_DEBUG("auto-select mode: accepting any address family, current=" << ifa->ifa_addr->sa_family);
+    }
 
-    //  prefix match with input ifa name
-    if (strncmp(ifa->ifa_name, ifaName, ifaLen) != 0) {
+    // prefix match with input ifa name (skip when autoSelect)
+    if (!autoSelect && strncmp(ifa->ifa_name, ifaName, ifaLen) != 0) {
         SHM_LOG_DEBUG("ifa name prefix un-match, get " << ifa->ifa_name << ", expect " << ifaName);
         return false;
+    }
+
+    // auto-select: filter out virtual and unusable interfaces
+    if (autoSelect) {
+        std::string ifNameStr(ifa->ifa_name);
+        // Exclude loopback, docker, veth, bridge and other virtual interfaces
+        if (ifNameStr.find("lo") == 0 ||          // loopback
+            ifNameStr.find("docker") == 0 ||      // docker bridge
+            ifNameStr.find("veth") == 0 ||        // virtual ethernet
+            ifNameStr.find("br-") == 0 ||         // bridge
+            ifNameStr.find("virbr") == 0 ||       // virtual bridge
+            ifNameStr.find("tun") == 0 ||         // tunnel
+            ifNameStr.find("tap") == 0) {         // tap device
+            SHM_LOG_DEBUG("skip virtual interface: " << ifa->ifa_name);
+            return false;
+        }
     }
 
     // ignore ifa which is down or loopback or not running
     if ((ifa->ifa_flags & IFF_LOOPBACK) || !(ifa->ifa_flags & IFF_RUNNING) || !(ifa->ifa_flags & IFF_UP)) {
         SHM_LOG_DEBUG("ifa flag un-match, flag=" << ifa->ifa_flags);
+        return false;
+    }
+
+    // auto-select: validate IP address
+    if (autoSelect && !aclshmemi_is_valid_ip(ifa->ifa_addr)) {
+        SHM_LOG_DEBUG("invalid IP address on interface: " << ifa->ifa_name);
         return false;
     }
 
@@ -238,15 +324,16 @@ inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool 
 inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, const char *ipInfo)
 {
     struct ifaddrs *ifaddr;
-    char ifaName[MAX_IFCONFIG_LENGTH];
+    char ifaName[MAX_IFCONFIG_LENGTH] = {0};  // Initialize to zero
     sockType = AF_INET;
     bool flag = false;
-    if (ipInfo == nullptr) {
-        std::string ifaNameStr = "eth";
-        ifaNameStr.resize(DEFAULT_IFNAME_LNEGTH, '\0');
-        std::copy(ifaNameStr.begin(), ifaNameStr.end(), ifaName);
-        ifaName[DEFAULT_IFNAME_LNEGTH - 1] = '\0';
-        SHM_LOG_INFO("use default if to find IP:" << ifaName);
+    bool autoSelect = false;
+    
+    // Treat nullptr or empty string as auto-select
+    if (ipInfo == nullptr || ipInfo[0] == '\0') {
+        // Auto-select network interface: skip virtual interfaces and use the first valid one
+        autoSelect = true;
+        SHM_LOG_INFO("auto-select network interface (skip lo/docker/veth/br-/virbr/tun/tap)");
     } else if (parse_interface_with_type(ipInfo, ifaName, sockType, flag) != ACLSHMEM_SUCCESS) {
         SHM_LOG_ERROR("IP size set in SHMEM_CONF_STORE_MASTER_IF format has wrong length");
         return ACLSHMEM_INVALID_PARAM;
@@ -257,29 +344,37 @@ inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, con
     }
     int32_t result = ACLSHMEM_INVALID_PARAM;
     for (auto ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (!aclshmemi_check_ifa(ifa, sockType, flag, ifaName, strlen(ifaName))) {
+        if (!aclshmemi_check_ifa(ifa, sockType, flag, ifaName, strlen(ifaName), autoSelect)) {
             continue;
         }
+        
+        bool ipObtained = false;
         if (sockType == AF_INET && flag) {
             auto localIp = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr)->sin_addr;
             if (inet_ntop(sockType, &localIp, local, 64) == nullptr) {
                 SHM_LOG_ERROR("convert local ipv4 to string failed. ");
                 continue;
             }
-            result = ACLSHMEM_SUCCESS;
-            break;
+            ipObtained = true;
         } else if (sockType == AF_INET6 && flag) {
             auto localIp = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr)->sin6_addr;
             if (inet_ntop(sockType, &localIp, local, 64) == nullptr) {
                 SHM_LOG_ERROR("convert local ipv6 to string failed. ");
                 continue;
             }
-            result = ACLSHMEM_SUCCESS;
-            break;
+            ipObtained = true;
         } else {
             auto ret = aclshmemi_auto_get_ip(ifa->ifa_addr, local, sockType);
             if (ret != ACLSHMEM_SUCCESS) {
                 continue;
+            }
+            ipObtained = true;
+        }
+        
+        if (ipObtained) {
+            if (autoSelect) {
+                SHM_LOG_INFO("auto-selected interface: " << ifa->ifa_name
+                    << ", IP: " << local << ", family: " << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
             }
             result = ACLSHMEM_SUCCESS;
             break;

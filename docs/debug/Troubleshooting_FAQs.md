@@ -100,12 +100,12 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 2. 检查端口是否被占用，`netstat -tuln | grep <端口号>`
 3. 调整环境变量`SHMEM_UID_SESSION_ID`及实际执行文件所使用的ip及端口号
 
-### 未通过环境变量配置ip/port，使用默认eth查询ip信息失败
-#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时使用`eth:inet4`查询本地ip地址，查询失败时错误日志如下: 
+### 未通过环境变量配置ip/port，且使用自动搜索可用网口时失败
+#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时自动搜索可用网口（IPv4/IPv6均可，排除lo/docker/veth/br-/virbr/tun/tap等虚拟接口），查询失败时错误日志如下: 
 
 ![session_id_sock_ifnam_not_set](./images/trouble-shooting/session_id_sock_ifnam_not_set.png)
 
-#### A: 应手动配置`SHMEM_UID_SESSION_ID`或`SHMEM_UID_SOCK_IFNAME`
+#### A: 应手动配置可用的`SHMEM_UID_SESSION_ID`或`SHMEM_UID_SOCK_IFNAME`
 配置示例:
 - SHMEM_UID_SESSION_ID: 
 

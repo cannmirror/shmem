@@ -32,9 +32,6 @@
 #include "catcoc/dgemm/block/block_swizzle_allgather.h"
 #include "catcoc/dgemm/kernel/allgather_matmul_with_gather_result.h"
 
-using namespace AscendC;
-using namespace Catcoc;
-
 template <
     class ArchTag,
     class ElementA, class LayoutA,
@@ -74,28 +71,28 @@ void AllGatherMatmulWithGatherResultImpl(
     >;
 
     using BlockScheduler = typename Catcoc::DGemm::Block::GemmBlockSwizzleAllGatherMesh<7, 1>;
-    using BlockCommScheduler = CommEpilogue::Block::BlockCommSwizzle<0>;
-    using BlockCopyGatherAScheduler = CommEpilogue::Block::BlockSchedulerCopyGatherA;
+    using BlockCommScheduler = Catcoc::CommEpilogue::Block::BlockCommSwizzle<0>;
+    using BlockCopyGatherAScheduler = Catcoc::CommEpilogue::Block::BlockSchedulerCopyGatherA;
 
     using RemoteSrcType = AType;
     using RemoteDstType = GatherAType;
     using CopyDirect = Catcoc::detail::CopyDirect;
-    using TileRemoteCopy = CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Put>;
+    using TileRemoteCopy = Catcoc::CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Put>;
     using TileScheduler = Catlass::Epilogue::Tile::EpilogueIdentityTileSwizzle;
 
     constexpr uint32_t UB_STAGES = 2;
     constexpr bool IS_DYNAMIC = true;
-    using EpilogueAllGatherDispatch = CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
+    using EpilogueAllGatherDispatch = Catcoc::CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
         Catcoc::detail::CopyMode::Gather, IS_DYNAMIC>;
-    using BlockEpilogueAllGather = CommEpilogue::Block::CommBlockEpilogue<
+    using BlockEpilogueAllGather = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         EpilogueAllGatherDispatch,
         RemoteSrcType, RemoteDstType,
         void, void, void,
         TileRemoteCopy, TileScheduler
     >;
 
-    using CopyGatherADispatchPolicy = CommEpilogue::EpilogueAtlasA2CommLocalCopy<UB_STAGES, IS_DYNAMIC>;
-    using BlockEpilogueCopyGatherA = CommEpilogue::Block::CommBlockEpilogue<
+    using CopyGatherADispatchPolicy = Catcoc::CommEpilogue::EpilogueAtlasA2CommLocalCopy<UB_STAGES, IS_DYNAMIC>;
+    using BlockEpilogueCopyGatherA = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         CopyGatherADispatchPolicy,
         AType, GatherAType,
         void, void,
@@ -103,7 +100,7 @@ void AllGatherMatmulWithGatherResultImpl(
     >;
 
     constexpr uint32_t WORKSPACE_STAGES = 2;
-    using AllGatherMatmulWithGatherResultKernel = DGemm::Kernel::AllGatherMatmulWithGatherResult<
+    using AllGatherMatmulWithGatherResultKernel = Catcoc::DGemm::Kernel::AllGatherMatmulWithGatherResult<
         BlockMmad,
         BlockEpilogueAllGather,
         BlockEpilogueCopyGatherA,

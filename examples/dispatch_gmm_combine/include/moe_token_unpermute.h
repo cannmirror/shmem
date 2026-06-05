@@ -17,8 +17,6 @@
 
 #include "kernel_operator.h"
 #include "moe_token_unpermute_tiling.h"
-using namespace AscendC;
-
 template <typename T1, typename T2, typename T3, bool PROBS> class KernelMoeTokenUnpermute {
 public:
     __aicore__ inline KernelMoeTokenUnpermute()
@@ -39,19 +37,19 @@ protected:
     __aicore__ inline void CalToken(const float prob_value, const int64_t h_length);
     __aicore__ inline void CopyOut(const int64_t out_token_index, const int64_t h_index, const int64_t h_length);
 
-    TPipe pipe;
-    TQue<QuePosition::VECIN, 1> tokens_inque, indices_inque, probs_inque;
-    TBuf<TPosition::VECCALC> temp_buffer0, temp_buffer1, temp_buffer2;
-    TQue<QuePosition::VECOUT, 1> outque;
-    GlobalTensor<T1> tokensGM, outGM;
-    GlobalTensor<T2> indicesGM;
-    GlobalTensor<T3> probsGM;
-    LocalTensor<T2> indicesLocal;
-    LocalTensor<float> token_tensor0, token_tensor1, probs_tensor;
-    DataCopyPadExtParams<T1> extParams1{false, 0, 0, 0};
-    DataCopyPadExtParams<T2> extParams2{false, 0, 0, 0};
-    DataCopyPadExtParams<T3> extParams3{false, 0, 0, 0};
-    DataCopyExtParams copyParams{1, 0, 0, 0, 0};
+    AscendC::TPipe pipe;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> tokens_inque, indices_inque, probs_inque;
+    AscendC::TBuf<AscendC::TPosition::VECCALC> temp_buffer0, temp_buffer1, temp_buffer2;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> outque;
+    AscendC::GlobalTensor<T1> tokensGM, outGM;
+    AscendC::GlobalTensor<T2> indicesGM;
+    AscendC::GlobalTensor<T3> probsGM;
+    AscendC::LocalTensor<T2> indicesLocal;
+    AscendC::LocalTensor<float> token_tensor0, token_tensor1, probs_tensor;
+   AscendC::DataCopyPadExtParams<T1> extParams1{false, 0, 0, 0};
+   AscendC::DataCopyPadExtParams<T2> extParams2{false, 0, 0, 0};
+   AscendC::DataCopyPadExtParams<T3> extParams3{false, 0, 0, 0};
+   AscendC::DataCopyExtParams copyParams{1, 0, 0, 0, 0};
 
     constexpr static uint32_t BLOCK_SIZE = 32;
     constexpr static uint32_t ALIGN_512 = 512;
@@ -145,7 +143,7 @@ KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(GM_ADDR permuted_tokens, GM_ADD
     this->pipe.InitBuffer(indices_inque, 1, block_splited_length * (sizeof(T2)));
     this->pipe.InitBuffer(outque, 1, hidden_splited_length_align512 * sizeof(T1));
 
-    if constexpr (!IsSameType<T1, float>::value) {
+    if constexpr (!AscendC::IsSameType<T1, float>::value) {
         this->pipe.InitBuffer(temp_buffer0, hidden_splited_length_align512 * sizeof(float) + 256);
         this->pipe.InitBuffer(temp_buffer1, hidden_splited_length_align512 * sizeof(float));
         this->token_tensor0 = this->temp_buffer0.template Get<float>();
@@ -155,7 +153,7 @@ KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(GM_ADDR permuted_tokens, GM_ADD
     if constexpr (PROBS) {
         this->probsGM.SetGlobalBuffer((__gm__ T3 *)probs + block_offset, block_length);
         this->pipe.InitBuffer(probs_inque, 1, block_splited_length * (sizeof(T3)));
-        if constexpr (!IsSameType<T3, float>::value) {
+        if constexpr (!AscendC::IsSameType<T3, float>::value) {
             this->pipe.InitBuffer(temp_buffer2, block_splited_length * sizeof(float));
             this->probs_tensor = this->temp_buffer2.template Get<float>();
         }
@@ -184,19 +182,19 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalMultiOutTo
     this->indicesLocal = this->indices_inque.template AllocTensor<T2>();
     int64_t in_offset = out_offset * this->top_k;
     this->copyParams.blockLen = out_tokens_number * this->top_k * sizeof(T2);
-    DataCopyPad(this->indicesLocal, this->indicesGM[in_offset], this->copyParams, this->extParams2);
+    AscendC::DataCopyPad(this->indicesLocal, this->indicesGM[in_offset], this->copyParams, this->extParams2);
     this->indices_inque.template EnQue(this->indicesLocal);
 
     if constexpr (PROBS) {
-        LocalTensor<T3> temp_probs_tensor = this->probs_inque.template AllocTensor<T3>();
+        AscendC::LocalTensor<T3> temp_probs_tensor = this->probs_inque.template AllocTensor<T3>();
         this->copyParams.blockLen = out_tokens_number * this->top_k * sizeof(T3);
-        DataCopyPad(temp_probs_tensor, this->probsGM[in_offset], this->copyParams, this->extParams3);
+        AscendC::DataCopyPad(temp_probs_tensor, this->probsGM[in_offset], this->copyParams, this->extParams3);
         this->probs_inque.template EnQue(temp_probs_tensor);
         temp_probs_tensor = this->probs_inque.template DeQue<T3>();
-        if constexpr (!IsSameType<T3, float>::value) {
-            Cast(this->probs_tensor, temp_probs_tensor, RoundMode::CAST_NONE, out_tokens_number * this->top_k);
+        if constexpr (!AscendC::IsSameType<T3, float>::value) {
+            AscendC::Cast(this->probs_tensor, temp_probs_tensor, AscendC::RoundMode::CAST_NONE, out_tokens_number * this->top_k);
             this->probs_inque.FreeTensor(temp_probs_tensor);
-            PipeBarrier<PIPE_V>();
+            AscendC::PipeBarrier<PIPE_V>();
         } else {
             this->probs_tensor = temp_probs_tensor;
         }
@@ -209,7 +207,7 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalMultiOutTo
     }
     // Free Tensor
     this->indices_inque.FreeTensor(this->indicesLocal);
-    if constexpr (PROBS && IsSameType<T3, float>::value) {
+    if constexpr (PROBS && AscendC::IsSameType<T3, float>::value) {
         this->probs_inque.FreeTensor(this->probs_tensor);
     }
 }
@@ -232,7 +230,7 @@ __aicore__ inline void
 KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutToken(const int64_t start_token, const int64_t h_index,
                                                             const int64_t h_length, const int64_t out_token_index)
 {
-    if constexpr (IsSameType<T1, float>::value) {
+    if constexpr (AscendC::IsSameType<T1, float>::value) {
         this->token_tensor0 = this->outque.template AllocTensor<T1>();
     }
     int64_t end_token = start_token + this->top_k;
@@ -246,11 +244,11 @@ KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutToken(const int64_t start_
         }
 
         CopyTokenIn(cal_token_idx, h_index, h_length);
-        PipeBarrier<PIPE_V>();
+        AscendC::PipeBarrier<PIPE_V>();
         CalFirstToken(probsValue, h_length);
     } else {
-        PipeBarrier<PIPE_V>();
-        Duplicate(this->token_tensor0, static_cast<float>(0), h_length);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Duplicate(this->token_tensor0, static_cast<float>(0), h_length);
     }
 
     // 处理剩余的Token数据
@@ -263,7 +261,7 @@ KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutToken(const int64_t start_
             }
         
             CopyTokenIn(cal_token_idx, h_index, h_length);
-            PipeBarrier<PIPE_V>();
+            AscendC::PipeBarrier<PIPE_V>();
             CalToken(probsValue, h_length);
         }
     }
@@ -277,14 +275,14 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CopyTokenIn(c
                                                                                const int64_t h_index,
                                                                                const int64_t h_length)
 {
-    LocalTensor<T1> tokensLocal = this->tokens_inque.template AllocTensor<T1>();
+    AscendC::LocalTensor<T1> tokensLocal = this->tokens_inque.template AllocTensor<T1>();
     int64_t offset = in_token_index * this->hidden_size + h_index * this->hidden_splited_length;
 
     if (likely((h_length * sizeof(T1)) % BLOCK_SIZE == 0)) {
-        DataCopy(tokensLocal, this->tokensGM[offset], h_length);
+        AscendC::DataCopy(tokensLocal, this->tokensGM[offset], h_length);
     } else {
         this->copyParams.blockLen = h_length * sizeof(T1);
-        DataCopyPad(tokensLocal, this->tokensGM[offset], this->copyParams, this->extParams1);
+        AscendC::DataCopyPad(tokensLocal, this->tokensGM[offset], this->copyParams, this->extParams1);
     }
 
     this->tokens_inque.template EnQue(tokensLocal);
@@ -294,20 +292,20 @@ template <typename T1, typename T2, typename T3, bool PROBS>
 __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalFirstToken(const float prob_value,
                                                                                  const int64_t h_length)
 {
-    LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
+    AscendC::LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
 
-    if constexpr (!IsSameType<T1, float>::value) {
-        Cast(this->token_tensor0, tokensLocal, RoundMode::CAST_NONE, h_length);
+    if constexpr (!AscendC::IsSameType<T1, float>::value) {
+        AscendC::Cast(this->token_tensor0, tokensLocal, AscendC::RoundMode::CAST_NONE, h_length);
     } else {
         uint64_t byteAlign32 = (h_length * sizeof(float) + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
-        DataCopy(this->token_tensor0, tokensLocal, byteAlign32 / sizeof(float));
+        AscendC::DataCopy(this->token_tensor0, tokensLocal, byteAlign32 / sizeof(float));
     }
 
     this->tokens_inque.FreeTensor(tokensLocal);
 
     if constexpr (PROBS) {
-        PipeBarrier<PIPE_V>();
-        Muls(this->token_tensor0, this->token_tensor0, prob_value, h_length);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Muls(this->token_tensor0, this->token_tensor0, prob_value, h_length);
     }
 }
 
@@ -315,21 +313,21 @@ template <typename T1, typename T2, typename T3, bool PROBS>
 __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalToken(const float prob_value,
                                                                             const int64_t h_length)
 {
-    LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
+    AscendC::LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
 
-    if constexpr (!IsSameType<T1, float>::value) {
-        Cast(this->token_tensor1, tokensLocal, RoundMode::CAST_NONE, h_length);
+    if constexpr (!AscendC::IsSameType<T1, float>::value) {
+        AscendC::Cast(this->token_tensor1, tokensLocal, AscendC::RoundMode::CAST_NONE, h_length);
         this->tokens_inque.FreeTensor(tokensLocal);
         if constexpr (PROBS) {
-            PipeBarrier<PIPE_V>();
-            Muls(this->token_tensor1, this->token_tensor1, prob_value, h_length);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::Muls(this->token_tensor1, this->token_tensor1, prob_value, h_length);
         }
-        PipeBarrier<PIPE_V>();
+        AscendC::PipeBarrier<PIPE_V>();
         Add(this->token_tensor0, this->token_tensor0, this->token_tensor1, h_length);
     } else {
         if constexpr (PROBS) {
-            Muls(tokensLocal, tokensLocal, prob_value, h_length);
-            PipeBarrier<PIPE_V>();
+            AscendC::Muls(tokensLocal, tokensLocal, prob_value, h_length);
+            AscendC::PipeBarrier<PIPE_V>();
         }
         Add(this->token_tensor0, this->token_tensor0, tokensLocal, h_length);
         this->tokens_inque.FreeTensor(tokensLocal);
@@ -341,11 +339,11 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CopyOut(const
                                                                            const int64_t h_index,
                                                                            const int64_t h_length)
 {
-    LocalTensor<T1> temp_out_tensors;
-    if constexpr (!IsSameType<T1, float>::value) {
+    AscendC::LocalTensor<T1> temp_out_tensors;
+    if constexpr (!AscendC::IsSameType<T1, float>::value) {
         temp_out_tensors = this->outque.template AllocTensor<T1>();
-        PipeBarrier<PIPE_V>();
-        Cast(temp_out_tensors, this->token_tensor0, RoundMode::CAST_RINT, h_length);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Cast(temp_out_tensors, this->token_tensor0, AscendC::RoundMode::CAST_RINT, h_length);
     } else {
         temp_out_tensors = this->token_tensor0;
     }
@@ -355,10 +353,10 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CopyOut(const
 
     int64_t offset = out_token_index * this->hidden_size + h_index * this->hidden_splited_length;
     if (likely((h_length * sizeof(T1)) % BLOCK_SIZE == 0)) {
-        DataCopy(this->outGM[offset], temp_out_tensors, h_length);
+        AscendC::DataCopy(this->outGM[offset], temp_out_tensors, h_length);
     } else {
         this->copyParams.blockLen = h_length * sizeof(T1);
-        DataCopyPad(this->outGM[offset], temp_out_tensors, this->copyParams);
+        AscendC::DataCopyPad(this->outGM[offset], temp_out_tensors, this->copyParams);
     }
 
     this->outque.FreeTensor(temp_out_tensors);

@@ -18,8 +18,6 @@
 #include "acl/acl.h"
 #include "shmemi_host_common.h"
 #include "gm2gm/shmemi_device_cc_kernel.h"
-using namespace std;
-
 uint64_t g_team_mask = 0;
 aclshmemx_team_t *g_aclshmem_team_pool = nullptr;
 

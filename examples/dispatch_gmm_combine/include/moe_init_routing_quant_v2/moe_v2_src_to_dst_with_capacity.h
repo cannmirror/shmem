@@ -18,9 +18,6 @@
 #include "moe_v2_common.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
-
 template<typename T, typename TilingData>
 class MoeV2SrcToDstWithCapacity {
 public:
@@ -28,7 +25,7 @@ public:
     {};
 
     __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
-                                const TilingData *tilingData, TPipe *tPipe);
+                                const TilingData *tilingData, AscendC::TPipe *tPipe);
 
     __aicore__ inline void Process();
 
@@ -44,20 +41,20 @@ private:
     __aicore__ inline void AssistInit();
 
 private:
-    TPipe *pipe;
-    TQue<QuePosition::VECIN, 1> copyInQueue;
-    TQue<QuePosition::VECOUT, 1> copyOutQueue;
-    TQue<QuePosition::VECOUT, 1> copyOutZeroQueue;
+    AscendC::TPipe *pipe;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> copyInQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> copyOutQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> copyOutZeroQueue;
 
-    GlobalTensor<int32_t> expandDstToSrcRowGm;
-    GlobalTensor<int32_t> expandedRowIdxGm;
-    GlobalTensor<int32_t> expertIdxValueGm;
-    GlobalTensor<int32_t> expandedExpertIdxGm;
-    GlobalTensor<T> expandedXGm;
+    AscendC::GlobalTensor<int32_t> expandDstToSrcRowGm;
+    AscendC::GlobalTensor<int32_t> expandedRowIdxGm;
+    AscendC::GlobalTensor<int32_t> expertIdxValueGm;
+    AscendC::GlobalTensor<int32_t> expandedExpertIdxGm;
+    AscendC::GlobalTensor<T> expandedXGm;
 
-    LocalTensor<T> outTmpLocal;
+    AscendC::LocalTensor<T> outTmpLocal;
 
-    const InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
+    const optiling::InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -83,13 +80,13 @@ private:
 template<typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::AssistInit()
 {
-    if constexpr(IsSameType<T, int8_t>::value) {
-        LocalTensor<int16_t> outLocal = copyOutZeroQueue.AllocTensor<int16_t>();
-        Duplicate<int16_t>(outLocal, static_cast<int16_t>(0), this->perLoopCols);
+    if constexpr(AscendC::IsSameType<T, int8_t>::value) {
+        AscendC::LocalTensor<int16_t> outLocal = copyOutZeroQueue.AllocTensor<int16_t>();
+        AscendC::Duplicate<int16_t>(outLocal, static_cast<int16_t>(0), this->perLoopCols);
         copyOutZeroQueue.EnQue<int16_t>(outLocal);
     } else {
-        LocalTensor<T> outLocal = copyOutZeroQueue.AllocTensor<T>();
-        Duplicate<T>(outLocal, static_cast<T>(0), this->perLoopCols);
+        AscendC::LocalTensor<T> outLocal = copyOutZeroQueue.AllocTensor<T>();
+        AscendC::Duplicate<T>(outLocal, static_cast<T>(0), this->perLoopCols);
         copyOutZeroQueue.EnQue<T>(outLocal);
     }
 
@@ -110,29 +107,29 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::AssistInit()
 template<typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyIn(int64_t progress)
 {
-    LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
+    AscendC::LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
     int64_t length = Align(currentLoopRows, sizeof(int32_t));
-    DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], length);
-    DataCopy(inLocal[length], expandedExpertIdxGm[progress * perLoopRows], length);
+    AscendC::DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], length);
+    AscendC::DataCopy(inLocal[length], expandedExpertIdxGm[progress * perLoopRows], length);
     copyInQueue.EnQue<int32_t>(inLocal);
 }
 
 template<typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOut(int64_t progress)
 {
-    LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
-    LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
+    AscendC::LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
+    AscendC::LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
     int64_t length = Align(currentLoopRows, sizeof(int32_t));
-    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
+   AscendC::DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
 
-    SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
+    SetWaitFlag<AscendC::HardEvent::MTE2_S>(AscendC::HardEvent::MTE2_S);
     if (this->lastExpertId == -1) {
         this->lastExpertId = this->lastCoreExpertId;
         this->tokenCount = this->lastCoreExpertIdNum;
     }
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         int32_t expertIdx = inLocal[length].GetValue(idx);
-        SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+        SetWaitFlag<AscendC::HardEvent::S_MTE3>(AscendC::HardEvent::S_MTE3);
         int32_t index = 0;
         while (this->lastExpertId < expertIdx) {
             while (this->tokenCount < this->expertCapacity) {
@@ -148,11 +145,11 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOut(int64_t
                         continue;
                     }
 #endif
-                    DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(col * sizeof(T)), 0,
+                   AscendC::DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(col * sizeof(T)), 0,
                                                   0, 0};
-                    DataCopyPad(expandedXGm[index * this->cols + i * this->perLoopCols], this->outTmpLocal,
+                    AscendC::DataCopyPad(expandedXGm[index * this->cols + i * this->perLoopCols], this->outTmpLocal,
                                 copyParams1);
-                    SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+                    SetWaitFlag<AscendC::HardEvent::MTE3_S>(AscendC::HardEvent::MTE3_S);
                 }
                 this->tokenCount++;
             }
@@ -164,9 +161,9 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOut(int64_t
             int32_t outOffset = inLocal.GetValue(idx);
             index = expertIdx * this->expertCapacity + this->tokenCount;
             outLocal.SetValue(0, index);
-            SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
-            DataCopyPad(expandedRowIdxGm[outOffset], outLocal, copyParams);
-            SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+            SetWaitFlag<AscendC::HardEvent::S_MTE3>(AscendC::HardEvent::S_MTE3);
+            AscendC::DataCopyPad(expandedRowIdxGm[outOffset], outLocal, copyParams);
+            SetWaitFlag<AscendC::HardEvent::MTE3_S>(AscendC::HardEvent::MTE3_S);
             this->tokenCount++;
         }
     }
@@ -189,9 +186,9 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOutRemain()
                 if (i == this->colLoops - 1) {
                     col = this->lastLoopCols;
                 }
-                DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(col * sizeof(T)), 0, 0, 0};
-                DataCopyPad(expandedXGm[index * this->cols + i * this->perLoopCols], this->outTmpLocal, copyParams);
-                SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+               AscendC::DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(col * sizeof(T)), 0, 0, 0};
+                AscendC::DataCopyPad(expandedXGm[index * this->cols + i * this->perLoopCols], this->outTmpLocal, copyParams);
+                SetWaitFlag<AscendC::HardEvent::MTE3_S>(AscendC::HardEvent::MTE3_S);
             }
             this->tokenCount++;
         }
@@ -215,9 +212,9 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::SyncAll()
 template<typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::Init(GM_ADDR expandedRowIdx, GM_ADDR expandedX,
                                                                       GM_ADDR workspace, const TilingData *tilingData,
-                                                                      TPipe *tPipe)
+                                                                      AscendC::TPipe *tPipe)
 {
-    int64_t blockNum = GetBlockNum();
+    int64_t blockNum = AscendC::GetBlockNum();
     this->pipe = tPipe;
     this->blockIdx = get_block_idx() + get_subblockid() * get_block_num();
 
@@ -257,7 +254,7 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::Init(GM_ADDR ex
 
     pipe->InitBuffer(copyInQueue, 1, AlignBytes(this->perLoopRows, sizeof(int32_t)) * 2);
     pipe->InitBuffer(copyOutQueue, 1, AlignBytes(INT32_ONE_BLOCK_NUM, sizeof(int32_t)));
-    if constexpr(IsSameType<T, int8_t>::value) {
+    if constexpr(AscendC::IsSameType<T, int8_t>::value) {
         pipe->InitBuffer(copyOutZeroQueue, 1, AlignBytes(this->perLoopCols, sizeof(int16_t)));
     } else {
         pipe->InitBuffer(copyOutZeroQueue, 1, AlignBytes(this->perLoopCols, sizeof(T)));

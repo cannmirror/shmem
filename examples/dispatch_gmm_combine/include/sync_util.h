@@ -10,8 +10,6 @@
 #ifndef SYNC_UTIL_H
 #define SYNC_UTIL_H
 #include "kernel_operator.h"
-using namespace AscendC;
-
 #define FORCE_INLINE_AICORE inline __attribute__((always_inline)) __aicore__
 constexpr int32_t BUFF_SIZE = 500 * 1024 * 1024;
 constexpr int32_t FLAG_OFFSET = 500 * 1024 * 1024 / sizeof(int32_t);
@@ -28,13 +26,12 @@ FORCE_INLINE_AICORE T gm_load(__gm__ T *cache) {
 }
 
 FORCE_INLINE_AICORE void gm_dcci(__gm__ uint8_t * addr) {
-    using namespace AscendC;
-    GlobalTensor<uint8_t> global;
+    AscendC::GlobalTensor<uint8_t> global;
     global.SetGlobalBuffer(addr);
 
     // Important: add hint to avoid dcci being optimized by compiler
     __asm__ __volatile__("");
-    DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(global);
+    AscendC::DataCacheCleanAndInvalid<uint8_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(global);
     __asm__ __volatile__("");
 }
 

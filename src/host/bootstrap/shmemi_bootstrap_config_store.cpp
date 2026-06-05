@@ -42,29 +42,27 @@ struct ConfigStoreState {
     shm::store::SmemGroupEnginePtr group_engine_ = nullptr;
 };
 
-using namespace shm::utils;
-
 int config_store_get_unique_id(void* uid) {
-    char pta_env_ip[MAX_IP];
+    char pta_env_ip[shm::utils::MAX_IP];
     uint16_t pta_env_port;
     sa_family_t sockType;
     const char *ipPort = std::getenv("SHMEM_UID_SESSION_ID");
     const char *ipInfo = std::getenv("SHMEM_UID_SOCK_IFNAME");
     bool is_from_ifa = false;
     if (ipPort != nullptr) {
-        if (aclshmemi_get_ip_from_env(pta_env_ip, pta_env_port, sockType, ipPort) != ACLSHMEM_SUCCESS) {
+        if (shm::utils::aclshmemi_get_ip_from_env(pta_env_ip, pta_env_port, sockType, ipPort) != ACLSHMEM_SUCCESS) {
             SHM_LOG_ERROR("cant get pta master addr.");
             return ACLSHMEM_INVALID_PARAM;
         }
     } else {
         is_from_ifa = true;
-        if (aclshmemi_get_ip_from_ifa(pta_env_ip, sockType, ipInfo) != ACLSHMEM_SUCCESS) {
+        if (shm::utils::aclshmemi_get_ip_from_ifa(pta_env_ip, sockType, ipInfo) != ACLSHMEM_SUCCESS) {
             SHM_LOG_ERROR("cant get available ip port.");
             return ACLSHMEM_INVALID_PARAM;
         }
     }
     SHM_LOG_INFO("get master IP value:" << pta_env_ip);
-    return aclshmemi_set_ip_info((aclshmemx_uniqueid_t *)uid, sockType, pta_env_ip, pta_env_port, is_from_ifa);
+    return shm::utils::aclshmemi_set_ip_info((aclshmemx_uniqueid_t *)uid, sockType, pta_env_ip, pta_env_port, is_from_ifa);
 }
 
 // Plugin pre-initialization entry function. 

@@ -18,9 +18,6 @@
 #include "moe_v2_common.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
-
 class MoeV2SrcToDstOp {
 public:
     __aicore__ inline MoeV2SrcToDstOp()
@@ -28,7 +25,7 @@ public:
 
     template<typename TilingData>
     __aicore__ inline void
-    Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe);
+    Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace, const TilingData *tilingData, AscendC::TPipe *tPipe);
 
     __aicore__ inline void Process();
 
@@ -43,16 +40,16 @@ private:
 
     __aicore__ inline void AssistInit();
 
-    TPipe *pipe;
-    TQue<QuePosition::VECIN, 1> copyInQueue;
-    TQue<QuePosition::VECOUT, 1> copyOutQueue;
-    TBuf <TPosition::VECCALC> assistBuffer;
+    AscendC::TPipe *pipe;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> copyInQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> copyOutQueue;
+    AscendC::TBuf <AscendC::TPosition::VECCALC> assistBuffer;
 
-    GlobalTensor<int32_t> expandDstToSrcRowGm;
-    GlobalTensor<int32_t> expandSrcToDstRowGm;
-    GlobalTensor<int32_t> assistGm;
+    AscendC::GlobalTensor<int32_t> expandDstToSrcRowGm;
+    AscendC::GlobalTensor<int32_t> expandSrcToDstRowGm;
+    AscendC::GlobalTensor<int32_t> assistGm;
 
-    const InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
+    const optiling::InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -68,28 +65,28 @@ __aicore__ inline void MoeV2SrcToDstOp::AssistInit()
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
     OOMCheckAddrRange(assistGm.GetPhyAddr(), ASSIST_NUM * sizeof(int32_t));
 #endif
-    LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
-    DataCopy(assistTensor, assistGm, ASSIST_NUM);
-    SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
-    Adds(assistTensor, assistTensor, (int32_t)(this->blockIdx * this->srcToDstTilingData->perCoreRows), ASSIST_NUM);
+    AscendC::LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
+    AscendC::DataCopy(assistTensor, assistGm, ASSIST_NUM);
+    SetWaitFlag<AscendC::HardEvent::MTE2_V>(AscendC::HardEvent::MTE2_V);
+    AscendC::Adds(assistTensor, assistTensor, (int32_t)(this->blockIdx * this->srcToDstTilingData->perCoreRows), ASSIST_NUM);
 }
 
 __aicore__ inline void MoeV2SrcToDstOp::CopyIn(int64_t progress)
 {
-    LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
-    DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
+    AscendC::LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
+    AscendC::DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
     copyInQueue.EnQue<int32_t>(inLocal);
 }
 
 __aicore__ inline void MoeV2SrcToDstOp::Compute(int64_t progress)
 {
-    LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
-    LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
+    AscendC::LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
+    AscendC::LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
 
     pipe_barrier(PIPE_V);
     int64_t loops = Ceil(currentLoopRows, ASSIST_INDEX_NUM);
     for (int64_t i = 0; i < loops; i++) {
-        Adds(outLocal[i * ASSIST_NUM], assistTensor,
+        AscendC::Adds(outLocal[i * ASSIST_NUM], assistTensor,
              static_cast<int32_t>(this->perLoopRows * progress + i * ASSIST_INDEX_NUM), ASSIST_NUM);
     }
     pipe_barrier(PIPE_V);
@@ -98,16 +95,16 @@ __aicore__ inline void MoeV2SrcToDstOp::Compute(int64_t progress)
 
 __aicore__ inline void MoeV2SrcToDstOp::CopyOut()
 {
-    LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
-    LocalTensor<int32_t> outLocal = copyOutQueue.DeQue<int32_t>();
-    SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
-    DataCopyParams intriParams;
+    AscendC::LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
+    AscendC::LocalTensor<int32_t> outLocal = copyOutQueue.DeQue<int32_t>();
+    SetWaitFlag<AscendC::HardEvent::MTE2_S>(AscendC::HardEvent::MTE2_S);
+    AscendC::DataCopyParams intriParams;
     intriParams.blockCount = 1;
     intriParams.blockLen = sizeof(int32_t);
     uint32_t outOffset;
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         outOffset = inLocal.GetValue(idx);
-        DataCopyPad(expandSrcToDstRowGm[outOffset], outLocal[idx * INT32_ONE_BLOCK_NUM], intriParams);
+        AscendC::DataCopyPad(expandSrcToDstRowGm[outOffset], outLocal[idx * INT32_ONE_BLOCK_NUM], intriParams);
     }
 
     copyInQueue.FreeTensor(inLocal);
@@ -126,9 +123,9 @@ __aicore__ inline void MoeV2SrcToDstOp::SyncAll()
 
 template<typename TilingData>
 __aicore__ inline void MoeV2SrcToDstOp::Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace, const TilingData *tilingData,
-                                             TPipe *tPipe)
+                                             AscendC::TPipe *tPipe)
 {
-    int64_t blockNum = GetBlockNum();
+    int64_t blockNum = AscendC::GetBlockNum();
     this->pipe = tPipe;
     this->blockIdx = get_block_idx() + get_subblockid() * get_block_num();
 

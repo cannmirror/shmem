@@ -31,9 +31,6 @@
 #include "catcoc/detail/remote_copy_type.h"
 #include "catcoc/dgemm/kernel/matmul_allreduce.h"
 
-using namespace AscendC;
-using namespace Catcoc;
-
 template <
     class ArchTag,
     class ElementA, class LayoutA,
@@ -75,13 +72,13 @@ void MatmulAllReduceImpl(
     using RemoteSrcType = SymmetricType;
     using RemoteDstType = DType;
     using CopyDirect = Catcoc::detail::CopyDirect;
-    using TileRemoteCopy = CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Get>;
+    using TileRemoteCopy = Catcoc::CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Get>;
     using TileScheduler = Catlass::Epilogue::Tile::EpilogueIdentityTileSwizzle;
 
     constexpr bool isDynamic = true;
-    using EpilogueReduceScatterDispatch = CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
+    using EpilogueReduceScatterDispatch = Catcoc::CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
         Catcoc::detail::CopyMode::Scatter, isDynamic>;
-    using BlockEpilogueReduceScatter = CommEpilogue::Block::CommBlockEpilogue<
+    using BlockEpilogueReduceScatter = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         EpilogueReduceScatterDispatch,
         RemoteSrcType, RemoteDstType,
         void,
@@ -89,9 +86,9 @@ void MatmulAllReduceImpl(
         void, TileRemoteCopy, TileScheduler
     >;
 
-    using EpilogueAllGatherDispatch = CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
+    using EpilogueAllGatherDispatch = Catcoc::CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
         Catcoc::detail::CopyMode::Gather, isDynamic>;
-    using BlockEpilogueAllGather = CommEpilogue::Block::CommBlockEpilogue<
+    using BlockEpilogueAllGather = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         EpilogueAllGatherDispatch,
         RemoteSrcType, RemoteDstType,
         void,
@@ -99,7 +96,7 @@ void MatmulAllReduceImpl(
         void, TileRemoteCopy, TileScheduler
     >;
 
-    using MatmulAllReduceKernel = DGemm::Kernel::MatmulAllReduce<
+    using MatmulAllReduceKernel = Catcoc::DGemm::Kernel::MatmulAllReduce<
         BlockMmad,
         BlockEpilogueReduceScatter,
         BlockEpilogueAllGather,

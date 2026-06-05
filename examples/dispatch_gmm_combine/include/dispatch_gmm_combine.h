@@ -39,13 +39,18 @@
 
 #include "moe_token_unpermute.h"
 
-using namespace AscendC;
 inline __gm__ struct OpSystemRunCfg g_opSystemRunCfg{Catlass::L2_OFFSET};
 
 namespace Catlass::Gemm::Kernel {
 constexpr uint32_t EXPERT_OFFSET = 8;
 constexpr uint32_t FLAG_VALUE = 2;
 constexpr uint32_t LOOP_DENOMINATOR = 8;
+
+template<typename T>
+CATLASS_DEVICE T AlignUp(T a, T b)
+{
+    return (a + b - 1) / b * b;
+}
 
 template<
     class BlockMmad_,
@@ -67,9 +72,9 @@ public:
     using LayoutC = typename BlockMmad::LayoutC;
     using ElementAccumulator = typename BlockMmad::ElementAccumulator;
     using ElementScale = uint64_t;
-    using LayoutScale = typename layout::VectorLayout;
+    using LayoutScale = typename Catlass::layout::VectorLayout;
     using ElementPerTokenScale = float;
-    using LayoutPerTokenScale = typename layout::VectorLayout;
+    using LayoutPerTokenScale = typename Catlass::layout::VectorLayout;
     using BlockScheduler = BlockScheduler_;
     using BlockEpilogue1 = BlockEpilogue1_;
     using BlockEpilogue2 = BlockEpilogue2_;
@@ -277,7 +282,7 @@ private:
     {
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
-        using TType = Gemm::GemmType<T, layout::RowMajor>;
+        using TType = Gemm::GemmType<T, Catlass::layout::RowMajor>;
         using CopyGmToUb = Epilogue::Tile::CopyGm2Ub<ArchTag, TType>;
         using CopyUbToGm = Epilogue::Tile::CopyUb2Gm<ArchTag, TType>;
         CopyGmToUb copyGmToUb;
@@ -305,10 +310,10 @@ private:
             // [ReduceScatter] 2. Pre Interface Sync
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(event_id);
             // [ReduceScatter] 3. Start aclshmemx_mte_get_nbi
-            copyGmToUb(buf, src[inputOffset], layout::RowMajor{1, curProcessNum}, layout::RowMajor{1, curProcessNum});
+            copyGmToUb(buf, src[inputOffset], Catlass::layout::RowMajor{1, curProcessNum}, Catlass::layout::RowMajor{1, curProcessNum});
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(event_id);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(event_id);
-            copyUbToGm(dst[outputOffset], buf, layout::RowMajor{1, curProcessNum}, layout::RowMajor{1, curProcessNum});
+            copyUbToGm(dst[outputOffset], buf, Catlass::layout::RowMajor{1, curProcessNum}, Catlass::layout::RowMajor{1, curProcessNum});
 
             // [ReduceScatter] 4. Post Interface Sync
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(event_id);
@@ -358,7 +363,7 @@ private:
                               AscendC::GlobalTensor<int32_t> &resultSend,
                               uint32_t expertPerRank, uint32_t rankId, uint32_t EP)
     {
-        layout::RowMajor commMatLayout{EP, EP * expertPerRank};
+        Catlass::layout::RowMajor commMatLayout{EP, EP * expertPerRank};
         for (uint32_t i = coreIdx; i < EP; i += coreNum) {
             int32_t sum = 0;
             for (uint32_t j = 0; j < rankId; ++j) {
@@ -383,7 +388,7 @@ private:
         for (uint32_t i = 0; i < L1_STAGES; i++) {
             l1BTensorList[i] = resource.l1Buf.template GetBufferByByte<ElementB>(l1BOffset + L1B_TILE_SIZE * i);
         }
-        using LayoutBInL1 = typename helper::L1BTypeSelector<Gemm::GemmType<int8_t, layout::zN>>::L1BType::Layout;
+        using LayoutBInL1 = typename helper::L1BTypeSelector<Gemm::GemmType<int8_t, Catlass::layout::zN>>::L1BType::Layout;
         static constexpr auto L1B_LAYOUT = LayoutBInL1::template MakeLayout<ElementB>(L1TileShape::K, L1TileShape::N);
 
         for (uint32_t groupIdx = 0; groupIdx < preLoadExperts; ++groupIdx) {
@@ -625,7 +630,7 @@ private:
             dstAddress.SetGlobalBuffer((__gm__ int32_t *)dstPeermemPtr);
 
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
-            using TType = Gemm::GemmType<int32_t, layout::RowMajor>;
+            using TType = Gemm::GemmType<int32_t, Catlass::layout::RowMajor>;
             using CopyGmToUb = Epilogue::Tile::CopyGm2Ub<ArchTag, TType>;
             using CopyUbToGm = Epilogue::Tile::CopyUb2Gm<ArchTag, TType>;
             CopyGmToUb copyGmToUb;
@@ -634,15 +639,15 @@ private:
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             uint32_t tmp = params.EP * params.expertPerRank;
             copyGmToUb(tmpBuffer, srcAddress[0],
-                       layout::RowMajor{1, tmp},
-                       layout::RowMajor{1, tmp});
+                       Catlass::layout::RowMajor{1, tmp},
+                       Catlass::layout::RowMajor{1, tmp});
 
             tmpBuffer.SetValue(params.EP * params.expertPerRank, count);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(EVENT_ID0);
             copyUbToGm(dstAddress[0], tmpBuffer,
-                       layout::RowMajor{1, tmp + 1},
-                       layout::RowMajor{1, tmp + 1});
+                       Catlass::layout::RowMajor{1, tmp + 1},
+                       Catlass::layout::RowMajor{1, tmp + 1});
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
 
@@ -858,7 +863,7 @@ private:
             int64_t workspaceOffset = 0;
             expandedRowIdx = params.ptrWorkspace;
 
-            workspaceOffset += AlignUp(params.problemShape.m(), 256) * params.topK * sizeof(int32_t);
+            workspaceOffset += AlignUp(params.problemShape.m(), static_cast<uint32_t>(256)) * params.topK * sizeof(int32_t);
             ptrcumsumMM = params.ptrWorkspace + workspaceOffset;
 
             workspaceOffset += (params.EP * params.EP * params.expertPerRank) * sizeof(int32_t);
@@ -937,7 +942,7 @@ private:
     AscendC::GlobalTensor<int32_t> tokenPerExpert;
 
     // preload B matrix
-    using CopyGmToL1B = Gemm::Tile::CopyGmToL1 <ArchTag, Gemm::GemmType<int8_t, layout::zN>>;
+    using CopyGmToL1B = Gemm::Tile::CopyGmToL1 <ArchTag, Gemm::GemmType<int8_t, Catlass::layout::zN>>;
     CopyGmToL1B copyGmToL1B;
     static constexpr uint32_t L1B_TILE_SIZE = L1TileShape::M * L1TileShape::K * sizeof(ElementB);
     static constexpr uint32_t L1_STAGES = 2;

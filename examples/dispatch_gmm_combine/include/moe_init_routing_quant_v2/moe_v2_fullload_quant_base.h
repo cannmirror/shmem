@@ -18,9 +18,6 @@
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
-
 class MoeV2FullLoadQuantBase {
 public:
     __aicore__ inline MoeV2FullLoadQuantBase()
@@ -29,7 +26,7 @@ public:
 protected:
     __aicore__ inline void InitBase(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                     GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
-                                    const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe);
+                                    const optiling::MoeInitRoutingQuantV2TilingData *tilingData, AscendC::TPipe *tPipe);
 
     __aicore__ inline void ProcessBase();
 
@@ -43,9 +40,9 @@ protected:
 
     __aicore__ inline void ComputeExpertTokenCountOrCumsum();
 
-    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
+    const optiling::InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
 
-    TPipe *pipe;
+    AscendC::TPipe *pipe;
     int64_t tileLength;
     int64_t bufferNum = 1;
     int64_t totalLength;
@@ -62,21 +59,21 @@ protected:
     int64_t expertNum;
     int64_t expertCapacity;
 
-    TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
-    TBuf <TPosition::VECCALC> tempBuffer;
-    TBuf <TPosition::VECCALC> sortedBuffer;
-    TQue<QuePosition::VECIN, 1> xCopyInQueue;
-    TQue<QuePosition::VECOUT, 1> expandedRowIdxCopyOutQueue;
-    TQue<QuePosition::VECOUT, 1> expandedExpertIdxCopyOutQueue;
-    TQue<QuePosition::VECOUT, 1> expandDstToSrcRowQueue;
-    TQue<QuePosition::VECOUT, 1> expertTokensCopyOutQueue;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> sortDataCopyInQueue;
+    AscendC::TBuf <AscendC::TPosition::VECCALC> tempBuffer;
+    AscendC::TBuf <AscendC::TPosition::VECCALC> sortedBuffer;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> xCopyInQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> expandedRowIdxCopyOutQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> expandedExpertIdxCopyOutQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> expandDstToSrcRowQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> expertTokensCopyOutQueue;
 
-    GlobalTensor<int32_t> expertIdxGm;
-    GlobalTensor<int8_t> expandedXGm;
-    GlobalTensor<int32_t> expandedRowIdxGm;
-    GlobalTensor<int32_t> expandedExpertIdxGm;
-    GlobalTensor<int32_t> expertTokensCountOrCumsumGm;
-    GlobalTensor<int32_t> expertTokensBeforeCapacityGm;
+    AscendC::GlobalTensor<int32_t> expertIdxGm;
+    AscendC::GlobalTensor<int8_t> expandedXGm;
+    AscendC::GlobalTensor<int32_t> expandedRowIdxGm;
+    AscendC::GlobalTensor<int32_t> expandedExpertIdxGm;
+    AscendC::GlobalTensor<int32_t> expertTokensCountOrCumsumGm;
+    AscendC::GlobalTensor<int32_t> expertTokensBeforeCapacityGm;
 
     int64_t expertTokensCountOrCumsumFlag = 0;
     int64_t expertTokensBeforeCapacityFlag = 0;
@@ -91,24 +88,24 @@ protected:
 
 __aicore__ inline void MoeV2FullLoadQuantBase::CopyIn()
 {
-    LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+    AscendC::LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
+   AscendC::DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
                                      static_cast<uint32_t>(this->totalLength * sizeof(int32_t)),
                                      0, 0, 0};
-    DataCopyPadExtParams <int32_t> dataCopyPadParams{false, 0, 0, 0};
-    DataCopyPad(inLocal[0], expertIdxGm, dataCopyParams, dataCopyPadParams);
-    ArithProgression<int32_t>(inLocal[this->sortNum], 0, 1, this->totalLength);
+   AscendC::DataCopyPadExtParams <int32_t> dataCopyPadParams{false, 0, 0, 0};
+    AscendC::DataCopyPad(inLocal[0], expertIdxGm, dataCopyParams, dataCopyPadParams);
+    AscendC::ArithProgression<int32_t>(inLocal[this->sortNum], 0, 1, this->totalLength);
     sortDataCopyInQueue.EnQue(inLocal);
 }
 
 __aicore__ inline void MoeV2FullLoadQuantBase::SortCompute()
 {
-    LocalTensor<int32_t> inLocal = sortDataCopyInQueue.DeQue<int32_t>();
-    LocalTensor<int32_t> expertIdxLocal = inLocal[0];
-    LocalTensor<float> expertIdxLocalFp32 = expertIdxLocal.ReinterpretCast<float>();
-    Cast(expertIdxLocalFp32, expertIdxLocal, RoundMode::CAST_ROUND, this->totalLength);
+    AscendC::LocalTensor<int32_t> inLocal = sortDataCopyInQueue.DeQue<int32_t>();
+    AscendC::LocalTensor<int32_t> expertIdxLocal = inLocal[0];
+    AscendC::LocalTensor<float> expertIdxLocalFp32 = expertIdxLocal.ReinterpretCast<float>();
+    AscendC::Cast(expertIdxLocalFp32, expertIdxLocal, AscendC::RoundMode::CAST_ROUND, this->totalLength);
     pipe_barrier(PIPE_V);
-    Muls(expertIdxLocalFp32, expertIdxLocalFp32, (float) -1, this->totalLength);
+    AscendC::Muls(expertIdxLocalFp32, expertIdxLocalFp32, (float) -1, this->totalLength);
     pipe_barrier(PIPE_V);
     int64_t duplicateNum = this->totalLength % ONE_REPEAT_SORT_NUM;
     if (duplicateNum > 0) {
@@ -117,38 +114,38 @@ __aicore__ inline void MoeV2FullLoadQuantBase::SortCompute()
         mask0 = mask0 << duplicateNum;
         mask0 = mask0 & (UINT64_MAX >> ONE_REPEAT_SORT_NUM);
         uint64_t mask[2] = {mask0, 0};
-        Duplicate(expertIdxLocalFp32[duplicateIndex], MIN_FP32, mask, 1, DST_BLK_STRIDE, DST_REP_STRIDE);
+        AscendC::Duplicate(expertIdxLocalFp32[duplicateIndex], MIN_FP32, mask, 1, DST_BLK_STRIDE, DST_REP_STRIDE);
         pipe_barrier(PIPE_V);
     }
-    LocalTensor<float> concatLocal;
-    LocalTensor<float> tempTensor = tempBuffer.Get<float>(GetSortLen<float>(this->sortNum));
-    Concat(concatLocal, expertIdxLocalFp32, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::LocalTensor<float> concatLocal;
+    AscendC::LocalTensor<float> tempTensor = tempBuffer.Get<float>(AscendC::GetSortLen<float>(this->sortNum));
+    AscendC::Concat(concatLocal, expertIdxLocalFp32, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
-    LocalTensor<uint32_t> rowIdxLocal = inLocal[this->sortNum].template ReinterpretCast<uint32_t>();
-    LocalTensor<float> sortedLocal = sortedBuffer.Get<float>(GetSortLen<float>(this->sortNum));
-    Sort<float, true>(sortedLocal, concatLocal, rowIdxLocal, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::LocalTensor<uint32_t> rowIdxLocal = inLocal[this->sortNum].template ReinterpretCast<uint32_t>();
+    AscendC::LocalTensor<float> sortedLocal = sortedBuffer.Get<float>(AscendC::GetSortLen<float>(this->sortNum));
+    AscendC::Sort<float, true>(sortedLocal, concatLocal, rowIdxLocal, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
-    LocalTensor<float> expandedExpertIdxLocal = expandedExpertIdxCopyOutQueue.AllocTensor<float>();
-    LocalTensor<uint32_t> expandDstToSrcRowLocal = expandDstToSrcRowQueue.AllocTensor<uint32_t>();
-    LocalTensor<float> expandDstToSrcRowLocalFp32 = expandDstToSrcRowLocal.ReinterpretCast<float>();
-    Extract(expandedExpertIdxLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::LocalTensor<float> expandedExpertIdxLocal = expandedExpertIdxCopyOutQueue.AllocTensor<float>();
+    AscendC::LocalTensor<uint32_t> expandDstToSrcRowLocal = expandDstToSrcRowQueue.AllocTensor<uint32_t>();
+    AscendC::LocalTensor<float> expandDstToSrcRowLocalFp32 = expandDstToSrcRowLocal.ReinterpretCast<float>();
+    AscendC::Extract(expandedExpertIdxLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
-    Cast(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
+    AscendC::Cast(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), AscendC::RoundMode::CAST_ROUND,
          this->totalLength);
     pipe_barrier(PIPE_V);
-    Muls(expandedExpertIdxLocal, expandedExpertIdxLocal, (float) -1, this->totalLength);
+    AscendC::Muls(expandedExpertIdxLocal, expandedExpertIdxLocal, (float) -1, this->totalLength);
     pipe_barrier(PIPE_V);
-    LocalTensor<int32_t> expandedExpertIdxLocalInt32;
+    AscendC::LocalTensor<int32_t> expandedExpertIdxLocalInt32;
     expandedExpertIdxLocalInt32 = expandedExpertIdxLocal.ReinterpretCast<int32_t>();
-    Cast(expandedExpertIdxLocalInt32, expandedExpertIdxLocal, RoundMode::CAST_ROUND, this->totalLength);
+    AscendC::Cast(expandedExpertIdxLocalInt32, expandedExpertIdxLocal, AscendC::RoundMode::CAST_ROUND, this->totalLength);
     pipe_barrier(PIPE_V);
     expandedExpertIdxCopyOutQueue.EnQue<int32_t>(expandedExpertIdxLocalInt32);
 
-    LocalTensor<uint32_t> expandedRowIdx = expandedRowIdxCopyOutQueue.AllocTensor<uint32_t>();
-    LocalTensor<uint32_t> expandedRowIdxU32 = expandedRowIdx.ReinterpretCast<uint32_t>();
-    Muls(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocalFp32, (float) -1, this->totalLength);
+    AscendC::LocalTensor<uint32_t> expandedRowIdx = expandedRowIdxCopyOutQueue.AllocTensor<uint32_t>();
+    AscendC::LocalTensor<uint32_t> expandedRowIdxU32 = expandedRowIdx.ReinterpretCast<uint32_t>();
+    AscendC::Muls(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocalFp32, (float) -1, this->totalLength);
     pipe_barrier(PIPE_V);
-    ArithProgression<int32_t>(inLocal[this->sortNum], 0, 1, this->totalLength);
+    AscendC::ArithProgression<int32_t>(inLocal[this->sortNum], 0, 1, this->totalLength);
     pipe_barrier(PIPE_V);
     if (duplicateNum > 0) {
         int duplicateIndex = this->totalLength - duplicateNum;
@@ -156,14 +153,14 @@ __aicore__ inline void MoeV2FullLoadQuantBase::SortCompute()
         mask0 = mask0 << duplicateNum;
         mask0 = mask0 & (UINT64_MAX >> ONE_REPEAT_SORT_NUM);
         uint64_t mask[2] = {mask0, 0};
-        Duplicate(expandDstToSrcRowLocalFp32[duplicateIndex], MIN_FP32, mask, 1, DST_BLK_STRIDE, DST_REP_STRIDE);
+        AscendC::Duplicate(expandDstToSrcRowLocalFp32[duplicateIndex], MIN_FP32, mask, 1, DST_BLK_STRIDE, DST_REP_STRIDE);
         pipe_barrier(PIPE_V);
     }
-    Concat(concatLocal, expandDstToSrcRowLocalFp32, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::Concat(concatLocal, expandDstToSrcRowLocalFp32, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
-    Sort<float, true>(sortedLocal, concatLocal, rowIdxLocal, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::Sort<float, true>(sortedLocal, concatLocal, rowIdxLocal, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
-    Extract(tempTensor, expandedRowIdxU32, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
+    AscendC::Extract(tempTensor, expandedRowIdxU32, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
     pipe_barrier(PIPE_V);
     expandedRowIdxCopyOutQueue.EnQue<uint32_t>(expandedRowIdx);
     sortDataCopyInQueue.FreeTensor(inLocal);
@@ -173,22 +170,22 @@ __aicore__ inline void MoeV2FullLoadQuantBase::SortCompute()
 
 __aicore__ inline void MoeV2FullLoadQuantBase::CopyOutIdx()
 {
-    LocalTensor<int32_t> expandedRowIdx = expandedRowIdxCopyOutQueue.DeQue<int32_t>();
-    DataCopyParams intriParams;
+    AscendC::LocalTensor<int32_t> expandedRowIdx = expandedRowIdxCopyOutQueue.DeQue<int32_t>();
+    AscendC::DataCopyParams intriParams;
     intriParams.blockCount = 1;
     intriParams.blockLen = this->totalLength * sizeof(int32_t);
-    DataCopyPad(expandedRowIdxGm, expandedRowIdx, intriParams);
+    AscendC::DataCopyPad(expandedRowIdxGm, expandedRowIdx, intriParams);
     expandedRowIdxCopyOutQueue.EnQue(expandedRowIdx);
 }
 
 __aicore__ inline void MoeV2FullLoadQuantBase::ComputeExpertTokenCountOrCumsum()
 {
-    LocalTensor<int32_t> expandedExpertIdx = expandedExpertIdxCopyOutQueue.DeQue<int32_t>();
-    LocalTensor<int32_t> expertTokensCount = expertTokensCopyOutQueue.AllocTensor<int32_t>();
+    AscendC::LocalTensor<int32_t> expandedExpertIdx = expandedExpertIdxCopyOutQueue.DeQue<int32_t>();
+    AscendC::LocalTensor<int32_t> expertTokensCount = expertTokensCopyOutQueue.AllocTensor<int32_t>();
 
     int64_t expertNumAlign = Align(this->expertNum, sizeof(int32_t));
-    Duplicate(expertTokensCount, 0, expertNumAlign);
-    SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
+    AscendC::Duplicate(expertTokensCount, 0, expertNumAlign);
+    SetWaitFlag<AscendC::HardEvent::V_S>(AscendC::HardEvent::V_S);
 
     int32_t lastExpertId = expandedExpertIdx.GetValue(0);
     int64_t tokenCount = 0;
@@ -212,11 +209,11 @@ __aicore__ inline void MoeV2FullLoadQuantBase::ComputeExpertTokenCountOrCumsum()
             lastExpertId++;
         }
     }
-    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0,
+   AscendC::DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0,
                                  0,
                                  0};
     if (this->expertTokensCountOrCumsumFlag > 0) {
-        DataCopyPad(expertTokensCountOrCumsumGm, expertTokensCount, copyParams);
+        AscendC::DataCopyPad(expertTokensCountOrCumsumGm, expertTokensCount, copyParams);
     }
     expertTokensCopyOutQueue.FreeTensor(expertTokensCount);
     expandedExpertIdxCopyOutQueue.FreeTensor(expandedExpertIdx);
@@ -224,15 +221,15 @@ __aicore__ inline void MoeV2FullLoadQuantBase::ComputeExpertTokenCountOrCumsum()
 
 __aicore__ inline void MoeV2FullLoadQuantBase::CopyOutEmpty()
 {
-    LocalTensor<int32_t> outLocal = expandedExpertIdxCopyOutQueue.DeQue<int32_t>();
+    AscendC::LocalTensor<int32_t> outLocal = expandedExpertIdxCopyOutQueue.DeQue<int32_t>();
     expandedExpertIdxCopyOutQueue.FreeTensor(outLocal);
 }
 
 __aicore__ inline void MoeV2FullLoadQuantBase::InitBase(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX,
                                                         GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
                                                         GM_ADDR workspace,
-                                                        const MoeInitRoutingQuantV2TilingData *tilingData,
-                                                        TPipe *tPipe)
+                                                        const optiling::MoeInitRoutingQuantV2TilingData *tilingData,
+                                                        AscendC::TPipe *tPipe)
 {
     this->gatherOutTilingData = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx = get_block_idx() + get_subblockid() * get_block_num();

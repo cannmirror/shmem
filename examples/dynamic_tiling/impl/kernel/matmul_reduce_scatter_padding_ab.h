@@ -31,9 +31,6 @@
 #include "catcoc/detail/remote_copy_type.h"
 #include "catcoc/dgemm/kernel/matmul_reduce_scatter_padding.h"
 
-using namespace AscendC;
-using namespace Catcoc;
-
 template <
     class ArchTag,
     class ElementA, class LayoutA,
@@ -90,13 +87,13 @@ void MatmulReduceScatterPaddingABImpl(
     using RemoteSrcType = SymmetricType;
     using RemoteDstType = DType;
     using CopyDirect = Catcoc::detail::CopyDirect;
-    using TileRemoteCopy = CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Get>;
+    using TileRemoteCopy = Catcoc::CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Get>;
     using TileScheduler = Catlass::Epilogue::Tile::EpilogueIdentityTileSwizzle;
 
     constexpr bool isDynamic = true;
-    using EpilogueReduceScatterDispatch = CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
+    using EpilogueReduceScatterDispatch = Catcoc::CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
         Catcoc::detail::CopyMode::Scatter, isDynamic>;
-    using BlockEpilogueReduceScatter = CommEpilogue::Block::CommBlockEpilogue<
+    using BlockEpilogueReduceScatter = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         EpilogueReduceScatterDispatch,
         RemoteSrcType, RemoteDstType,
         void,
@@ -104,7 +101,7 @@ void MatmulReduceScatterPaddingABImpl(
         void, TileRemoteCopy, TileScheduler
     >;
 
-    using MatmulReduceScatterKernel = DGemm::Kernel::MatmulReduceScatterPadding<
+    using MatmulReduceScatterKernel = Catcoc::DGemm::Kernel::MatmulReduceScatterPadding<
         GlobalPaddingA,
         GlobalPaddingB,
         BlockMmad,

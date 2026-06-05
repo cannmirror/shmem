@@ -17,8 +17,8 @@
 #include "device_udma_transport_manager.h"
 #endif
 
-using namespace shm;
-using namespace shm::transport;
+namespace shm {
+namespace transport {
 
 std::shared_ptr<TransportManager> TransportManager::Create(TransportType type)
 {
@@ -65,3 +65,6 @@ Result TransportManager::ConnectWithOptions(const HybmTransPrepareOptions &optio
 
     return UpdateRankOptions(options);
 }
+
+}  // namespace transport
+}  // namespace shm

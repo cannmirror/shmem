@@ -16,8 +16,6 @@
 #include "mem_entity_default.h"
 #include "mem_entity_inter.h"
 
-using namespace shm::transport;
-
 namespace shm {
 
 thread_local bool MemEntityDefault::isSetDevice_ = false;
@@ -794,12 +792,12 @@ Result MemEntityDefault::InitTransManager()
     }
 
     if (options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_RDMA) {
-        transportManager_ = transport::TransportManager::Create(TransportType::TT_HCCP);
+        transportManager_ = transport::TransportManager::Create(transport::TransportType::TT_HCCP);
     } else if (options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_SDMA) {
-        transportManager_ = transport::TransportManager::Create(TransportType::TT_SDMA);
+        transportManager_ = transport::TransportManager::Create(transport::TransportType::TT_SDMA);
     } else if (options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_UDMA) {
 #if defined(ACLSHMEM_UDMA_SUPPORT)
-        transportManager_ = transport::TransportManager::Create(TransportType::TT_UDMA);
+        transportManager_ = transport::TransportManager::Create(transport::TransportType::TT_UDMA);
 #else
         SHM_LOG_ERROR("DEVICE UDMA support is not enabled in this build.");
         return ACLSHMEM_NOT_SUPPORTED;

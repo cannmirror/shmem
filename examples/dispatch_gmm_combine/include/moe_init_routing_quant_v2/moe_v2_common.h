@@ -18,8 +18,6 @@
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
 constexpr int64_t SPLIT_N = 0;
 constexpr int64_t SPLIT_K = 1;
 constexpr float MIN_FP32 = -3.4e38;
@@ -88,11 +86,11 @@ __aicore__ inline T Max(T a, T b)
     return a < b ? b : a;
 }
 
-template <HardEvent event>
-__aicore__ inline void SetWaitFlag(HardEvent evt) {
+template <AscendC::HardEvent event>
+__aicore__ inline void SetWaitFlag(AscendC::HardEvent evt) {
     event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(evt));
-    SetFlag<event>(eventId);
-    WaitFlag<event>(eventId);
+    AscendC::SetFlag<event>(eventId);
+    AscendC::WaitFlag<event>(eventId);
 }
 
 }  // namespace MoeInitRoutingQuantV2

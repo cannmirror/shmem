@@ -24,13 +24,11 @@
 // from shmem-device
 #include "shmem.h"
 
-using namespace Catlass;
-
 CATLASS_DEVICE
-MatrixCoord GetActualShape(const MatrixCoord &blockCount, const MatrixCoord &blockCoord, const MatrixCoord &blockShape,
-                           const MatrixCoord &residue)
+Catlass::MatrixCoord GetActualShape(const Catlass::MatrixCoord &blockCount, const Catlass::MatrixCoord &blockCoord,
+                                    const Catlass::MatrixCoord &blockShape, const Catlass::MatrixCoord &residue)
 {
-    MatrixCoord c = blockShape;
+    Catlass::MatrixCoord c = blockShape;
 
     if ((residue.row() != 0) && (blockCoord.row() == blockCount.row() - 1)) {
         c.row() = residue.row();
@@ -59,11 +57,11 @@ public:
     // Type aliases
     using ArchTag = Arch::AtlasA2;
 
-    using ElementC = half;
-    using ElementAttachedSource = half;
-    using ElementAttachedOutput = half;
+    using ElementC = AscendC::half;
+    using ElementAttachedSource = AscendC::half;
+    using ElementAttachedOutput = AscendC::half;
 
-    using LayoutStore = layout::RowMajor;
+    using LayoutStore = Catlass::layout::RowMajor;
 
     using LayoutWorkspace = LayoutStore;
 
@@ -126,7 +124,7 @@ public:
         auto loopNumPerComm = aicoreNum * pValue;
 
         auto layoutPeerMemStore =
-            layout::RowMajor(blockShape.row() * loopNumPerComm * BufferNum, blockShape.column(), blockShape.column());
+            Catlass::layout::RowMajor(blockShape.row() * loopNumPerComm * BufferNum, blockShape.column(), blockShape.column());
 
         // re-sliced Block by comm cores
         uint32_t flagIdx = calIdx % BufferNum;
@@ -170,10 +168,10 @@ public:
 
                 // [ReduceScatter] 1. Alloc TmpUB
                 int tmpBufferSize = 32 * 1024 / sizeof(ElementC);  // 32 KB
-                AscendC::LocalTensor<half> tmpBuffer1 = resource.ubBuf.template GetBufferByByte<ElementC>(0);
+                AscendC::LocalTensor<AscendC::half> tmpBuffer1 = resource.ubBuf.template GetBufferByByte<ElementC>(0);
                 tmpBuffer1.SetSize(tmpBufferSize);
-                int tmpBufferOffset = 96 * 1024;  // half of UB
-                AscendC::LocalTensor<half> tmpBuffer2 =
+                int tmpBufferOffset = 96 * 1024;  // AscendC::half of UB
+                AscendC::LocalTensor<AscendC::half> tmpBuffer2 =
                     resource.ubBuf.template GetBufferByByte<ElementC>(tmpBufferOffset);
                 tmpBuffer2.SetSize(tmpBufferSize);
 
@@ -246,10 +244,10 @@ public:
 
                 // [AllGather] 1. Alloc TmpUB
                 int tmpBufferSize = 32 * 1024 / sizeof(ElementC);  // 32 KB
-                AscendC::LocalTensor<half> tmpBuffer1 = resource.ubBuf.template GetBufferByByte<ElementC>(0);
+                AscendC::LocalTensor<AscendC::half> tmpBuffer1 = resource.ubBuf.template GetBufferByByte<ElementC>(0);
                 tmpBuffer1.SetSize(tmpBufferSize);
-                int tmpBufferOffset = 96 * 1024;  // half of UB
-                AscendC::LocalTensor<half> tmpBuffer2 =
+                int tmpBufferOffset = 96 * 1024;  // AscendC::half of UB
+                AscendC::LocalTensor<AscendC::half> tmpBuffer2 =
                     resource.ubBuf.template GetBufferByByte<ElementC>(tmpBufferOffset);
                 tmpBuffer2.SetSize(tmpBufferSize);
 
@@ -286,8 +284,8 @@ public:
                             auto outputOffset = outputBlockTileOffset * gemmBlockShape + residueOutputOffset;
 
                             auto actualMoveShape = MatrixCoord{actualMoveM, outputBlockGemmActualSize.n()};
-                            layout::RowMajor layoutInput = layoutPeerMemStore.GetTileLayout(actualMoveShape);
-                            layout::RowMajor layoutOutput = params.layoutDestination.GetTileLayout(actualMoveShape);
+                            Catlass::layout::RowMajor layoutInput = layoutPeerMemStore.GetTileLayout(actualMoveShape);
+                            Catlass::layout::RowMajor layoutOutput = params.layoutDestination.GetTileLayout(actualMoveShape);
                             int64_t inputElemOffset = layoutInput.GetOffset(inputOffset);
                             int64_t outputElemOffset = layoutOutput.GetOffset(outputOffset);
 

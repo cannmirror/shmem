@@ -30,7 +30,7 @@
 #include "hybm_mem_common.h"
 #include "hybm_vmm_based_segment.h"
 
-using namespace shm;
+namespace shm {
 
 Result HybmVmmBasedSegment::ValidateOptions() noexcept
 {
@@ -466,3 +466,5 @@ bool HybmVmmBasedSegment::CheckSdmaReaches(uint32_t remoteRankId) const noexcept
 
     return IsSdmaAccessible(pos->second.superPodId, pos->second.serverId, pos->second.logicDeviceId);
 }
+
+}  // namespace shm

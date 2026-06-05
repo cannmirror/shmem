@@ -16,8 +16,6 @@
 #include "device/gm2gm/shmem_device_rma.h"
 #include "shmemi_device_mo.h"
 
-using namespace std;
-
 #define ACLSHMEM_TYPE_FUNC(FUNC) \
     FUNC(float, float);       \
     FUNC(double, double);     \

@@ -18,9 +18,6 @@
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
-
 class MoeV2SortBase {
 public:
     __aicore__ inline MoeV2SortBase()
@@ -29,17 +26,17 @@ public:
 protected:
     __aicore__ inline void SyncAll();
 
-    TPipe *pipe;
-    TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
-    TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
-    TBuf <TPosition::VECCALC> tempBuffer;
-    TBuf <TPosition::VECCALC> sortedBuffer;
+    AscendC::TPipe *pipe;
+    AscendC::TQue<AscendC::QuePosition::VECIN, 1> sortDataCopyInQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> sortDataCopyOutQueue;
+    AscendC::TBuf <AscendC::TPosition::VECCALC> tempBuffer;
+    AscendC::TBuf <AscendC::TPosition::VECCALC> sortedBuffer;
 
-    GlobalTensor <int32_t> expertIdxGm;
-    GlobalTensor <int32_t> sortedexpertIdxGm;
-    GlobalTensor <int32_t> expandDstToSrcRowGm;
-    GlobalTensor <int32_t> expertTokensCountOrCumsumGm;
-    GlobalTensor <int32_t> expertTokensBeforeCapacityGm;
+    AscendC::GlobalTensor <int32_t> expertIdxGm;
+    AscendC::GlobalTensor <int32_t> sortedexpertIdxGm;
+    AscendC::GlobalTensor <int32_t> expandDstToSrcRowGm;
+    AscendC::GlobalTensor <int32_t> expertTokensCountOrCumsumGm;
+    AscendC::GlobalTensor <int32_t> expertTokensBeforeCapacityGm;
 
     int64_t tileLength;
     int64_t bufferNum = 1;

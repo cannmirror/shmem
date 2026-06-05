@@ -32,9 +32,6 @@
 #include "catcoc/dgemm/block/block_swizzle_allgather.h"
 #include "catcoc/dgemm/kernel/allgather_matmul_padding.h"
 
-using namespace AscendC;
-using namespace Catcoc;
-
 template <
     class ArchTag,
     class ElementA, class LayoutA,
@@ -83,13 +80,13 @@ void AllGatherMatmulPaddingImpl(
     using RemoteSrcType = AType;
     using RemoteDstType = AType;
     using CopyDirect = Catcoc::detail::CopyDirect;
-    using TileRemoteCopy = CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Put>;
+    using TileRemoteCopy = Catcoc::CommEpilogue::Tile::TileRemoteCopy<ArchTag, RemoteSrcType, RemoteDstType, CopyDirect::Put>;
     using TileScheduler = Catlass::Epilogue::Tile::EpilogueIdentityTileSwizzle;
 
     constexpr bool isDynamic = true;
-    using EpilogueAllGatherDispatch = CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
+    using EpilogueAllGatherDispatch = Catcoc::CommEpilogue::EpilogueAtlasA2CommRemoteCopy<UB_STAGES,
         Catcoc::detail::CopyMode::Gather, isDynamic>;
-    using BlockEpilogueAllGather = CommEpilogue::Block::CommBlockEpilogue<
+    using BlockEpilogueAllGather = Catcoc::CommEpilogue::Block::CommBlockEpilogue<
         EpilogueAllGatherDispatch,
         RemoteSrcType, RemoteDstType,
         void,
@@ -97,7 +94,7 @@ void AllGatherMatmulPaddingImpl(
         void, TileRemoteCopy, TileScheduler
     >;
 
-    using AllGatherMatmulKernel = DGemm::Kernel::AllGatherMatmulPadding<
+    using AllGatherMatmulKernel = Catcoc::DGemm::Kernel::AllGatherMatmulPadding<
         GlobalPaddingB,
         BlockMmad,
         BlockEpilogueAllGather,

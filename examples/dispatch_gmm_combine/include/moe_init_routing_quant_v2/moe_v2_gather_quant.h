@@ -19,8 +19,6 @@
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {
-using namespace AscendC;
-using namespace optiling;
 constexpr int64_t BUFFER_NUM = 2;
 
 template<typename T>
@@ -31,7 +29,7 @@ public:
 
     __aicore__ inline void
     Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-         GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe);
+         GM_ADDR workspace, const optiling::MoeInitRoutingQuantV2TilingData *tilingData, AscendC::TPipe *tPipe);
 
     __aicore__ inline void Process();
 
@@ -42,20 +40,20 @@ private:
 
     __aicore__ inline void CopyOut(int64_t progress);
 
-    TPipe *pipe;
-    TQue <QuePosition::VECIN, BUFFER_NUM> inputXCopyInQueue;
-    TQue <QuePosition::VECIN, BUFFER_NUM> expandRowIdxCopyInQueue;
-    TQue <QuePosition::VECOUT, BUFFER_NUM> inputXCopyOutQueue;
-    TQue<QuePosition::VECOUT, 1> floatQueue;
-    TQue<QuePosition::VECOUT, 1> halfQueue;
+    AscendC::TPipe *pipe;
+    AscendC::TQue <AscendC::QuePosition::VECIN, BUFFER_NUM> inputXCopyInQueue;
+    AscendC::TQue <AscendC::QuePosition::VECIN, BUFFER_NUM> expandRowIdxCopyInQueue;
+    AscendC::TQue <AscendC::QuePosition::VECOUT, BUFFER_NUM> inputXCopyOutQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> floatQueue;
+    AscendC::TQue<AscendC::QuePosition::VECOUT, 1> halfQueue;
 
-    GlobalTensor<T> inputXGm;
-    GlobalTensor<int8_t> expandedXGm;
-    GlobalTensor<int32_t> expandedRowIdxGm;
-    GlobalTensor<float> scaleGm;
-    GlobalTensor<float> offsetGm;
+    AscendC::GlobalTensor<T> inputXGm;
+    AscendC::GlobalTensor<int8_t> expandedXGm;
+    AscendC::GlobalTensor<int32_t> expandedRowIdxGm;
+    AscendC::GlobalTensor<float> scaleGm;
+    AscendC::GlobalTensor<float> offsetGm;
 
-    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
+    const optiling::InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -84,10 +82,10 @@ private:
 template<typename T>
 __aicore__ inline void MoeV2GatherQuant<T>::CopyInIndices(int64_t progress) {
     this->indicesOffset = progress * this->perLoopRows;
-    LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(this->currentLoopRows * sizeof(int32_t)), 0, 0, 0};
-    DataCopyPadExtParams <int32_t> dataCopyPadParams{false, 0, 0, 0};
-    DataCopyPad(indicesLocal, expandedRowIdxGm[indicesOffset], dataCopyParams, dataCopyPadParams);
+    AscendC::LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.AllocTensor<int32_t>();
+   AscendC::DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(this->currentLoopRows * sizeof(int32_t)), 0, 0, 0};
+   AscendC::DataCopyPadExtParams <int32_t> dataCopyPadParams{false, 0, 0, 0};
+    AscendC::DataCopyPad(indicesLocal, expandedRowIdxGm[indicesOffset], dataCopyParams, dataCopyPadParams);
     expandRowIdxCopyInQueue.
     EnQue<int32_t>(indicesLocal);
 }
@@ -95,42 +93,42 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyInIndices(int64_t progress) {
 template<typename T>
 __aicore__ inline void MoeV2GatherQuant<T>::Compute()
 {
-    LocalTensor<T> inLocal = inputXCopyInQueue.DeQue<T>();
-    LocalTensor<int8_t> outLocal = inputXCopyOutQueue.AllocTensor<int8_t>();
-    LocalTensor<float> floatLocal = floatQueue.AllocTensor<float>();
-    LocalTensor<half> halfLocal = halfQueue.AllocTensor<half>();
+    AscendC::LocalTensor<T> inLocal = inputXCopyInQueue.DeQue<T>();
+    AscendC::LocalTensor<int8_t> outLocal = inputXCopyOutQueue.AllocTensor<int8_t>();
+    AscendC::LocalTensor<float> floatLocal = floatQueue.AllocTensor<float>();
+    AscendC::LocalTensor<half> halfLocal = halfQueue.AllocTensor<half>();
     uint32_t elements = Align(this->colsTileLength, sizeof(T));
-    if constexpr(IsSameType<T, bfloat16_t>::value) {
-        Cast(floatLocal, inLocal, RoundMode::CAST_NONE, elements);
+    if constexpr(AscendC::IsSameType<T, bfloat16_t>::value) {
+        AscendC::Cast(floatLocal, inLocal, AscendC::RoundMode::CAST_NONE, elements);
         pipe_barrier(PIPE_V);
-        Cast(halfLocal, floatLocal, RoundMode::CAST_NONE, elements);
+        AscendC::Cast(halfLocal, floatLocal, AscendC::RoundMode::CAST_NONE, elements);
         pipe_barrier(PIPE_V);
-        Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
+        AscendC::Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
         pipe_barrier(PIPE_V);
-        Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
+        AscendC::Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
         pipe_barrier(PIPE_V);
-        LocalTensor<int32_t> intLocal = floatLocal.ReinterpretCast<int32_t>();
-        Cast(intLocal, halfLocal, RoundMode::CAST_RINT, elements);
+        AscendC::LocalTensor<int32_t> intLocal = floatLocal.ReinterpretCast<int32_t>();
+        AscendC::Cast(intLocal, halfLocal, AscendC::RoundMode::CAST_RINT, elements);
         pipe_barrier(PIPE_V);
-        SetDeqScale((half) 1.000000e+00f);
+        AscendC::SetDeqScale((half) 1.000000e+00f);
         pipe_barrier(PIPE_V);
-        Cast(halfLocal, intLocal, RoundMode::CAST_RINT, elements);
+        AscendC::Cast(halfLocal, intLocal, AscendC::RoundMode::CAST_RINT, elements);
         pipe_barrier(PIPE_V);
-        Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
-    } else if constexpr(IsSameType<T, float>::value) {
-        Cast(halfLocal, inLocal, RoundMode::CAST_NONE, elements);
+        AscendC::Cast(outLocal, halfLocal, AscendC::RoundMode::CAST_RINT, elements);
+    } else if constexpr(AscendC::IsSameType<T, float>::value) {
+        AscendC::Cast(halfLocal, inLocal, AscendC::RoundMode::CAST_NONE, elements);
         pipe_barrier(PIPE_V);
-        Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
+        AscendC::Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
         pipe_barrier(PIPE_V);
-        Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
+        AscendC::Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
         pipe_barrier(PIPE_V);
-        Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
+        AscendC::Cast(outLocal, halfLocal, AscendC::RoundMode::CAST_RINT, elements);
     } else {
-        Muls(inLocal, inLocal, static_cast<T>(this->scale), elements);
+        AscendC::Muls(inLocal, inLocal, static_cast<T>(this->scale), elements);
         pipe_barrier(PIPE_V);
-        Adds(inLocal, inLocal, static_cast<T>(this->offset), elements);
+        AscendC::Adds(inLocal, inLocal, static_cast<T>(this->offset), elements);
         pipe_barrier(PIPE_V);
-        Cast(outLocal, inLocal, RoundMode::CAST_RINT, elements);
+        AscendC::Cast(outLocal, inLocal, AscendC::RoundMode::CAST_RINT, elements);
     }
     inputXCopyOutQueue.EnQue(outLocal);
     floatQueue.FreeTensor(floatLocal);
@@ -139,8 +137,8 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()
 
 template<typename T>
 __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress) {
-    LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.DeQue<int32_t>();
-    SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
+    AscendC::LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.DeQue<int32_t>();
+    SetWaitFlag<AscendC::HardEvent::MTE2_S>(AscendC::HardEvent::MTE2_S);
     colsTileLength = this->perLoopCols;
     for (int64_t colsLoop = 0; colsLoop < this->colLoops; colsLoop++) {
         int64_t initialRow = this->gatherOutTilingData->perCoreRows * this->blockIdx + this->perLoopRows * progress;
@@ -151,19 +149,19 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress) {
         int64_t currentLoopStartRow = initialRow / this->k;
         int64_t currentLoopLastRow = (initialRow + this->currentLoopRows - 1) / this->k;
         for (int64_t row = currentLoopStartRow; row <= currentLoopLastRow; row++) {
-            LocalTensor<T> inLocal = inputXCopyInQueue.AllocTensor<T>();
+            AscendC::LocalTensor<T> inLocal = inputXCopyInQueue.AllocTensor<T>();
             // input row position
             inputOffset = row * this->cols + colsLoop * this->perLoopCols;
-            DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(this->colsTileLength * sizeof(T)), 0, 0, 0};
-            DataCopyPadExtParams<T> dataCopyPadParams{false, 0, 0, 0};
-            DataCopyPad(inLocal, inputXGm[inputOffset], dataCopyParams, dataCopyPadParams);
+           AscendC::DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(this->colsTileLength * sizeof(T)), 0, 0, 0};
+           AscendC::DataCopyPadExtParams<T> dataCopyPadParams{false, 0, 0, 0};
+            AscendC::DataCopyPad(inLocal, inputXGm[inputOffset], dataCopyParams, dataCopyPadParams);
             inputXCopyInQueue.
             EnQue<T>(inLocal);
 
             Compute();
 
-            LocalTensor<int8_t> outLocal = inputXCopyOutQueue.DeQue<int8_t>();
-            DataCopyExtParams intriParams{1, static_cast<uint32_t>(this->colsTileLength * sizeof(int8_t)), 0, 0, 0};
+            AscendC::LocalTensor<int8_t> outLocal = inputXCopyOutQueue.DeQue<int8_t>();
+           AscendC::DataCopyExtParams intriParams{1, static_cast<uint32_t>(this->colsTileLength * sizeof(int8_t)), 0, 0, 0};
             while (curLoopRow < this->currentLoopRows &&initialRow / this->k == row) {
                 int32_t outIndex = indicesLocal.GetValue(curLoopRow);
                 curLoopRow++;
@@ -172,7 +170,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress) {
                     continue;
                 }
                 outOffset = outIndex * cols + colsLoop * this->perLoopCols;
-                DataCopyPad(expandedXGm[outOffset], outLocal, intriParams);
+                AscendC::DataCopyPad(expandedXGm[outOffset], outLocal, intriParams);
             }
             inputXCopyInQueue.
             FreeTensor(inLocal);
@@ -188,7 +186,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress) {
 template<typename T>
 __aicore__ inline void MoeV2GatherQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
                                                  GM_ADDR expandedX, GM_ADDR workspace,
-                                                 const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe)
+                                                 const optiling::MoeInitRoutingQuantV2TilingData *tilingData, AscendC::TPipe *tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = get_block_idx() + get_subblockid() * get_block_num();

@@ -15,8 +15,6 @@
 #include "host_device/shmem_common_types.h"
 #include "gm2gm/shmemi_device_cc_kernel.h"
 
-using namespace std;
-
 #define ACLSHMEM_PUT_TYPENAME_MEM_SIGNAL(NAME, TYPE)                                                                    \
     /**                                                                                                                 \
      * @brief Synchronous interface. Copy a contiguous data on local UB to symmetric address on the specified PE.       \

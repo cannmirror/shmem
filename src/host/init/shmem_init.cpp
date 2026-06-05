@@ -23,8 +23,6 @@
 #include "host/shmem_host_def.h"
 #include "prof/prof_util.h"
 
-using namespace std;
-
 #define DEFAULT_MY_PE (-1)
 #define DEFAULT_N_PES (-1)
 

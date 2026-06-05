@@ -14,8 +14,6 @@
 #include "host_device/shmem_common_types.h"
 #include "host/data_plane/shmem_host_rma.h"
 
-using namespace std;
-
 inline bool check_heap_addr(void *ptr, uint64_t heap_base, size_t heap_size)
 {
     uint64_t lower_bound = heap_base;

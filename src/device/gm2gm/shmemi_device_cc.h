@@ -340,13 +340,13 @@ ACLSHMEM_DEVICE void aclshmemi_barrier(aclshmem_team_t team)
 
 ACLSHMEM_DEVICE void dcci_cacheline(__gm__ uint8_t * addr)
 {
-    using namespace AscendC;
-    GlobalTensor<uint8_t> global;
+    AscendC::GlobalTensor<uint8_t> global;
     global.SetGlobalBuffer(addr);
 
     // Important: add hint to avoid dcci being optimized by compiler
     __asm__ __volatile__("");
-    DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(global);
+    AscendC::DataCacheCleanAndInvalid<uint8_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
+        AscendC::DcciDst::CACHELINE_OUT>(global);
     __asm__ __volatile__("");
 }
 
@@ -368,30 +368,28 @@ ACLSHMEM_DEVICE void dcci_cachelines(__gm__ uint8_t* addr, uint64_t length)
 
 ACLSHMEM_DEVICE void dcci_entire_cache()
 {
-    using namespace AscendC;
-    GlobalTensor<uint8_t> global;
-    
+    AscendC::GlobalTensor<uint8_t> global;
+
     // Important: add hint to avoid dcci being optimized by compiler
     __asm__ __volatile__("");
-    DataCacheCleanAndInvalid<uint8_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_OUT>(global);
+    AscendC::DataCacheCleanAndInvalid<uint8_t, AscendC::CacheLine::ENTIRE_DATA_CACHE,
+        AscendC::DcciDst::CACHELINE_OUT>(global);
     __asm__ __volatile__("");
 }
 
 ACLSHMEM_DEVICE void dcci_atomic()
 {
-    using namespace AscendC;
-    GlobalTensor<uint8_t> global;
+    AscendC::GlobalTensor<uint8_t> global;
 
     __asm__ __volatile__("");
-    DataCacheCleanAndInvalid<uint8_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_ATOMIC>(global);
+    AscendC::DataCacheCleanAndInvalid<uint8_t, AscendC::CacheLine::ENTIRE_DATA_CACHE,
+        AscendC::DcciDst::CACHELINE_ATOMIC>(global);
     __asm__ __volatile__("");
 }
 
 ACLSHMEM_DEVICE void dsb_all()
 {
-    using namespace AscendC;
-    
-    DataSyncBarrier<MemDsbT::ALL>();
+    AscendC::DataSyncBarrier<AscendC::MemDsbT::ALL>();
 }
 
 ACLSHMEM_DEVICE void aclshmemi_barrier_cross_host(aclshmemx_team_t *team)

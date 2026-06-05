@@ -19,6 +19,7 @@
 #include "shmem.h"
 #include "shmemi_host_common.h"
 #include "unittest_main_test.h"
+#include "unittest/utils/hbm_leak_checker.h"
 
 int test_global_ranks;
 int test_gnpu_num;
@@ -391,6 +392,18 @@ int main(int argc, char** argv)
     test_first_rank = std::atoi(argv[idx++]);
     test_first_npu = std::atoi(argv[idx++]);
 
+    HbmLeakChecker::Instance().SetCardRange(test_first_npu, test_gnpu_num);
+    if (!HbmLeakChecker::Instance().CheckBefore()) {
+      std::cout << "WARNING: HBM baseline sampling failed, leak detection "
+                << "may be incomplete." << std::endl;
+    }
+
     ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    int result = RUN_ALL_TESTS();
+
+    bool no_leak = HbmLeakChecker::Instance().CheckAfter();
+    if (!no_leak && result == 0) {
+      return 1;
+    }
+    return result;
 }

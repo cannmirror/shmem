@@ -322,10 +322,15 @@ ACLSHMEM_DEVICE void aclshmemi_udma_fill_sqe_ctx(
     // Fill SQE control information (reference udma_fill_write_sqe logic)
     if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
         sqeCtx->opcode = static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_WRITE);
-        sqeCtx->flag = 0b10100010; // udf_flag = 1 for write with reduce
+        // udf_flag = 1 for write with reduce; last 2 bits = 00 (NO, no ordering) for higher throughput.
+        sqeCtx->flag = 0b10100000;
     } else {
         sqeCtx->opcode = static_cast<uint32_t>(OP_CODE);
-        sqeCtx->flag = 0b00100010;
+        // Last 2 bits = 00 (NO, no ordering) for higher throughput.
+        // Note: aclshmemx_udma_quiet only guarantees completion of submitted WQEs,
+        // it does NOT restore inter-submission ordering — the framework currently
+        // does not provide a strong-ordering primitive for this path.
+        sqeCtx->flag = 0b00100000;
     }
     sqeCtx->nf = 0; // Need fence
     sqeCtx->tokenEn = remoteMemInfo->tokenValueValid;
@@ -529,7 +534,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
         aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY> signal_params{
             .sig_addr = (__gm__ uint64_t*)(sig_addr_dst), .signal = signal};
         aclshmemi_udma_write_notify<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY>(
-            (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T), signal_params);
+            (__gm__ T*)ptr, src, pe, 0, elem_size * sizeof(T), signal_params);
     } else {
         ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
     }

@@ -27,8 +27,7 @@
 constexpr uint32_t MAX_RETRY_TIMES = 1000000;
 
 ACLSHMEM_DEVICE void aclshmemi_dump_sge(__gm__ uint8_t* wqeAddr, uint32_t sge_num);
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr);
+ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr, uint32_t atomicLen);
 
 ACLSHMEM_DEVICE __gm__ ACLSHMEMAIVUDMAInfo* aclshmemi_udma_qp_info_fetch()
 {
@@ -131,8 +130,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(
     st_dev(curTail, (__gm__ uint32_t*)curWQTailAddr, 0);
 }
 
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr)
+ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr, uint32_t atomicLen)
 {
     if (wqeAddr == nullptr) {
         AscendC::printf("WQE: nullptr pointer\n");
@@ -190,15 +188,21 @@ ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr)
     }
     aclshmemi_dump_sge(wqeAddr, sgeNum);
     if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OPCODE_FAA)) {
-        __gm__ T* amoDataAddr = (__gm__ T*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx));
-        T add_data = *amoDataAddr;
-        AscendC::printf("SGE: add_data: 0x%llx \n", (unsigned long long)add_data);
+        __gm__ uint8_t* amoDataAddr = (__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx);
+        uint64_t add_lo = (atomicLen == sizeof(uint32_t))
+            ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr)
+            : *(__gm__ uint64_t*)amoDataAddr;
+        AscendC::printf("SGE: add_data: 0x%llx \n", (unsigned long long)add_lo);
     } else if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_CAS)) {
-        __gm__ T* amoDataAddr = (__gm__ T*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx));
-        T swap_data = *amoDataAddr;
-        T cond_data = *(amoDataAddr + 1);
+        __gm__ uint8_t* amoDataAddr = (__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx);
+        uint64_t swap_lo = (atomicLen == sizeof(uint32_t))
+            ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr)
+            : *(__gm__ uint64_t*)amoDataAddr;
+        uint64_t cond_lo = (atomicLen == sizeof(uint32_t))
+            ? static_cast<uint64_t>(*(__gm__ uint32_t*)(amoDataAddr + atomicLen))
+            : *(__gm__ uint64_t*)(amoDataAddr + atomicLen);
         AscendC::printf("SGE: cond_data: 0x%llx, swap_data: 0x%llx\n",
-            (unsigned long long)cond_data, (unsigned long long)swap_data);
+            (unsigned long long)cond_lo, (unsigned long long)swap_lo);
     }
 }
 
@@ -413,7 +417,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
-    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe<T>, (__gm__ uint8_t*)sqeCtx);
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeCtx, (uint32_t)sizeof(T));
 }
 
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm__ ACLSHMEMUDMAWQCtx*& qpCtxEntry)

@@ -122,5 +122,5 @@ TEST(TestMemApi, TestShmemCMOMem)
 {
     const int processCount = test_gnpu_num;
     uint64_t local_mem_size = 1024UL * 1024UL * 64;
-    return;
+    // test_mutil_task(test_aclshmem_cmo_mem, local_mem_size, processCount);
 }

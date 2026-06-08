@@ -115,9 +115,8 @@ extern "C" __global__ __aicore__ void PutNotifyWaitTestTensor(GM_ADDR gva, uint6
         int64_t my_pe = aclshmem_my_pe();
         int64_t n_pes = aclshmem_n_pes();
 
-        // Define temporary UB buffer as LocalTensor for SDMA operations
         constexpr uint32_t ub_offset = 1024;
-        constexpr uint32_t ub_size = 64;  // 64B for temporary buffer
+        constexpr uint32_t ub_size = 64;
         AscendC::LocalTensor<uint8_t> tmp_local;
         tmp_local.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
         tmp_local.address_.bufferAddr = ub_offset;
@@ -169,9 +168,8 @@ extern "C" __global__ __aicore__ void GetNotifyWaitTestTensor(GM_ADDR gva, uint6
         int64_t my_pe = aclshmem_my_pe();
         int64_t n_pes = aclshmem_n_pes();
 
-        // Define temporary UB buffer as LocalTensor for SDMA operations
         constexpr uint32_t ub_offset = 1024;
-        constexpr uint32_t ub_size = 64;  // 64B for temporary buffer
+        constexpr uint32_t ub_size = 64;
         AscendC::LocalTensor<uint8_t> tmp_local;
         tmp_local.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
         tmp_local.address_.bufferAddr = ub_offset;
@@ -194,16 +192,16 @@ extern "C" __global__ __aicore__ void GetNotifyWaitTestTensor(GM_ADDR gva, uint6
         if (base_per_core == 0) {
             return;
         }
-        GM_ADDR data_addr = gva + my_pe * MESSAGE_SIZE + data_offset;
-        AscendC::GlobalTensor<uint8_t> src_tensor;
-        src_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(data_addr), base_per_core);
-        AscendC::GlobalTensor<uint8_t> dst_tensor;
-        dst_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(data_addr), base_per_core);
         for (int64_t peer = 0; peer < n_pes; peer++) {
             if (peer == my_pe) {
                 continue;
             }
-            aclshmemx_sdma_put_nbi(dst_tensor, src_tensor, tmp_local, base_per_core, peer, EVENT_ID0);
+            GM_ADDR data_addr = gva + peer * MESSAGE_SIZE + data_offset;
+            AscendC::GlobalTensor<uint8_t> src_tensor;
+            src_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(data_addr), base_per_core);
+            AscendC::GlobalTensor<uint8_t> dst_tensor;
+            dst_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(data_addr), base_per_core);
+            aclshmemx_sdma_get_nbi(dst_tensor, src_tensor, tmp_local, base_per_core, peer, EVENT_ID0);
         }
         aclshmemx_sdma_notify_record(tmp_local, EVENT_ID0);
     }

@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 #include <dlfcn.h>
 #include "dl_acl_api.h"
 #include "shmemi_file_util.h"
@@ -15,7 +15,9 @@ namespace shm {
 bool DlAclApi::gLoaded = false;
 std::mutex DlAclApi::gMutex;
 void *DlAclApi::rtHandle;
+void *DlAclApi::runtimeHandle;
 const char *DlAclApi::gAscendAclLibName = "libascendcl.so";
+const char *DlAclApi::gAscendRuntimeLibName = "libruntime.so";
 
 aclrtGetDeviceFunc DlAclApi::pAclrtGetDevice = nullptr;
 aclrtSetDeviceFunc DlAclApi::pAclrtSetDevice = nullptr;
@@ -37,6 +39,8 @@ rtIpcOpenMemoryFunc DlAclApi::pRtIpcOpenMemory = nullptr;
 rtIpcCloseMemoryFunc DlAclApi::pRtIpcCloseMemory = nullptr;
 aclrtGetSocNameFunc DlAclApi::pAclrtGetSocName = nullptr;
 rtGetLogicDevIdByUserDevIdFunc DlAclApi::pRtGetLogicDevIdByUserDevId = nullptr;
+aclrtGetPhyDevIdByLogicDevIdFunc DlAclApi::pAclrtGetPhyDevIdByLogicDevId = nullptr;
+rtGetDevicePhyIdByIndexFunc DlAclApi::pRtGetDevicePhyIdByIndex = nullptr;
 
 Result DlAclApi::LoadLibrary(const std::string &libDirPath)
 {
@@ -80,6 +84,39 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
     DL_LOAD_SYM(pAclrtGetSocName, aclrtGetSocNameFunc, rtHandle, "aclrtGetSocName");
     DL_LOAD_SYM(pRtGetLogicDevIdByUserDevId, rtGetLogicDevIdByUserDevIdFunc, rtHandle, "rtGetLogicDevIdByUserDevId");
 
+    pAclrtGetPhyDevIdByLogicDevId =
+        reinterpret_cast<aclrtGetPhyDevIdByLogicDevIdFunc>(dlsym(rtHandle, "aclrtGetPhyDevIdByLogicDevId"));
+    if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+        SHM_LOG_WARN("Optional symbol aclrtGetPhyDevIdByLogicDevId is not loaded.");
+    }
+
+    std::string runtimePath;
+    if (shm::utils::FileUtil::LibraryRealPath(libDirPath, std::string(gAscendRuntimeLibName), runtimePath)) {
+        runtimeHandle = dlopen(runtimePath.c_str(), RTLD_NOW | RTLD_LOCAL);
+    } else {
+        runtimeHandle = dlopen(gAscendRuntimeLibName, RTLD_NOW | RTLD_LOCAL);
+    }
+    if (runtimeHandle == nullptr) {
+        SHM_LOG_ERROR("Failed to open libruntime.so error: " << dlerror());
+        dlclose(rtHandle);
+        rtHandle = nullptr;
+        return ACLSHMEM_DL_FUNC_FAILED;
+    }
+
+    pRtGetDevicePhyIdByIndex = reinterpret_cast<rtGetDevicePhyIdByIndexFunc>(
+        dlsym(runtimeHandle, "rtGetDevicePhyIdByIndex"));
+    if (pRtGetDevicePhyIdByIndex == nullptr && pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+        SHM_LOG_ERROR("Neither aclrtGetPhyDevIdByLogicDevId nor rtGetDevicePhyIdByIndex is available.");
+        dlclose(runtimeHandle);
+        runtimeHandle = nullptr;
+        dlclose(rtHandle);
+        rtHandle = nullptr;
+        return ACLSHMEM_DL_FUNC_FAILED;
+    }
+    if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+        SHM_LOG_INFO("aclrtGetPhyDevIdByLogicDevId not found, use rtGetDevicePhyIdByIndex for phy id mapping.");
+    }
+
     gLoaded = true;
     SHM_LOG_INFO("Load " << realPath << " success.");
     return ACLSHMEM_SUCCESS;
@@ -110,6 +147,13 @@ void DlAclApi::CleanupLibrary()
     pRtIpcSetMemoryName = nullptr;
     pAclrtGetSocName = nullptr;
     pRtGetLogicDevIdByUserDevId = nullptr;
+    pAclrtGetPhyDevIdByLogicDevId = nullptr;
+    pRtGetDevicePhyIdByIndex = nullptr;
+
+    if (runtimeHandle != nullptr) {
+        dlclose(runtimeHandle);
+        runtimeHandle = nullptr;
+    }
 
     if (rtHandle != nullptr) {
         dlclose(rtHandle);

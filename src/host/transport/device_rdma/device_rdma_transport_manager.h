@@ -46,12 +46,13 @@ public:
     const void *GetQpInfo() const override;
 
 private:
-    static bool PrepareOpenDevice(uint32_t userId, uint32_t device, uint32_t rankCount, net_addr_t &deviceIp, void *&rdmaHandle);
-    static bool OpenTsd(uint32_t deviceId, uint32_t rankCount);
-    static bool RaInit(uint32_t deviceId);
-    static bool HandleRetiredDeviceIp(uint32_t deviceId, net_addr_t &deviceIp, net_addr_t &retiredIp);
-    static bool RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceIp);
-    static bool RaRdevInit(uint32_t deviceId, net_addr_t deviceIp, void *&rdmaHandle);
+    static bool PrepareOpenDevice(uint32_t userId, uint32_t phyId, uint32_t rankCount, net_addr_t &deviceIp,
+        void *&rdmaHandle);
+    static bool OpenTsd(uint32_t userId, uint32_t rankCount);
+    static bool RaInit(uint32_t phyId);
+    static bool HandleRetiredDeviceIp(uint32_t phyId, net_addr_t &deviceIp, net_addr_t &retiredIp);
+    static bool RetireDeviceIp(uint32_t phyId, net_addr_t &deviceIp);
+    static bool RaRdevInit(uint32_t phyId, net_addr_t deviceIp, void *&rdmaHandle);
     void ClearAllRegisterMRs();
     int CheckPrepareOptions(const HybmTransPrepareOptions &options);
     void InitializeDeviceAddress(mf_sockaddr &deviceAddr);
@@ -61,6 +62,7 @@ private:
     uint32_t rankId_{0};
     uint32_t rankCount_{1};
     uint32_t deviceId_{0};
+    uint32_t phyId_{0};
     hybm_role_type role_{HYBM_ROLE_PEER};
     net_addr_t deviceIp_{};
     uint16_t devicePort_{0};

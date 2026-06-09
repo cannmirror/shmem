@@ -65,7 +65,19 @@ Result RdmaTransportManager::OpenDevice(const TransportOptions &options)
                              "RtGetLogicDevIdByUserDevId() return=" << ret << ", output deviceId=" << logicId,
                              ACLSHMEM_DL_FUNC_FAILED);
 
+    int32_t phyId = -1;
+    // CANN 8.2: rtGetDevicePhyIdByIndex / aclrtGetPhyDevIdByLogicDevId take userDevId when
+    // ASCEND_RT_VISIBLE_DEVICES remaps devices (logicId=4 but userId=1 -> phyId=4).
+    ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(userId, &phyId);
+    SHM_ASSERT_LOG_AND_RETURN(ret == 0 && phyId >= 0,
+                             "GetPhyDevIdByUserDevId() return=" << ret << ", userId=" << userId
+                                 << ", logicDeviceId=" << logicId << ", output phyId=" << phyId,
+                             ACLSHMEM_DL_FUNC_FAILED);
+
     deviceId_ = static_cast<uint32_t>(logicId);
+    phyId_ = static_cast<uint32_t>(phyId);
+    SHM_LOG_INFO(rankId_ << " resolved device mapping: userId=" << userId << ", logicDeviceId=" << deviceId_
+                         << ", phyId=" << phyId_);
     rankId_ = options.rankId;
     rankCount_ = options.rankCount;
     role_ = options.role;
@@ -81,8 +93,8 @@ Result RdmaTransportManager::OpenDevice(const TransportOptions &options)
         deviceIp_.type = IpV6;
     }
 
-    if (!PrepareOpenDevice(userId, deviceId_, rankCount_, deviceIp_, rdmaHandle_)) {
-        SHM_LOG_ERROR(deviceId_ << " PrepareOpenDevice failed.");
+    if (!PrepareOpenDevice(userId, phyId_, rankCount_, deviceIp_, rdmaHandle_)) {
+        SHM_LOG_ERROR("phyId=" << phyId_ << " PrepareOpenDevice failed.");
         return ACLSHMEM_INNER_ERROR;
     }
     nicInfo_ = GenerateDeviceNic(deviceIp_, devicePort_);
@@ -90,9 +102,9 @@ Result RdmaTransportManager::OpenDevice(const TransportOptions &options)
     mf_sockaddr deviceAddr;
     InitializeDeviceAddress(deviceAddr);
     if (role_ == HYBM_ROLE_PEER) {
-        qpManager_ = std::make_shared<FixedRanksQpManager>(userId, deviceId_, rankId_, rankCount_, deviceAddr);
+        qpManager_ = std::make_shared<FixedRanksQpManager>(userId, phyId_, rankId_, rankCount_, deviceAddr);
     } else {
-        qpManager_ = std::make_shared<DynamicRanksQpManager>(userId, deviceId_, rankId_, rankCount_, deviceAddr,
+        qpManager_ = std::make_shared<DynamicRanksQpManager>(userId, phyId_, rankId_, rankCount_, deviceAddr,
                                                              role_ == HYBM_ROLE_RECEIVER);
     }
 
@@ -311,109 +323,109 @@ const void *RdmaTransportManager::GetQpInfo() const
     return qpManager_->GetQpInfoAddress();
 }
 
-bool RdmaTransportManager::PrepareOpenDevice(uint32_t userId, uint32_t device, uint32_t rankCount,
+bool RdmaTransportManager::PrepareOpenDevice(uint32_t userId, uint32_t phyId, uint32_t rankCount,
                                              net_addr_t &deviceIp, void *&rdmaHandle)
 {
     // If can get rdmaHandle, maybe the device has been opened, can try get rdmaHandle directly.
-    if (DlHccpApi::RaRdevGetHandle(device, rdmaHandle) == 0) {
+    if (DlHccpApi::RaRdevGetHandle(phyId, rdmaHandle) == 0) {
         if (rdmaHandle != nullptr) {
-            if (!RetireDeviceIp(device, deviceIp)) {
-                SHM_LOG_ERROR(device << " RetireDeviceIp failed.");
+            if (!RetireDeviceIp(phyId, deviceIp)) {
+                SHM_LOG_ERROR("phyId=" << phyId << " RetireDeviceIp failed.");
                 return false;
             }
-            SHM_LOG_DEBUG(device << " Had prepared device and get rdmaHandle success.");
+            SHM_LOG_DEBUG("phyId=" << phyId << " Had prepared device and get rdmaHandle success.");
             return true;
         }
-        SHM_LOG_INFO(device << " Had prepared device, but rdmaHandle is null, need init again.");
+        SHM_LOG_INFO("phyId=" << phyId << " Had prepared device, but rdmaHandle is null, need init again.");
     }
     if (!OpenTsd(userId, rankCount)) {
-        SHM_LOG_ERROR(device << " open tsd failed.");
+        SHM_LOG_ERROR("phyId=" << phyId << " open tsd failed.");
         return false;
     }
 
-    if (!RaInit(device)) {
-        SHM_LOG_ERROR(device << " RaInit failed.");
+    if (!RaInit(phyId)) {
+        SHM_LOG_ERROR("phyId=" << phyId << " RaInit failed.");
         return false;
     }
 
-    if (!RetireDeviceIp(device, deviceIp)) {
-        SHM_LOG_ERROR(device << " RetireDeviceIp failed.");
+    if (!RetireDeviceIp(phyId, deviceIp)) {
+        SHM_LOG_ERROR("phyId=" << phyId << " RetireDeviceIp failed.");
         return false;
     }
 
-    if (!RaRdevInit(device, deviceIp, rdmaHandle)) {
-        SHM_LOG_ERROR(device << " RaRdevInit failed.");
+    if (!RaRdevInit(phyId, deviceIp, rdmaHandle)) {
+        SHM_LOG_ERROR("phyId=" << phyId << " RaRdevInit failed.");
         return false;
     }
     return true;
 }
 
-bool RdmaTransportManager::OpenTsd(uint32_t deviceId, uint32_t rankCount)
+bool RdmaTransportManager::OpenTsd(uint32_t userId, uint32_t rankCount)
 {
     if (tsdOpened_) {
-        SHM_LOG_INFO(deviceId << " tsd already opened.");
+        SHM_LOG_INFO("userId=" << userId << " tsd already opened.");
         return true;
     }
 
-    auto res = DlHccpApi::TsdOpen(deviceId, rankCount);
+    auto res = DlHccpApi::TsdOpen(userId, rankCount);
     if (res != 0) {
-        SHM_LOG_ERROR("TsdOpen for (deviceId=" << deviceId << ", rankCount=" << rankCount << ") failed: " << res);
+        SHM_LOG_ERROR("TsdOpen for (userId=" << userId << ", rankCount=" << rankCount << ") failed: " << res);
         return false;
     }
 
-    SHM_LOG_DEBUG("open tsd for device id: " << deviceId << ", rank count: " << rankCount << " success.");
+    SHM_LOG_DEBUG("open tsd for user id: " << userId << ", rank count: " << rankCount << " success.");
     tsdOpened_ = true;
     return true;
 }
 
-bool RdmaTransportManager::RaInit(uint32_t deviceId)
+bool RdmaTransportManager::RaInit(uint32_t phyId)
 {
     if (raInitialized_) {
-        SHM_LOG_INFO(deviceId << " ra already initialized.");
+        SHM_LOG_INFO("phyId=" << phyId << " ra already initialized.");
         return true;
     }
     const std::chrono::seconds WAIT_TIME(3);
     HccpRaInitConfig initConfig{};
-    initConfig.phyId = deviceId;
+    initConfig.phyId = phyId;
     initConfig.nicPosition = NETWORK_OFFLINE;
     initConfig.hdcType = 6;  // HDC_SERVICE_TYPE_RDMA = 6
-    SHM_LOG_DEBUG(deviceId << " RaInit=" << initConfig);
+    SHM_LOG_DEBUG("phyId=" << phyId << " RaInit=" << initConfig);
     std::this_thread::sleep_for(WAIT_TIME); // avoid hccl init conflict
     auto ret = DlHccpApi::RaInit(initConfig);
     if (ret != 0) {
-        SHM_LOG_WARN(deviceId << " Hccp Init RA failed: " << ret);
+        SHM_LOG_WARN("phyId=" << phyId << " Hccp Init RA failed: " << ret);
         // maybe hccl have already initialized ra, wait 3s then return true.
         std::this_thread::sleep_for(WAIT_TIME);
         raInitialized_ = true;
         return true;
     }
 
-    SHM_LOG_DEBUG(deviceId << " ra init for device id: " << deviceId << " success.");
+    SHM_LOG_DEBUG("phyId=" << phyId << " ra init success.");
     raInitialized_ = true;
     return true;
 }
 
-bool RdmaTransportManager::HandleRetiredDeviceIp(uint32_t deviceId, net_addr_t &deviceIp, net_addr_t &retiredIp)
+bool RdmaTransportManager::HandleRetiredDeviceIp(uint32_t phyId, net_addr_t &deviceIp, net_addr_t &retiredIp)
 {
     if (deviceIpRetired_ && deviceIp.type == IpV4) {
-        SHM_LOG_INFO(deviceId << " device ip already retired : " << inet_ntoa(retiredIp.ip.ipv4));
+        SHM_LOG_INFO("phyId=" << phyId << " device ip already retired : " << inet_ntoa(retiredIp.ip.ipv4));
         deviceIp = retiredIp;
         return true;
     } else if (deviceIpRetired_ && deviceIp.type == IpV6) {
         char ipv6Str[INET6_ADDRSTRLEN];
         inet_ntop(AF_INET6, &retiredIp.ip.ipv6, ipv6Str, INET6_ADDRSTRLEN);
-        SHM_LOG_INFO(deviceId << " device ip already retired : " << ipv6Str);
+        SHM_LOG_INFO("phyId=" << phyId << " device ip already retired : " << ipv6Str);
         deviceIp = retiredIp;
         return true;
     }
     return false;
 }
 
-bool RdmaTransportManager::RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceIp)
+bool RdmaTransportManager::RetireDeviceIp(uint32_t phyId, net_addr_t &deviceIp)
 {
     net_addr_t retiredIp{};
 
-    auto isRetire = HandleRetiredDeviceIp(deviceId, deviceIp, retiredIp);
+    auto isRetire = HandleRetiredDeviceIp(phyId, deviceIp, retiredIp);
     if (isRetire) {
         return true;
     }
@@ -422,32 +434,32 @@ bool RdmaTransportManager::RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceI
     std::vector<HccpInterfaceInfo> infos;
 
     HccpRaGetIfAttr config;
-    config.phyId = deviceId;
+    config.phyId = phyId;
     config.nicPosition = NETWORK_OFFLINE;
     config.isAll = false;
 
     auto ret = DlHccpApi::RaGetIfNum(config, count);
     if (ret != 0 || count == 0) {
-        SHM_LOG_ERROR(deviceId << " get interface count failed: " << ret << ", count: " << count);
+        SHM_LOG_ERROR("phyId=" << phyId << " get interface count failed: " << ret << ", count: " << count);
         return false;
     }
 
     infos.resize(count);
     ret = DlHccpApi::RaGetIfAddrs(config, infos.data(), count);
     if (ret != 0) {
-        SHM_LOG_ERROR(deviceId << " get interface information failed: " << ret);
+        SHM_LOG_ERROR("phyId=" << phyId << " get interface information failed: " << ret);
         return false;
     }
 
     for (auto &info : infos) {
-        SHM_LOG_DEBUG(deviceId << " found interface: ifname=" << info.ifname 
+        SHM_LOG_DEBUG("phyId=" << phyId << " found interface: ifname=" << info.ifname 
                       << ", scopeId=" << info.scopeId 
                       << ", family=" << info.family);
         if (info.family == AF_INET) {
             deviceIp.ip.ipv4 = retiredIp.ip.ipv4 = info.ifaddr.ip.addr;
             deviceIp.type = IpV4;
             deviceIpRetired_ = true;
-            SHM_LOG_DEBUG(deviceId << " retire device ip success : " << inet_ntoa(deviceIp.ip.ipv4));
+            SHM_LOG_DEBUG("phyId=" << phyId << " retire device ip success : " << inet_ntoa(deviceIp.ip.ipv4));
             return true;
         }
         if (info.family == AF_INET6) {
@@ -456,19 +468,19 @@ bool RdmaTransportManager::RetireDeviceIp(uint32_t deviceId, net_addr_t &deviceI
             deviceIpRetired_ = true;
             char ipv6Str[INET6_ADDRSTRLEN];
             inet_ntop(AF_INET6, &deviceIp.ip.ipv6, ipv6Str, INET6_ADDRSTRLEN);
-            SHM_LOG_DEBUG(deviceId << " retire device ip success : " << ipv6Str);
+            SHM_LOG_DEBUG("phyId=" << phyId << " retire device ip success : " << ipv6Str);
             return true;
         }
     }
 
-    SHM_LOG_ERROR(deviceId << " not found network device of AF_INET or AF_INET6 on NPU.");
+    SHM_LOG_ERROR("phyId=" << phyId << " not found network device of AF_INET or AF_INET6 on NPU.");
     return false;
 }
 
-bool RdmaTransportManager::RaRdevInit(uint32_t deviceId, net_addr_t deviceIp, void *&rdmaHandle)
+bool RdmaTransportManager::RaRdevInit(uint32_t phyId, net_addr_t deviceIp, void *&rdmaHandle)
 {
     if (storedRdmaHandle_ != nullptr) {
-        SHM_LOG_INFO(deviceId << " ra rdev already initialized.");
+        SHM_LOG_INFO("phyId=" << phyId << " ra rdev already initialized.");
         rdmaHandle = storedRdmaHandle_;
         return true;
     }
@@ -479,22 +491,22 @@ bool RdmaTransportManager::RaRdevInit(uint32_t deviceId, net_addr_t deviceIp, vo
     info.mode = NETWORK_OFFLINE;
     info.notifyType = NOTIFY;
     info.enabled2mbLite = true;
-    rdev.phyId = deviceId;
+    rdev.phyId = phyId;
     rdev.family = (deviceIp.type == IpV4) ? AF_INET : AF_INET6;
     if (deviceIp.type == IpV4) {
         rdev.localIp.addr = deviceIp.ip.ipv4;
     } else if (deviceIp.type == IpV6) {
         rdev.localIp.addr6 = deviceIp.ip.ipv6;
     }
-    SHM_LOG_DEBUG(deviceId << " RaRdevInitV2, info=" << info << "rdev=" << rdev);
+    SHM_LOG_DEBUG("phyId=" << phyId << " RaRdevInitV2, info=" << info << "rdev=" << rdev);
     auto ret = DlHccpApi::RaRdevInitV2(info, rdev, rdmaHandle);
     if (ret != 0) {
-        SHM_LOG_ERROR(deviceId << " Hccp Init RDev failed: " << ret);
+        SHM_LOG_ERROR("phyId=" << phyId << " Hccp Init RDev failed: " << ret);
         return false;
     }
 
     storedRdmaHandle_ = rdmaHandle;
-    SHM_LOG_INFO(deviceId << " initialize RDev success.");
+    SHM_LOG_INFO("phyId=" << phyId << " initialize RDev success.");
     return true;
 }
 

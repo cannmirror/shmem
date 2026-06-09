@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #ifndef MF_HYBM_CORE_DL_ACL_API_H
 #define MF_HYBM_CORE_DL_ACL_API_H
@@ -38,6 +38,8 @@ using rtIpcOpenMemoryFunc = int32_t (*)(void **, const char *);
 using rtIpcCloseMemoryFunc = int32_t (*)(const void *);
 using aclrtGetSocNameFunc = const char *(*)();
 using rtGetLogicDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
+using aclrtGetPhyDevIdByLogicDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
+using rtGetDevicePhyIdByIndexFunc = int32_t (*)(uint32_t, uint32_t *);
 
 class DlAclApi {
 public:
@@ -200,11 +202,33 @@ public:
         return pRtGetLogicDevIdByUserDevId(userDevId, logicDevId);
     }
 
+    static inline Result AclrtGetPhyDevIdByLogicDevId(const int32_t logicDevId, int32_t * const phyDevId)
+    {
+        if (logicDevId < 0 || phyDevId == nullptr) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        if (pAclrtGetPhyDevIdByLogicDevId != nullptr) {
+            return pAclrtGetPhyDevIdByLogicDevId(logicDevId, phyDevId);
+        }
+        if (pRtGetDevicePhyIdByIndex != nullptr) {
+            uint32_t phy = 0;
+            const auto ret = pRtGetDevicePhyIdByIndex(static_cast<uint32_t>(logicDevId), &phy);
+            if (ret != 0) {
+                return ret;
+            }
+            *phyDevId = static_cast<int32_t>(phy);
+            return 0;
+        }
+        return ACLSHMEM_UNDER_API_UNLOAD;
+    }
+
 private:
     static std::mutex gMutex;
     static bool gLoaded;
     static void *rtHandle;
+    static void *runtimeHandle;
     static const char *gAscendAclLibName;
+    static const char *gAscendRuntimeLibName;
 
     static aclrtSetDeviceFunc pAclrtSetDevice;
     static aclrtGetDeviceFunc pAclrtGetDevice;
@@ -226,6 +250,8 @@ private:
     static rtIpcCloseMemoryFunc pRtIpcCloseMemory;
     static aclrtGetSocNameFunc pAclrtGetSocName;
     static rtGetLogicDevIdByUserDevIdFunc pRtGetLogicDevIdByUserDevId;
+    static aclrtGetPhyDevIdByLogicDevIdFunc pAclrtGetPhyDevIdByLogicDevId;
+    static rtGetDevicePhyIdByIndexFunc pRtGetDevicePhyIdByIndex;
 };
 }
 

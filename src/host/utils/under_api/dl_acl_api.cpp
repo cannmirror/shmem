@@ -9,6 +9,7 @@
  */
 #include <dlfcn.h>
 #include "dl_acl_api.h"
+#include "dl_hal_api.h"
 #include "shmemi_file_util.h"
 
 namespace shm {
@@ -41,6 +42,8 @@ aclrtGetSocNameFunc DlAclApi::pAclrtGetSocName = nullptr;
 rtGetLogicDevIdByUserDevIdFunc DlAclApi::pRtGetLogicDevIdByUserDevId = nullptr;
 aclrtGetPhyDevIdByLogicDevIdFunc DlAclApi::pAclrtGetPhyDevIdByLogicDevId = nullptr;
 rtGetDevicePhyIdByIndexFunc DlAclApi::pRtGetDevicePhyIdByIndex = nullptr;
+aclrtReserveMemAddressFunc DlAclApi::pAclrtReserveMemAddress = nullptr;
+aclrtReleaseMemAddressFunc DlAclApi::pAclrtReleaseMemAddress = nullptr;
 
 Result DlAclApi::LoadLibrary(const std::string &libDirPath)
 {
@@ -90,6 +93,17 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
         SHM_LOG_WARN("Optional symbol aclrtGetPhyDevIdByLogicDevId is not loaded.");
     }
 
+    pAclrtReserveMemAddress =
+        reinterpret_cast<aclrtReserveMemAddressFunc>(dlsym(rtHandle, "aclrtReserveMemAddress"));
+    pAclrtReleaseMemAddress =
+        reinterpret_cast<aclrtReleaseMemAddressFunc>(dlsym(rtHandle, "aclrtReleaseMemAddress"));
+    if (pAclrtReserveMemAddress == nullptr || pAclrtReleaseMemAddress == nullptr) {
+        pAclrtReserveMemAddress = nullptr;
+        pAclrtReleaseMemAddress = nullptr;
+        SHM_LOG_WARN("Optional symbol aclrtReserveMemAddress/aclrtReleaseMemAddress is not loaded, "
+                     "nullptr reserve requires aclrt; specified-address reserve will use Hal.");
+    }
+
     std::string runtimePath;
     if (shm::utils::FileUtil::LibraryRealPath(libDirPath, std::string(gAscendRuntimeLibName), runtimePath)) {
         runtimeHandle = dlopen(runtimePath.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -122,6 +136,38 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
     return ACLSHMEM_SUCCESS;
 }
 
+Result DlAclApi::AclrtReserveMemAddress(void **virPtr, size_t size, size_t alignment, void *expectPtr, uint64_t flags)
+{
+    if (expectPtr == nullptr) {
+        if (pAclrtReserveMemAddress == nullptr) {
+            SHM_LOG_ERROR("AclrtReserveMemAddress is not available, nullptr reserve requires aclrt.");
+            return ACLSHMEM_DL_FUNC_FAILED;
+        }
+        return pAclrtReserveMemAddress(virPtr, size, alignment, nullptr, flags);
+    }
+
+    if (pAclrtReserveMemAddress != nullptr) {
+        auto ret = pAclrtReserveMemAddress(virPtr, size, alignment, expectPtr, flags);
+        if (ret == 0) {
+            return ret;
+        }
+        SHM_LOG_WARN("AclrtReserveMemAddress specified failed ret=" << ret
+                     << ", fallback to HalMemAddressReserve expectAddr=" << expectPtr);
+    }
+    return DlHalApi::HalMemAddressReserve(virPtr, size, alignment, expectPtr, flags);
+}
+
+Result DlAclApi::AclrtReleaseMemAddress(void *virPtr)
+{
+    if (pAclrtReleaseMemAddress != nullptr) {
+        auto ret = pAclrtReleaseMemAddress(virPtr);
+        if (ret == 0) {
+            return ret;
+        }
+    }
+    return DlHalApi::HalMemAddressFree(virPtr);
+}
+
 void DlAclApi::CleanupLibrary()
 {
     std::lock_guard<std::mutex> guard(gMutex);
@@ -149,6 +195,8 @@ void DlAclApi::CleanupLibrary()
     pRtGetLogicDevIdByUserDevId = nullptr;
     pAclrtGetPhyDevIdByLogicDevId = nullptr;
     pRtGetDevicePhyIdByIndex = nullptr;
+    pAclrtReserveMemAddress = nullptr;
+    pAclrtReleaseMemAddress = nullptr;
 
     if (runtimeHandle != nullptr) {
         dlclose(runtimeHandle);

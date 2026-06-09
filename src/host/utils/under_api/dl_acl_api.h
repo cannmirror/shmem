@@ -40,6 +40,8 @@ using aclrtGetSocNameFunc = const char *(*)();
 using rtGetLogicDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using aclrtGetPhyDevIdByLogicDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using rtGetDevicePhyIdByIndexFunc = int32_t (*)(uint32_t, uint32_t *);
+using aclrtReserveMemAddressFunc = int (*)(void **, size_t, size_t, void *, uint64_t);
+using aclrtReleaseMemAddressFunc = int (*)(void *);
 
 class DlAclApi {
 public:
@@ -222,6 +224,10 @@ public:
         return ACLSHMEM_UNDER_API_UNLOAD;
     }
 
+    static Result AclrtReserveMemAddress(void **virPtr, size_t size, size_t alignment, void *expectPtr, uint64_t flags);
+
+    static Result AclrtReleaseMemAddress(void *virPtr);
+
 private:
     static std::mutex gMutex;
     static bool gLoaded;
@@ -252,6 +258,8 @@ private:
     static rtGetLogicDevIdByUserDevIdFunc pRtGetLogicDevIdByUserDevId;
     static aclrtGetPhyDevIdByLogicDevIdFunc pAclrtGetPhyDevIdByLogicDevId;
     static rtGetDevicePhyIdByIndexFunc pRtGetDevicePhyIdByIndex;
+    static aclrtReserveMemAddressFunc pAclrtReserveMemAddress;
+    static aclrtReleaseMemAddressFunc pAclrtReleaseMemAddress;
 };
 }
 

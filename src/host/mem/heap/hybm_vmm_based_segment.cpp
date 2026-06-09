@@ -14,9 +14,6 @@
 #include <map>
 #include <bitset>
 
-#include "acl/acl.h"
-#include "acl/acl_rt.h"
-
 #include "dl_comm_def.h"
 #include "dl_api.h"
 #include "dl_hal_api.h"
@@ -30,7 +27,7 @@
 #include "hybm_mem_common.h"
 #include "hybm_vmm_based_segment.h"
 
-using namespace shm;
+namespace shm {
 
 Result HybmVmmBasedSegment::ValidateOptions() noexcept
 {
@@ -47,29 +44,6 @@ Result HybmVmmBasedSegment::ValidateOptions() noexcept
     return ACLSHMEM_SUCCESS;
 }
 
-static Result CheckVirtualMemoryAvailable(size_t size, uint32_t rankCnt)
-{
-    void *base = nullptr;
-    std::vector<uint64_t> tempAddrs;
-
-    for (uint32_t i = 0; i < rankCnt; i++) {
-        auto ret = aclrtReserveMemAddress(&base, size, 0, nullptr, 1);
-        if (ret != 0 || base == 0) {
-            SHM_LOG_ERROR("prepare virtual memory size(" << size << ") failed. ret: " << ret);
-            for (auto &va : tempAddrs) {
-                aclrtReleaseMemAddress(reinterpret_cast<void *>(va));
-            }
-            return ACLSHMEM_MALLOC_FAILED;
-        }
-        tempAddrs.emplace_back(reinterpret_cast<uint64_t>(base));
-    }
-
-    for (auto &va : tempAddrs) {
-        aclrtReleaseMemAddress(reinterpret_cast<void *>(va));
-    }
-    return ACLSHMEM_SUCCESS;
-}
-
 Result HybmVmmBasedSegment::ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept
 {
     if (expectSt + totalReservedSize > HYBM_DEVICE_META_ADDR) {
@@ -80,65 +54,48 @@ Result HybmVmmBasedSegment::ReserveEachPeMemorySpace(size_t reserveAlignedSize, 
 
     void *base = nullptr;
 
-    // Less than 128GB prefers single allocation; 950 does not support specified address allocation
+    // 950 and small heap: single nullptr reserve, then slice by rank offset
     if (socType_ == AscendSocType::ASCEND_950 || totalReservedSize < HYBM_MAX_SINGLE_RESERVE_SIZE) {
-        auto ret = aclrtReserveMemAddress(&base, totalReservedSize, 0, nullptr, 1);
-        if (ret != 0 || base == 0) {
-            SHM_LOG_ERROR("aclrtReserveMemAddress prepare virtual memory size(" << totalReservedSize << ") failed. ret: " << ret);
+        auto ret = DlAclApi::AclrtReserveMemAddress(&base, totalReservedSize, 0, nullptr, 1);
+        if (ret != 0 || base == nullptr) {
+            SHM_LOG_ERROR("VMM reserve(single,nullptr) failed, logicDev=" << logicDeviceId_
+                         << " totalSize=" << totalReservedSize << " ret=" << ret);
             return ACLSHMEM_MALLOC_FAILED;
         }
-        uint8_t* currentAddr = static_cast<uint8_t*>(base);
+        uint8_t *currentAddr = static_cast<uint8_t *>(base);
         for (uint32_t i = 0; i < options_.rankCnt; i++) {
             reservedVirtualAddresses_.emplace_back(reinterpret_cast<uint64_t>(currentAddr));
-            SHM_LOG_INFO("rankId: " << i << ", vaddr: " << (void*)currentAddr << " size: " << options_.size << " align_size: " << reserveAlignedSize);
+            SHM_LOG_INFO("RankId: " << i << ", vaddr: " << (void *)currentAddr << " size: " << options_.size
+                                     << " align_size: " << reserveAlignedSize);
             currentAddr += reserveAlignedSize;
         }
         singleReservation_ = true;
         return ACLSHMEM_SUCCESS;
     }
 
-    if (CheckVirtualMemoryAvailable(reserveAlignedSize, options_.rankCnt) != ACLSHMEM_SUCCESS) {
-        SHM_LOG_ERROR("CheckVirtualMemoryAvailable failed, size: " << reserveAlignedSize << ", rankCnt: " << options_.rankCnt);
-        return ACLSHMEM_MALLOC_FAILED;
-    }
-
-    uint64_t curStartAddr = expectSt;
-    while (true) {
-        if (curStartAddr + totalReservedSize > HYBM_DEVICE_META_ADDR) {
-            SHM_LOG_ERROR("total reserved size(" << totalReservedSize << ") exceeds available virtual address range, "
-                          << "curStartAddr=0x" << std::hex << curStartAddr << ", HYBM_DEVICE_META_ADDR=0x" << HYBM_DEVICE_META_ADDR << std::dec);
+    // large heap: per-PE specified address from expectSt, fail fast (no offset retry)
+    uint8_t *curBase = reinterpret_cast<uint8_t *>(expectSt);
+    for (uint32_t i = 0; i < options_.rankCnt; i++) {
+        auto ret = DlAclApi::AclrtReserveMemAddress(&base, reserveAlignedSize, 0, curBase, 1);
+        if (ret != 0 || base == 0) {
+            SHM_LOG_ERROR("VMM reserve(per-pe) failed, logicDev=" << logicDeviceId_ << " rankId=" << i
+                         << " expectAddr=" << (void *)curBase << " size=" << reserveAlignedSize << " ret=" << ret);
+            for (auto &va : reservedVirtualAddresses_) {
+                DlAclApi::AclrtReleaseMemAddress(reinterpret_cast<void *>(va));
+            }
+            reservedVirtualAddresses_.clear();
             return ACLSHMEM_MALLOC_FAILED;
         }
-
-        bool allSuccess = true;
-        uint8_t *curBase = reinterpret_cast<uint8_t*>(curStartAddr);
-
-        for (uint32_t i = 0; i < options_.rankCnt; i++) {
-            auto ret = aclrtReserveMemAddress(&base, reserveAlignedSize, 0, curBase, 1);
-            if (ret != 0 || base == 0) {
-                SHM_LOG_WARN("aclrtReserveMemAddress reserve at specified address failed, offset and retry. ret: " << ret);
-                allSuccess = false;
-                break;
-            }
-            SHM_LOG_DEBUG("reserve memory success, rankId: " << i << ", size: " << reserveAlignedSize
-                         << ", expect addr: " << (void*)curBase << ", actual addr: " << (void*)base);
-            reservedVirtualAddresses_.emplace_back(reinterpret_cast<uint64_t>(base));
-            curBase = reinterpret_cast<uint8_t*>(base) + reserveAlignedSize;
-        }
-
-        if (allSuccess) {
-            SHM_LOG_INFO("success to reserve memory space for logic deviceid " << logicDeviceId_
-                         << ", start addr: " << (void*)curStartAddr << ", total size: " << totalReservedSize);
-            totalVirtualSize_ += totalReservedSize;
-            return ACLSHMEM_SUCCESS;
-        }
-
-        for (auto &va : reservedVirtualAddresses_) {
-            aclrtReleaseMemAddress(reinterpret_cast<void *>(va));
-        }
-        reservedVirtualAddresses_.clear();
-        curStartAddr += reserveAlignedSize;
+        SHM_LOG_DEBUG("Reserve memory success, rankId: " << i << ", size: " << reserveAlignedSize << ", addr: "
+                         << (void *)base);
+        reservedVirtualAddresses_.emplace_back(reinterpret_cast<uint64_t>(base));
+        curBase = reinterpret_cast<uint8_t *>(base) + reserveAlignedSize;
     }
+
+    SHM_LOG_INFO("Success to reserve memory space for logic deviceid " << logicDeviceId_ << ", start addr: "
+                 << (void *)expectSt << ", total size: " << totalReservedSize);
+    totalVirtualSize_ += totalReservedSize;
+    return ACLSHMEM_SUCCESS;
 }
 
 Result HybmVmmBasedSegment::ReserveMemorySpace(void **address) noexcept
@@ -179,10 +136,10 @@ Result HybmVmmBasedSegment::UnReserveMemorySpace() noexcept
     allocatedSize_ = 0;
     sliceCount_ = 0;
     if (singleReservation_ && !reservedVirtualAddresses_.empty()) {
-        aclrtReleaseMemAddress(reinterpret_cast<void *>(reservedVirtualAddresses_[0]));
+        DlAclApi::AclrtReleaseMemAddress(reinterpret_cast<void *>(reservedVirtualAddresses_[0]));
     } else {
         for (auto &va : reservedVirtualAddresses_) {
-            aclrtReleaseMemAddress(reinterpret_cast<void *>(va));
+            DlAclApi::AclrtReleaseMemAddress(reinterpret_cast<void *>(va));
         }
     }
     reservedVirtualAddresses_.clear();
@@ -551,3 +508,5 @@ bool HybmVmmBasedSegment::CheckSdmaReaches(uint32_t remoteRankId) const noexcept
 
     return IsSdmaAccessible(pos->second.superPodId, pos->second.serverId, pos->second.logicDeviceId);
 }
+
+}  // namespace shm

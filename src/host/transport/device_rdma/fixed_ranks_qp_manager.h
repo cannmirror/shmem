@@ -88,6 +88,8 @@ private:
     std::unordered_map<uint32_t, ConnectionChannel> clientConnections_;
     std::unordered_map<uint32_t, ConnectionChannel> serverConnections_;
     uint32_t userDeviceId_{0};
+    uint8_t trafficClass_{0};
+    uint8_t serviceLevel_{0};
 };
 }
 }

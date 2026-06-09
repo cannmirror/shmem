@@ -15,6 +15,12 @@ SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
 
 以上两个环境变量均未配置时自动搜索可用网口（IPv4/IPv6均可，跳过lo/docker/veth/br-/virbr/tun/tap等虚拟网口）。
 
+### RDMA场景
+使能RDMA场景下，配置TC和SL
+
+* `HCCL_RDMA_TC`: 复用HCCL的环境变量，配置RDMA网卡的traffic class。该环境变量的取值范围为[0, 255]，且需要配置为4的整数倍，默认值: 132。[参考连接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0089.html)
+* `HCCL_RDMA_SL`: 复用HCCL的环境变量，配置RDMA网卡的service lever。该值需要和网卡配置的PFC优先级保持一致，若配置不一致可能导致性能劣化。该环境变量需要配置为整数，取值范围为[0, 7], 默认值: 4。[参考连接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0090.html)
+
 ## 日志相关
 
 日志相关环境变量及详细介绍见[SHMEM日志](../debug/log_debug.md)。

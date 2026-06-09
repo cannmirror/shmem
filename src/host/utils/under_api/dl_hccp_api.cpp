@@ -45,6 +45,7 @@ raQpConnectAsyncFunc DlHccpApi::gRaQpConnectAsync;
 raRegisterMrFunc DlHccpApi::gRaRegisterMR;
 raDeregisterMrFunc DlHccpApi::gRaDeregisterMR;
 raMrRegFunc DlHccpApi::gRaMrReg;
+raSetQpAttrQosFunc DlHccpApi::gRaSetQpAttrQos;
 tsdOpenFunc DlHccpApi::gTsdOpen;
 
 Result DlHccpApi::LoadLibrary()
@@ -105,6 +106,7 @@ Result DlHccpApi::LoadLibrary()
     DL_LOAD_SYM_ALT(gRaRegisterMR, raRegisterMrFunc, raHandle, "ra_register_mr", "RaRegisterMr");
     DL_LOAD_SYM_ALT(gRaDeregisterMR, raDeregisterMrFunc, raHandle, "ra_deregister_mr", "RaDeregisterMr");
     DL_LOAD_SYM_ALT(gRaMrReg, raMrRegFunc, raHandle, "ra_mr_reg", "RaMrReg");
+    DL_LOAD_SYM_ALT(gRaSetQpAttrQos, raSetQpAttrQosFunc, raHandle, "ra_set_qp_attr_qos", "RaSetQpAttrQos");
 
     DL_LOAD_SYM(gTsdOpen, tsdOpenFunc, tsdHandle, "TsdOpen");
     SHM_LOG_INFO("LoadLibrary for DlHccpApi success");
@@ -141,6 +143,7 @@ void DlHccpApi::CleanupLibrary()
     gRaRegisterMR = nullptr;
     gRaDeregisterMR = nullptr;
     gRaMrReg = nullptr;
+    gRaSetQpAttrQos = nullptr;
     gTsdOpen = nullptr;
 
     if (raHandle != nullptr) {

@@ -153,6 +153,41 @@ std::string GenerateDeviceNic(net_addr_t ip, uint16_t port)
     }
     return ss.str();
 }
+
+uint8_t GetEnvUint8(const char *envName, uint8_t defaultValue, long minVal, long maxVal, bool requireMultipleOf4)
+{
+    const char *envVal = std::getenv(envName);
+    if (envVal == nullptr) {
+        SHM_LOG_INFO("Environment " << envName << " is not set, use default value: " << static_cast<int>(defaultValue));
+        return defaultValue;
+    }
+
+    char *end = nullptr;
+    errno = 0;
+    long val = std::strtol(envVal, &end, 10L);
+
+    if (errno != 0 || *end != '\0') {
+        SHM_LOG_WARN("Invalid Environment " << envName
+            << ", not a number or out of range, use default value: " << static_cast<int>(defaultValue));
+        return defaultValue;
+    }
+
+    if (val < minVal || val > maxVal) {
+        SHM_LOG_WARN("Invalid Environment " << envName
+            << ", expected in range [" << minVal << "," << maxVal
+            << "], use default value: " << static_cast<int>(defaultValue));
+        return defaultValue;
+    }
+
+    if (requireMultipleOf4 && (val % 4) != 0) {
+        SHM_LOG_WARN("Invalid Environment " << envName
+            << ", expected a multiple of 4 in range [" << minVal << "," << maxVal
+            << "], use default value: " << static_cast<int>(defaultValue));
+        return defaultValue;
+    }
+
+    return static_cast<uint8_t>(val);
+}
 }
 }
 }

@@ -363,6 +363,14 @@ struct AiQpRMAQueueInfo {
     struct AiQpRMACQ *rcq;
     RdmaMemRegionInfo *mr;
 };
+
+constexpr int RA_QOS_ATTR_RESERVED = 6;
+
+ struct QosAttr {
+    unsigned char tc;
+    unsigned char sl;
+    unsigned char reserved[RA_QOS_ATTR_RESERVED];
+};
 }
 
 #endif  // MF_HYBRID_DL_HCCP_DEF_H

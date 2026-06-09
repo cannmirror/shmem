@@ -40,6 +40,7 @@ using raQpConnectAsyncFunc = int (*)(void *, const void *);
 using raRegisterMrFunc = int (*)(const void *, HccpMrInfo *, void **);
 using raDeregisterMrFunc = int (*)(const void *, void *);
 using raMrRegFunc = int (*)(void *, HccpMrInfo *);
+using raSetQpAttrQosFunc = int (*)(void *, QosAttr *);
 using tsdOpenFunc = uint32_t (*)(uint32_t, uint32_t);
 
 class DlHccpApi {
@@ -157,6 +158,11 @@ public:
         return gRaMrReg(qpHandle, &info);
     }
 
+    static inline int RaSetQpAttrQos(void *qpHandle, QosAttr &attr)
+    {
+        return gRaSetQpAttrQos(qpHandle, &attr);
+    }
+
     static inline uint32_t TsdOpen(uint32_t deviceId, uint32_t rankSize)
     {
         return gTsdOpen(deviceId, rankSize);
@@ -193,6 +199,7 @@ private:
     static raRegisterMrFunc gRaRegisterMR;
     static raDeregisterMrFunc gRaDeregisterMR;
     static raMrRegFunc gRaMrReg;
+    static raSetQpAttrQosFunc gRaSetQpAttrQos;
 
     static tsdOpenFunc gTsdOpen;
 };

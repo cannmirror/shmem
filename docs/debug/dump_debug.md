@@ -36,7 +36,7 @@ AscendC算子调测API是AscendC提供的调试能力，可进行kernel内部的
       ...
    }
    ```
-   注意：`ALL_DUMPSIZE`及`aclCheck`等宏和接口定义位于文件`examples\utils\debug.h`中，其中`ALL_DUMPSIZE`默认为75MB，用户可根据需要进行自定义修改。
+   注意：`ALL_DUMPSIZE`及`aclCheck`等宏和接口定义位于文件`examples/utils/debug.h`中，其中`ALL_DUMPSIZE`默认为75MB，用户可根据需要进行自定义修改。
 
 ## 编译运行
 

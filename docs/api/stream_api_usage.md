@@ -27,7 +27,7 @@ attributes.option_attr.data_op_engine_type = static_cast<data_op_engine_type_t>(
 int status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 ```
 
-完整初始化可参考`tests\unittest\host\main_test.cpp`的`void test_cross_init()`函数。
+完整初始化可参考`tests/unittest/host/main_test.cpp`的`void test_cross_init()`函数。
 
 ***
 
@@ -58,7 +58,7 @@ ACLSHMEM_HOST_API void aclshmemx_putmem_on_stream(void* dst, void* src, size_t e
 | stream     | aclrtStream | 使用的流（如果为NULL，则使用默认流） |
 
 **使用示例：**
-`tests\unittest\host\mem\shmem_host_put_stream_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_putmem_on_stream`接口进行数据传输。下面仅展示核心流程。
+`tests/unittest/host/mem/shmem_host_put_stream_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_putmem_on_stream`接口进行数据传输。下面仅展示核心流程。
 
 ```cpp
 // 伪代码示例：aclshmemx_putmem_on_stream使用流程
@@ -123,7 +123,7 @@ ACLSHMEM_HOST_API void aclshmemx_getmem_on_stream(void* dst, void* src, size_t e
 | stream     | aclrtStream | 使用的ACL流（如果为NULL，则使用默认流） |
 
 **使用示例：**
-`tests\unittest\host\mem\shmem_host_get_stream_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_getmem_on_stream`接口进行数据传输。下面仅展示核心流程。
+`tests/unittest/host/mem/shmem_host_get_stream_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_getmem_on_stream`接口进行数据传输。下面仅展示核心流程。
 
 ```cpp
 // 伪代码示例：aclshmemx_getmem_on_stream使用流程
@@ -192,7 +192,7 @@ ACLSHMEM_HOST_API void aclshmemx_signal_op_on_stream(int32_t *sig_addr, int32_t 
 | stream    | aclrtStream | 使用的ACL流（如果为NULL，则使用默认流）                                                     |
 
 **使用示例：**
-`tests\unittest\host\sync\signal\signal_host_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_signal_op_on_stream`接口进行信号操作。下面仅展示核心流程。
+`tests/unittest/host/sync/signal/signal_host_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_signal_op_on_stream`接口进行信号操作。下面仅展示核心流程。
 
 ```cpp
 // 伪代码示例：aclshmemx_signal_op_on_stream使用流程
@@ -257,7 +257,7 @@ ACLSHMEM_HOST_API void aclshmemx_signal_wait_until_on_stream(int32_t *sig_addr, 
 | stream    | aclrtStream | 使用的ACL流（如果为NULL，则使用默认流）                                                                                                                            |
 
 **使用示例：**
-`tests\unittest\host\sync\signal\signal_host_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_signal_wait_until_on_stream`接口等待信号条件。下面仅展示核心流程。
+`tests/unittest/host/sync/signal/signal_host_test.cpp`存在完整调用示例，展示了如何在指定流上使用`aclshmemx_signal_wait_until_on_stream`接口等待信号条件。下面仅展示核心流程。
 
 ```cpp
 // 伪代码示例：aclshmemx_signal_wait_until_on_stream使用流程
@@ -276,7 +276,7 @@ int32_t* signal_var = (int32_t*)aclshmem_malloc(sizeof(int32_t));
 // 4. 设置信号值
 aclshmemx_signal_op_on_stream(signal_var, 2, ACLSHMEM_SIGNAL_SET, target_pe, stream);
 
-// 4. 等待本地信号等于指定值（阻塞直到条件满足），通常为多卡场景
+// 5. 等待本地信号等于指定值（阻塞直到条件满足），通常为多卡场景
 aclshmemx_signal_wait_until_on_stream(signal_var, ACLSHMEM_CMP_EQ, 2, stream);
 
 // 6. 等待操作完成
@@ -294,7 +294,7 @@ aclFinalize();
 
 ### 典型使用场景：环形信号同步
 
-以下示例展示多个PE之间的环形信号同步场景：每个PE等待上一个PE设置的信号，然后设置下一个PE的信号。完整示例见`tests\unittest\host\sync\signal\signal_host_test.cpp`的`test_signal_eq_all_pes`函数。
+以下示例展示多个PE之间的环形信号同步场景：每个PE等待上一个PE设置的信号，然后设置下一个PE的信号。完整示例见`tests/unittest/host/sync/signal/signal_host_test.cpp`的`test_signal_eq_all_pes`函数。
 
 ```cpp
 // 伪代码示例：环形信号同步场景

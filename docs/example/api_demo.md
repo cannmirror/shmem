@@ -56,7 +56,7 @@ const char* test_global_ipport = "tcp://127.0.0.1:8666";
 status = aclrtSetDevice(device_id);
 
 aclshmemx_init_attr_t* attributes = new aclshmemx_init_attr_t{rank_id, n_ranks, test_global_ipport, local_mem_size, {0, ACLSHMEM_DATA_OP_MTE, 120, 120, 120}}; // 自定义attr
-aclshmemx_init_attr(attributes);
+aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, attributes);
 delete attributes;
 attributes = nullptr;
 
@@ -110,7 +110,7 @@ uint32_t pw_len = strlen(password);
 int ret = aclshmemx_set_config_store_tls_key(pk, pk_len, password, pw_len, my_key_password_decrypt_handler);
 ```
 
-如需关闭加密特性，则调用如下接口。关闭后，则无需调用aclshmem_set_config_store_tls_key接口。
+如需关闭加密特性，则调用如下接口。关闭后，则无需调用aclshmemx_set_config_store_tls_key接口。
 ```c
 int ret = aclshmemx_set_conf_store_tls(false, nullptr, 0);
 ```

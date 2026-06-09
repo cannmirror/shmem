@@ -54,7 +54,7 @@ href=https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/API/appdev
 ![image](images/principles/6.png)
 
 ### 同步管理初始化
-<p style="text-indent: 2em;">该部分仅获取一个ffts地址，后续可通过<code>shmemx_get_ffts_config</code>获得，在算子内通过<code>shmemx_set_ffts_config</code>设置，用于runtime同步，AscendC层面会影响的<code>SyncAll</code>、<code>CrossCoreSetFlag</code>和<code>CrossCoreWaitFlag</code>接口，shmem层面会影响到barrier相关接口。（</code>shmemx_set_ffts_config</code>开销较小，建议算子内都调用一次该接口）。</p>
+<p style="text-indent: 2em;">该部分仅获取一个ffts地址，后续可通过<code>shmemx_get_ffts_config</code>获得，在算子内通过<code>shmemx_set_ffts_config</code>设置，用于runtime同步，AscendC层面会影响的<code>SyncAll</code>、<code>CrossCoreSetFlag</code>和<code>CrossCoreWaitFlag</code>接口，shmem层面会影响到barrier相关接口。（<code>shmemx_set_ffts_config</code>开销较小，建议算子内都调用一次该接口）。</p>
 
 ![image](images/principles/7.png)
 

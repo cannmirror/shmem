@@ -20,7 +20,7 @@ bash scripts/build.sh
 更多命令介绍可查看shmem仓主目录下的`README.md`和`scripts/build.sh`文件。
 
 ### SHMEM编译相关说明
-SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本信息，并创建安装包(默认情况下不会编译RDMA能力、用例、测试、python接口)。后可跟参数，实现不同功能：
+SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本信息，并创建安装包(默认情况下不会编译RDMA能力、示例、测试、python接口)。后可跟参数，实现不同功能：
 - `-use_cxx11_abi1`：启用 `C++11 ABI`，默认
 - `-use_cxx11_abi0`：禁用 `C++11 ABI`
 - `-cann`：CANN 8.5以上版本可以使用CANN开放接口编译

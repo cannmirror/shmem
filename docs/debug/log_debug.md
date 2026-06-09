@@ -4,7 +4,7 @@
 
 SHMEM日志相关的几个环境变量：
 
-* `SHMEM_LOG_LEVEL`: 用于设置SHMEM日志等级，严重程度从低到高有DEBUG、WARN、INFO、ERROR、FATAL。默认为ERROR，调试时建议设置为DEBUG或INFO。
+* `SHMEM_LOG_LEVEL`: 用于设置SHMEM日志等级，严重程度从低到高有DEBUG、INFO、WARN、ERROR、FATAL。默认为ERROR，调试时建议设置为DEBUG或INFO。
 * `SHMEM_LOG_TO_STDOUT`: 用于设置SHMEM日志是否输出到控制台, 0: 关闭, 1: 开启输出到控制台。默认关闭，不输出到控制台，日志会存储到默认路径或指定路径。如果开启则会在控制台打印日志，日志将不再落盘到文件。
 * `SHMEM_LOG_PATH`: 用于设置SHMEM日志保存路径， 需要传递合法路径。如不设置默认存储路径为`${HOME}/shmem/log`。
 

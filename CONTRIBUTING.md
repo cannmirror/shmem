@@ -131,11 +131,11 @@
   
   1. 准备CANN开发环境
     
-     如果您想参与编码贡献，需要准备CANN开发环境，请参考[环境准备](./README.md#二、环境构建)。
+     如果您想参与编码贡献，需要准备CANN开发环境，请参考[环境准备](./docs/quickstart.md#4-环境准备)。
   
   2. 了解SHMEM的开发注意事项
   
-     1）请参考[安装指南](./README.md#CANN详细安装指南)，了解编码贡献的一些环境和工具要求。
+     1）请参考[快速开始](./docs/quickstart.md#快速开始)，了解编码贡献的一些环境和工具要求。
   
      2）SHMEM软件编码遵循许可协议：CANN Open Software License Agreement Version 2.0，详细的协议说明请参见[LICENSE](./LICENSE)文件，如果您贡献代码到SHMEM源码仓，请遵循此协议。
      
@@ -178,6 +178,6 @@
      (1) 进行代码开发前，请先将需要SHMEM仓库fork到个人仓，然后将个人仓下载到本地。并在本地分支进行代码修改。  
      (2) 代码验证满足贡献要求后，提交Pull-Request，将代码贡献到SHMEM，在[Pull-Request列表](https://gitcode.com/cann/shmem/pulls)，可以找到提交的Pull-Request。  
      (3) 在提交的Pull-Request的评论区，评论`compile`触发编译。  
-     (4) 请注意查看门禁测试结果，若未通过，请根据问题提示进行本地代码修改；若通过，此PR会被分配给commiter检视，请关注commiter的检视意见。  
+     (4) 请注意查看门禁测试结果，若未通过，请根据问题提示进行本地代码修改；若通过，此PR会被分配给committer检视，请关注committer的检视意见。  
      (5) 当您的PR检视通过后，代码会合入SHMEM源码仓。
   

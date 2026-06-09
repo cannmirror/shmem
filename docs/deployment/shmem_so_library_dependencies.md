@@ -69,7 +69,7 @@ graph TD
 Linux命令（CentOS/Ubuntu）：
 ```bash
 # 在项目根目录执行
-bash build.sh install
+bash scripts/build.sh install
 
 # 产物检查
 ls -l install/lib/*.so

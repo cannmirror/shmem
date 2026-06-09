@@ -268,21 +268,21 @@ static bool DriverVersionCheck(const std::string &ver)
     int32_t baseVal = GetValueFromVersion(ver, "V");
     int32_t readVal = GetValueFromVersion(readVer, "V");
     if (baseVal == -1 || readVal == -1 || baseVal != readVal) {
-        SHM_LOG_INFO("check driver version failed, V Version not equal");
+        SHM_LOG_INFO("driver version mismatch detected, V Version not equal");
         return false;
     }
 
     baseVal = GetValueFromVersion(ver, "R");
     readVal = GetValueFromVersion(readVer, "R");
     if (baseVal == -1 || readVal == -1 || baseVal != readVal) {
-        SHM_LOG_INFO("check driver version failed, R Release not equal");
+        SHM_LOG_INFO("driver version mismatch detected, R Release not equal");
         return false;
     }
 
     baseVal = GetValueFromVersion(ver, "C");
     readVal = GetValueFromVersion(readVer, "C");
     if (baseVal == -1 || readVal == -1 || readVal < baseVal) {
-        SHM_LOG_INFO("check driver version failed, C Customer is too low");
+        SHM_LOG_INFO("driver version mismatch detected, C Customer is too low");
         return false;
     }
     if (readVal > baseVal) {
@@ -308,7 +308,7 @@ static bool DriverVersionCheck(const std::string &ver)
     baseVal = GetValueFromVersion(ver, "B");
     readVal = GetValueFromVersion(readVer, "B");
     if (baseVal == -1 || readVal == -1 || readVal < baseVal) {
-        SHM_LOG_INFO("check driver version failed, B Build is too low:");
+        SHM_LOG_INFO("driver version mismatch detected, B Build is too low");
         return false;
     }
     return true;

@@ -1,7 +1,7 @@
 # 快速开始
 
 ## 1 介绍
-本系统主要面向昇腾平台上的模型和算子开发者，提供便携易用的多机多卡内存访问方式，方便用户开发在卡间同步数据，加速通信或通算融合类算子开发。  
+本系统主要面向昇腾平台上的模型和算子开发者，提供便捷易用的多机多卡内存访问方式，方便用户开发在卡间同步数据，加速通信或通算融合类算子开发。  
 
 ## 2 软件架构
 共享内存库接口主要分为 host 和 device 接口部分：
@@ -247,7 +247,7 @@ shm.set_conf_store_tls(True, tls_info)      # 开启TLS认证
 6. 使用torchrun运行测试demo
 
 ```sh
-torchrun --nproc-per-node=k test.py // k为想运行的ranksize
+torchrun --nproc-per-node=k test.py # k为想运行的ranksize
 ```
 看到日志中打印出“test.py running success!”即为demo运行成功
 

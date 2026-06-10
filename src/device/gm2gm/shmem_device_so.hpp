@@ -16,6 +16,12 @@
 #include "shmemi_device_rma.h"
 #include "utils/mstx/shmemi_mstx_report.h"
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+constexpr int ACLSHMEM_RDMA_V2_SUPPORTED = 1;
+#else
+constexpr int ACLSHMEM_RDMA_V2_SUPPORTED = 0;
+#endif
+
 /**
  * @brief Standard RMA Types and Names
  *
@@ -270,11 +276,15 @@ ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int pe, int32_t 
     if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
         aclshmemi_signal_set((__gm__ int32_t *)aclshmem_ptr(addr, pe), val);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {
-        __gm__ int32_t *sig_addr_int32 = reinterpret_cast<__gm__ int32_t *>(device_state->signal_addr);
-        aclshmemi_store(sig_addr_int32, val);
-        // flush data cache to GM after signal to ensure it is visible to other ranks
-        dcci_cachelines((__gm__ uint8_t *)sig_addr_int32, sizeof(int32_t));
-        aclshmemi_highlevel_signal_set(addr, sig_addr_int32, pe);
+        if constexpr (ACLSHMEM_RDMA_V2_SUPPORTED) {
+            aclshmemx_roce_atomic_set(addr, val, pe);
+        } else {
+            __gm__ int32_t *sig_addr_int32 = reinterpret_cast<__gm__ int32_t *>(device_state->signal_addr);
+            aclshmemi_store(sig_addr_int32, val);
+            // flush data cache to GM after signal to ensure it is visible to other ranks
+            dcci_cachelines((__gm__ uint8_t *)sig_addr_int32, sizeof(int32_t));
+            aclshmemi_highlevel_signal_set(addr, sig_addr_int32, pe);
+        } 
     }
 }
 

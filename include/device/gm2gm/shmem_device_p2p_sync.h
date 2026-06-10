@@ -24,7 +24,7 @@ extern "C" {
  * @brief The aclshmemx_signal_op operation updates sig_addr with signal using operation sig_op on the specified PE.
  *        This operation can be used together with aclshmem_signal_wait_until for efficient
  *        point-to-point synchronization.
- * WARNING: Atomicity NOT Guaranteed.
+ *        On Ascend950, RDMA is used as the communication engine, supporting signal_set with guaranteed atomicity.
  *
  * @param sig_addr              [in] Symmetric address of the signal word to be updated.
  * @param signal                [in] The value used to update sig_addr.

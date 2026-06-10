@@ -51,10 +51,6 @@ MemSegmentPtr MemSegment::Create(const MemSegmentOptions &options, int entityId)
 #else
         case HYBM_MST_HBM:
             if (socType_ == AscendSocType::ASCEND_950 || (HybmGetGvaVersion() == HYBM_GVA_V4)) {
-                if (!CannVersionCheck("8.5")) {
-                    SHM_LOG_ERROR("CANN version must be >= 8.5 for HybmVmmBasedSegment");
-                    break;
-                }
                 tmpSeg = std::make_shared<HybmVmmBasedSegment>(options, entityId);
             } else {
                 tmpSeg = std::make_shared<MemSegmentDevice>(options, entityId);

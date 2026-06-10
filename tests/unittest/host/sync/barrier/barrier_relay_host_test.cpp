@@ -181,11 +181,11 @@ static void test_barrier_relay_perf(int32_t rank_id, int32_t n_ranks, uint64_t l
         std::cout << "[PERF] npes=" << n_ranks << " iters=" << kPerfIters << std::endl;
         std::cout << "  barrier_all_vec (v3 LEGACY):       " << per_v3 << " ms/iter (total " << ms_v3 << " ms)"
                   << std::endl;
-        std::cout << "  barrier_all_vec_relay:             " << per_relay << " ms/iter (total " << ms_relay
+        std::cout << "  sync_all_vec_relay:                " << per_relay << " ms/iter (total " << ms_relay
                   << " ms)" << std::endl;
-        std::cout << "  (N-1) put + barrier_all_vec_relay: " << per_put_relay << " ms/iter (total "
+        std::cout << "  (N-1) put + sync_all_vec_relay:    " << per_put_relay << " ms/iter (total "
                   << ms_put_relay << " ms)" << std::endl;
-        std::cout << "  relay/v3 barrier ratio:            " << ratio << std::endl;
+        std::cout << "  relay/v3 sync ratio:               " << ratio << std::endl;
         const BarrierVisitModel v3m = model_v3(n_ranks);
         const BarrierVisitModel rlym = model_relay(n_ranks);
         std::cout << "[PERF_CSV] npes=" << n_ranks << ",v3_ms=" << per_v3 << ",relay_ms=" << per_relay

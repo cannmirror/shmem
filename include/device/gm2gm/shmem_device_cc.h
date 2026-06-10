@@ -95,15 +95,24 @@ ACLSHMEM_DEVICE void aclshmemx_barrier_all_vec(void);
 #define shmemx_barrier_all_vec aclshmemx_barrier_all_vec
 
 /**
- * @brief Vector-team barrier for FullMesh relay (950): writes completion flags to each remote peer's
- *        sync_pool[my_team_index] and polls local sync_pool slots. Use after relay-mode puts.
- *        LEGACY aclshmemx_barrier_all_vec (v3) writes local sync_pool[0] only.
+ * @brief Vector-team sync for FullMesh relay puts (Ascend 950). Only VEC cores participate; cube
+ *        cores may call the API but take no effect. Call after relay-mode non-blocking puts complete
+ *        submission on the executing stream; this routine ensures each peer observes completion flags
+ *        from all other team members before return. Unlike aclshmem_barrier, this is a sync (flag
+ *        exchange) and does not wait for remote RMA payload visibility beyond the relay flag contract.
+ *        Does not replace aclrtSynchronizeStream for CPU-side completion. If @p team is invalid or the
+ *        caller is not in the team, the call returns without effect.
+ *
+ * @param team              [in] team to synchronize
  */
-ACLSHMEM_DEVICE void aclshmemx_barrier_vec_relay(aclshmem_team_t team);
-#define shmemx_barrier_vec_relay aclshmemx_barrier_vec_relay
+ACLSHMEM_DEVICE void aclshmemx_sync_vec_relay(aclshmem_team_t team);
+#define shmemx_sync_vec_relay aclshmemx_sync_vec_relay
 
-ACLSHMEM_DEVICE void aclshmemx_barrier_all_vec_relay(void);
-#define shmemx_barrier_all_vec_relay aclshmemx_barrier_all_vec_relay
+/**
+ * @brief aclshmemx_sync_vec_relay over all PEs (ACLSHMEM_TEAM_WORLD).
+ */
+ACLSHMEM_DEVICE void aclshmemx_sync_all_vec_relay(void);
+#define shmemx_sync_all_vec_relay aclshmemx_sync_all_vec_relay
 
 /**
  * @brief Similar to aclshmem_barrier. In contrast with the aclshmem_barrier routine, aclshmem_sync only ensures

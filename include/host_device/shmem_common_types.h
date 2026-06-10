@@ -195,10 +195,6 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// @deprecated Use ACLSHMEM_SYNCBIT_SIZE instead
 #define ACLSHMEMI_SYNCBIT_SIZE ACLSHMEM_SYNCBIT_SIZE
 
-/// \def ACLSHMEMI_COMPLETION_FLAG_BYTES
-/// \brief UBMEM completion flag size (32B bus ordering anchor on Ascend 950)
-#define ACLSHMEMI_COMPLETION_FLAG_BYTES 32
-
 // npu level sync
 /// \def SYNC_LOG_MAX_PES
 /// \brief Number of log bits required for NPU-level synchronization (5 bits), calculated as: ceil(log₈(16384)) = 5

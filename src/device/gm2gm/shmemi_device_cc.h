@@ -329,9 +329,9 @@ ACLSHMEM_DEVICE void aclshmemi_barrier_npu_v3(aclshmem_team_t team_idx)
     MSTX_BARRIER_NPU_REPORT(size, vec_size);
 }
 
-/** Centralized relay barrier (push mode): remote sync_pool flag write, local poll. */
+/** Centralized relay sync (push mode): remote completion-flag write, local poll. */
 template<bool IS_AIV_ONLY = true>
-ACLSHMEM_DEVICE void aclshmemi_barrier_npu_relay(aclshmem_team_t team_idx)
+ACLSHMEM_DEVICE void aclshmemi_sync_npu_relay(aclshmem_team_t team_idx)
 {
     aclshmemx_team_t *team = aclshmemi_get_state()->team_pools[team_idx];
     int32_t vec_id = AscendC::GetBlockIdx();
@@ -383,12 +383,12 @@ ACLSHMEM_DEVICE void aclshmemi_barrier(aclshmem_team_t team)
 }
 
 template<bool IS_AIV_ONLY = true>
-ACLSHMEM_DEVICE void aclshmemi_barrier_relay(aclshmem_team_t team)
+ACLSHMEM_DEVICE void aclshmemi_sync_relay(aclshmem_team_t team)
 {
     if (team == -1) {
         return; // not in team
     }
-    aclshmemi_barrier_npu_relay<IS_AIV_ONLY>(team);
+    aclshmemi_sync_npu_relay<IS_AIV_ONLY>(team);
 }
 
 ACLSHMEM_DEVICE void dcci_cacheline(__gm__ uint8_t * addr)
@@ -544,14 +544,14 @@ ACLSHMEM_DEVICE void aclshmemx_barrier_all_vec()
     aclshmemx_barrier_vec(ACLSHMEM_TEAM_WORLD);
 }
 
-ACLSHMEM_DEVICE void aclshmemx_barrier_vec_relay(aclshmem_team_t tid)
+ACLSHMEM_DEVICE void aclshmemx_sync_vec_relay(aclshmem_team_t tid)
 {
-    aclshmemi_barrier_relay<true>(tid);
+    aclshmemi_sync_relay<true>(tid);
 }
 
-ACLSHMEM_DEVICE void aclshmemx_barrier_all_vec_relay()
+ACLSHMEM_DEVICE void aclshmemx_sync_all_vec_relay()
 {
-    aclshmemx_barrier_vec_relay(ACLSHMEM_TEAM_WORLD);
+    aclshmemx_sync_vec_relay(ACLSHMEM_TEAM_WORLD);
 }
 
 #ifdef __cplusplus

@@ -11,12 +11,15 @@
 #define MEMFABRIC_NET_UTIL_H
 
 #include <algorithm>
+#include <cstring>
+#include <memory>
 #include <random>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <fstream>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <netdb.h>
 
 #include "shmemi_logger.h"
 #include "shmemi_host_def.h"
@@ -28,12 +31,80 @@ constexpr int MIN_PORT = 1024;
 constexpr int MAX_PORT = 65536;
 constexpr int MAX_ATTEMPTS = 1000;
 constexpr int MAX_IFCONFIG_LENGTH = 23;
-constexpr int MAX_IP = 48;
+constexpr int MAX_IP = 256;  // must hold INET6_ADDRSTRLEN (46) and max hostname (253)
 constexpr int DEFAULT_IFNAME_LNEGTH = 4;
 
 // Invalid IPv4 address prefixes
 constexpr uint32_t IPV4_APIPA_PREFIX = 0xA9FE;     // 169.254.x.x (APIPA/Link-local)
 constexpr uint32_t IPV4_LOOPBACK_PREFIX = 0x7F;    // 127.x.x.x (Loopback)
+
+// Resolve `name` (literal IP or hostname) to sockaddr_storage.
+// `family` is AF_INET / AF_INET6 / AF_UNSPEC.
+// On success, fills `out` and returns ACLSHMEM_SUCCESS.
+//
+// AF_UNSPEC: iterates all getaddrinfo results, prefers IPv4 for deterministic
+// dual-stack resolution, and logs every candidate so operators can diagnose
+// mismatches.  If consistent family selection across PEs is critical, use IP
+// literals or an explicit family (AF_INET / AF_INET6) instead of AF_UNSPEC.
+inline int32_t ResolveAddress(const std::string &name, int family, sockaddr_storage &out)
+{
+    constexpr size_t maxHostnameLen = 253;
+    if (name.size() > maxHostnameLen) {
+        SHM_LOG_ERROR("Hostname too long: " << name.size() << " exceeds max " << maxHostnameLen);
+        return ACLSHMEM_INVALID_PARAM;
+    }
+
+    addrinfo hints{};
+    hints.ai_family = family;
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo *raw = nullptr;
+    int gai = getaddrinfo(name.c_str(), nullptr, &hints, &raw);
+    if (gai != 0) {
+        SHM_LOG_ERROR("getaddrinfo failed for '" << name << "': " << gai_strerror(gai));
+        return ACLSHMEM_INVALID_PARAM;
+    }
+    if (raw == nullptr) {
+        SHM_LOG_ERROR("getaddrinfo returned null for '" << name << "'");
+        return ACLSHMEM_INVALID_PARAM;
+    }
+    std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> guard(raw, freeaddrinfo);
+    if (family != AF_UNSPEC && raw->ai_family != family) {
+        SHM_LOG_ERROR("getaddrinfo for '" << name << "' returned address family "
+            << raw->ai_family << ", expected " << family);
+        return ACLSHMEM_INVALID_PARAM;
+    }
+
+    if (family == AF_UNSPEC) {
+        // Iterate all results: prefer IPv4 for deterministic dual-stack behaviour,
+        // log every candidate so operators can diagnose resolution mismatches.
+        addrinfo *preferred = nullptr;
+        for (addrinfo *rp = raw; rp != nullptr; rp = rp->ai_next) {
+            char ipBuf[INET6_ADDRSTRLEN] = {0};
+            if (rp->ai_family == AF_INET) {
+                auto *sin = reinterpret_cast<struct sockaddr_in *>(rp->ai_addr);
+                inet_ntop(AF_INET, &sin->sin_addr, ipBuf, sizeof(ipBuf));
+                SHM_LOG_INFO("getaddrinfo '" << name << "' candidate: IPv4 " << ipBuf);
+                if (preferred == nullptr) {
+                    preferred = rp;  // prefer first IPv4
+                }
+            } else if (rp->ai_family == AF_INET6) {
+                auto *sin6 = reinterpret_cast<struct sockaddr_in6 *>(rp->ai_addr);
+                inet_ntop(AF_INET6, &sin6->sin6_addr, ipBuf, sizeof(ipBuf));
+                SHM_LOG_INFO("getaddrinfo '" << name << "' candidate: IPv6 " << ipBuf);
+            } else {
+                SHM_LOG_INFO("getaddrinfo '" << name << "' candidate: family " << rp->ai_family);
+            }
+        }
+        if (preferred != nullptr) {
+            std::memcpy(&out, preferred->ai_addr, preferred->ai_addrlen);
+        } else {
+            std::memcpy(&out, raw->ai_addr, raw->ai_addrlen);
+        }
+    } else {
+        std::memcpy(&out, raw->ai_addr, raw->ai_addrlen);
+    }
+    return ACLSHMEM_SUCCESS;
+}
 
 inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t *innerUId)
 {
@@ -384,6 +455,28 @@ inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, con
     return result;
 }
 
+inline bool aclshmemi_parse_port(const std::string &portStr, uint16_t &port)
+{
+    constexpr int maxPort = 65535;
+    try {
+        size_t parsedLen = 0;
+        int portInt = std::stoi(portStr, &parsedLen);
+        if (parsedLen != portStr.size()) {
+            SHM_LOG_ERROR("Invalid port format: " << portStr);
+            return false;
+        }
+        if (portInt < 0 || portInt > maxPort) {
+            SHM_LOG_ERROR("Invalid port value: " << portInt << ", must be in range [0, " << maxPort << "]");
+            return false;
+        }
+        port = static_cast<uint16_t>(portInt);
+        return true;
+    } catch (const std::exception &e) {
+        SHM_LOG_ERROR("Invalid port string: " << e.what());
+        return false;
+    }
+}
+
 inline int32_t aclshmemi_get_ip_from_env(char *ip, uint16_t &port, sa_family_t &sockType, const char *ipPort)
 {
     if (ipPort == nullptr) {
@@ -395,18 +488,28 @@ inline int32_t aclshmemi_get_ip_from_env(char *ip, uint16_t &port, sa_family_t &
     if (ipPort[0] == '[') {
         sockType = AF_INET6;
         size_t found = ipPortStr.find_last_of(']');
-        if (found == std::string::npos || ipPortStr.length() - found <= 1) {
-            SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid");
+        if (found == std::string::npos) {
+            SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid: no closing ']'");
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        if (found + 1 >= ipPortStr.size() || ipPortStr[found + 1] != ':') {
+            SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid: missing ':' after ']'");
             return ACLSHMEM_INVALID_PARAM;
         }
         std::string ipStr = ipPortStr.substr(1, found - 1);
         std::string portStr = ipPortStr.substr(found + 2);
 
+        if (ipStr.size() >= MAX_IP) {
+            SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid: ipStr too long");
+            return ACLSHMEM_INVALID_PARAM;
+        }
+
         std::snprintf(ip, MAX_IP, "%s", ipStr.c_str());
 
-        port = std::stoi(portStr);
+        if (!aclshmemi_parse_port(portStr, port)) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
     } else {
-        sockType = AF_INET;
         size_t found = ipPortStr.find_last_of(':');
         if (found == std::string::npos || ipPortStr.length() - found <= 1) {
             SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid");
@@ -415,9 +518,29 @@ inline int32_t aclshmemi_get_ip_from_env(char *ip, uint16_t &port, sa_family_t &
         std::string ipStr = ipPortStr.substr(0, found);
         std::string portStr = ipPortStr.substr(found + 1);
 
+        if (ipStr.size() >= MAX_IP) {
+            SHM_LOG_ERROR("get env SHMEM_UID_SESSION_ID is invalid: ipStr too long");
+            return ACLSHMEM_INVALID_PARAM;
+        }
+
+        char addr_buf[sizeof(struct in6_addr)] = {0};
+        if (inet_pton(AF_INET6, ipStr.c_str(), addr_buf) == 1) {
+            sockType = AF_INET6;
+        } else if (inet_pton(AF_INET, ipStr.c_str(), addr_buf) == 1) {
+            sockType = AF_INET;
+        } else {
+            sockaddr_storage resolved{};
+            if (ResolveAddress(ipStr, AF_UNSPEC, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INVALID_PARAM;
+            }
+            sockType = resolved.ss_family;
+        }
+
         std::snprintf(ip, MAX_IP, "%s", ipStr.c_str());
 
-        port = std::stoi(portStr);
+        if (!aclshmemi_parse_port(portStr, port)) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
     }
     return ACLSHMEM_SUCCESS;
 }
@@ -434,15 +557,23 @@ inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &soc
     if (sock_type == AF_INET) {
         innerUID->addr.addr.addr4.sin_family = AF_INET;
         if (inet_pton(AF_INET, pta_env_ip, &(innerUID->addr.addr.addr4.sin_addr)) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv4 failed");
-            return ACLSHMEM_NOT_INITED;
+            sockaddr_storage resolved{};
+            if (ResolveAddress(pta_env_ip, AF_INET, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            auto *sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            innerUID->addr.addr.addr4.sin_addr = sin->sin_addr;
         }
         innerUID->addr.type = ADDR_IPv4;
     } else if (sock_type == AF_INET6) {
         innerUID->addr.addr.addr6.sin6_family = AF_INET6;
         if (inet_pton(AF_INET6, pta_env_ip, &(innerUID->addr.addr.addr6.sin6_addr)) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv6 failed");
-            return ACLSHMEM_NOT_INITED;
+            sockaddr_storage resolved{};
+            if (ResolveAddress(pta_env_ip, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            auto *sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            innerUID->addr.addr.addr6.sin6_addr = sin6->sin6_addr;
         }
         innerUID->addr.type = ADDR_IPv6;
     } else {

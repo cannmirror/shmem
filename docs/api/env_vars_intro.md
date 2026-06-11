@@ -3,10 +3,14 @@
 ## 初始化相关
 使用unique id的接口初始化时，需要手动配置环境变量SHMEM_UID_SESSION_ID或者SHMEM_UID_SOCK_IFNAME，同时配置时只读SHMEM_UID_SESSION_ID。指定SHMEM_UID_SESSION_ID时需保证ip可连通，port空闲。指定SHMEM_UID_SOCK_IFNAME时需保证网口指定的网络协议地址存在。
 
-* `SHMEM_UID_SESSION_ID`:直接指定PE 0的监听socket的ip和端口。
+* `SHMEM_UID_SESSION_ID`:直接指定PE 0的监听socket的ip和端口，支持格式：
+  - **IPv4字面量**：`ip:port`，如 `SHMEM_UID_SESSION_ID=192.168.1.100:1234`
+  - **IPv6字面量**：`[ip]:port`，如 `SHMEM_UID_SESSION_ID=[::1]:886`
+  - **主机名**：`hostname:port`，如 `SHMEM_UID_SESSION_ID=my-server:5555`（主机名通过系统名称解析服务（DNS、/etc/hosts 等）解析为实际 IP 地址）
 SHMEM_UID_SESSION_ID配置示例：
 SHMEM_UID_SESSION_ID=127.0.0.1:1234
 SHMEM_UID_SESSION_ID=[6666:6666:6666:6666:6666:6666:6666:6666]:886
+SHMEM_UID_SESSION_ID=localhost:8888
 
 * `SHMEM_UID_SOCK_IFNAME`:指定PE 0的监听socket的网口名和网络层协议。
 SHMEM_UID_SOCK_IFNAME配置示例：

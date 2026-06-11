@@ -29,7 +29,7 @@
 #include "store_net_common.h"
 
 #include "socket/uid_utils.h"
-#include "config_store/store_net_utils.h"
+#include "store_net_utils.h"
 
 constexpr int DEFAULT_ID = 0;
 

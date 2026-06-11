@@ -7,25 +7,48 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#include <net/if.h>
-#include <sys/time.h>
-#include "acc_common_util.h"
 #include "acc_tcp_listener.h"
+
+#include <net/if.h>
+#include <netdb.h>
+#include <sys/time.h>
+
+#include "acc_common_util.h"
+#include "store_net_utils.h"
 
 namespace shm {
 namespace acc {
 
-void AccTcpListener::PrepareSockAddr(mf_sockaddr& addr) noexcept
+bool AccTcpListener::PrepareSockAddr(mf_sockaddr& addr) noexcept
 {
     if (addr.type == IpV4) {
         addr.ip.ipv4.sin_family = AF_INET;
-        addr.ip.ipv4.sin_addr.s_addr = inet_addr(listenIp_.c_str());
         addr.ip.ipv4.sin_port = htons(listenPort_);
+        if (inet_pton(AF_INET, listenIp_.c_str(), &addr.ip.ipv4.sin_addr) != 1) {
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(listenIp_, AF_INET, resolved) != ACLSHMEM_SUCCESS) {
+                LOG_ERROR("Failed to resolve hostname " << listenIp_ << " to IPv4 address"
+                    << ", refusing to fallback to INADDR_ANY");
+                return false;
+            }
+            auto *sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            addr.ip.ipv4.sin_addr = sin->sin_addr;
+        }
     } else if (addr.type == IpV6) {
         addr.ip.ipv6.sin6_family = AF_INET6;
         addr.ip.ipv6.sin6_port = htons(listenPort_);
-        inet_pton(AF_INET6, listenIp_.c_str(), &addr.ip.ipv6.sin6_addr);
+        if (inet_pton(AF_INET6, listenIp_.c_str(), &addr.ip.ipv6.sin6_addr) != 1) {
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(listenIp_, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
+                LOG_ERROR("Failed to resolve hostname " << listenIp_ << " to IPv6 address"
+                    << ", refusing to fallback to in6addr_any");
+                return false;
+            }
+            auto *sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            addr.ip.ipv6.sin6_addr = sin6->sin6_addr;
+        }
     }
+    return true;
 }
 
 
@@ -35,8 +58,19 @@ Result AccTcpListener::CreateSocketForStrat(mf_sockaddr &addr, int &tmpFD) noexc
         tmpFD = ::socket(AF_INET6, SOCK_STREAM, 0);
         addr.type = IpV6;
     } else {
-        tmpFD = ::socket(AF_INET, SOCK_STREAM, 0);
-        addr.type = IpV4;
+        sockaddr_storage resolved{};
+        if (shm::utils::ResolveAddress(listenIp_, AF_UNSPEC, resolved) == ACLSHMEM_SUCCESS) {
+            if (resolved.ss_family == AF_INET6) {
+                tmpFD = ::socket(AF_INET6, SOCK_STREAM, 0);
+                addr.type = IpV6;
+            } else {
+                tmpFD = ::socket(AF_INET, SOCK_STREAM, 0);
+                addr.type = IpV4;
+            }
+        } else {
+            tmpFD = ::socket(AF_INET, SOCK_STREAM, 0);
+            addr.type = IpV4;
+        }
     }
     if (tmpFD < 0) {
         char buffer[256];
@@ -91,7 +125,11 @@ Result AccTcpListener::Start() noexcept
 
     LOG_INFO("create socket success tmp_fd = " << tmpFD << " listen fd = " << listenFd_);
     /* assign address */
-    PrepareSockAddr(addr);
+    if (!PrepareSockAddr(addr)) {
+        SafeCloseFd(tmpFD);
+        LOG_ERROR("Failed to prepare socket address for " << NameAndPort());
+        return ACC_ERROR;
+    }
     int result_bind = -1;
     /* set option, bind and listen */
     if (listenFd_ > 0) {

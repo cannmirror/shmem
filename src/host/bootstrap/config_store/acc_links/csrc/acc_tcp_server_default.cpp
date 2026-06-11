@@ -7,11 +7,15 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#include <net/if.h>
-#include "sotre_net.h"
-#include "acc_tcp_server.h"
-#include "acc_common_util.h"
 #include "acc_tcp_server_default.h"
+
+#include <net/if.h>
+#include <netdb.h>
+
+#include "acc_common_util.h"
+#include "acc_tcp_server.h"
+#include "sotre_net.h"
+#include "store_net_utils.h"
 
 namespace shm {
 namespace acc {
@@ -472,7 +476,18 @@ static Result CreateSocket(const std::string &peerIp, IpType &type, int &sockfd)
         type = IpV6;
         sockfd = ::socket(AF_INET6, SOCK_STREAM, 0);
     } else {
-        return ACC_ERROR;
+        sockaddr_storage resolved{};
+        if (shm::utils::ResolveAddress(peerIp, AF_UNSPEC, resolved) != ACLSHMEM_SUCCESS) {
+            LOG_ERROR("hostname resolution failed for CreateSocket: " << peerIp);
+            return ACC_ERROR;
+        }
+        if (resolved.ss_family == AF_INET) {
+            type = IpV4;
+            sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
+        } else {
+            type = IpV6;
+            sockfd = ::socket(AF_INET6, SOCK_STREAM, 0);
+        }
     }
     if (sockfd < 0) {
         LOG_ERROR("Failed to create socket, errno:" << errno << ", please check if fd is out of limit");
@@ -481,19 +496,37 @@ static Result CreateSocket(const std::string &peerIp, IpType &type, int &sockfd)
     return ACC_OK;
 }
 
-
-void AccTcpServerDefault::ConstructSocketAddress(IpType ipType, mf_sockaddr &addr,
+bool AccTcpServerDefault::ConstructSocketAddress(IpType ipType, mf_sockaddr &addr,
                                                  const std::string &peerIp, uint16_t port)
 {
     if (ipType == IpV4) {
         addr.ip.ipv4.sin_family = AF_INET;
-        addr.ip.ipv4.sin_addr.s_addr = inet_addr(peerIp.c_str());
         addr.ip.ipv4.sin_port = htons(port);
+        if (inet_pton(AF_INET, peerIp.c_str(), &addr.ip.ipv4.sin_addr) != 1) {
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(peerIp, AF_INET, resolved) != ACLSHMEM_SUCCESS) {
+                LOG_ERROR("Failed to resolve hostname " << peerIp << " to IPv4 address"
+                    << ", refusing to fallback to INADDR_ANY");
+                return false;
+            }
+            auto *sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            addr.ip.ipv4.sin_addr = sin->sin_addr;
+        }
     } else {
         addr.ip.ipv6.sin6_family = AF_INET6;
-        inet_pton(AF_INET6, peerIp.c_str(), &addr.ip.ipv6.sin6_addr);
         addr.ip.ipv6.sin6_port = htons(port);
+        if (inet_pton(AF_INET6, peerIp.c_str(), &addr.ip.ipv6.sin6_addr) != 1) {
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(peerIp, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
+                LOG_ERROR("Failed to resolve hostname " << peerIp << " to IPv6 address"
+                    << ", refusing to fallback to in6addr_any");
+                return false;
+            }
+            auto *sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            addr.ip.ipv6.sin6_addr = sin6->sin6_addr;
+        }
     }
+    return true;
 }
 
 Result AccTcpServerDefault::ConnectToPeerServer(const std::string &peerIp, uint16_t port, const AccConnReq &req,
@@ -512,7 +545,11 @@ Result AccTcpServerDefault::ConnectToPeerServer(const std::string &peerIp, uint1
     setsockopt(tmpFD, IPPROTO_TCP, TCP_SYNCNT, &synCnt, sizeof(synCnt));
 
     mf_sockaddr addr {};
-    ConstructSocketAddress(ipType, addr, peerIp, port);
+    if (!ConstructSocketAddress(ipType, addr, peerIp, port)) {
+        SafeCloseFd(tmpFD);
+        LOG_ERROR("Failed to construct socket address for " << ipAndPort);
+        return ACC_ERROR;
+    }
 
     uint32_t timesRetried = 0;
     int lastErrno = 0;
@@ -547,7 +584,6 @@ Result AccTcpServerDefault::ConnectToPeerServer(const std::string &peerIp, uint1
     LOG_ERROR("Failed to connect to " << ipAndPort << " after tried " << timesRetried << " times");
     return ACC_ERROR;
 }
-
 AccTcpServerDefault::~AccTcpServerDefault()
 {
     if (sslCtx_ != nullptr) {

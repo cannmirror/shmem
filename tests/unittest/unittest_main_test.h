@@ -24,5 +24,9 @@ int32_t test_udma_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclrtS
 void test_cross_init(int pe_id, int n_pes, uint64_t local_mem_size, aclrtStream *st);
 void test_finalize(aclrtStream stream, int device_id);
 void test_mutil_task(std::function<void(int, int, uint64_t)> func, uint64_t local_mem_size, int process_count);
+void test_mutil_task_with_uid(
+    std::function<void(int, int, uint64_t, aclshmemx_uniqueid_t&)> func,
+    uint64_t local_mem_size,
+    int process_count);
 
 #endif // UNITTEST_H

@@ -52,6 +52,28 @@
  * Asynchronous interface. Perform contiguous data atomic add operation on
  * symmetric memory from the specified PE to address on the local PE.
  *
+ * The implementation dispatches to MTE or UDMA based on the transport topology.
+ * Pipeline synchronization requirements differ by transport and must be ensured
+ * externally by the caller:
+ * - MTE path: writes operands to UB via Scalar, then MTE3 reads UB and performs
+ *   the remote atomic add to GM.
+ *   - Before calling: if another unit (e.g. MTE2) is also writing to the same UB
+ *     region, the caller must fence those writes before Scalar writes to UB
+ *     (e.g. SetFlag/WaitFlag on MTE2_S event), otherwise UB data may be
+ *     corrupted.
+ *   - After calling: if there is a data dependency on the atomic add result, the
+ *     caller must fence MTE3 before reading GM (e.g. SetFlag/WaitFlag on
+ *     MTE3_MTE2 event). Likewise, if new values will be written to the same UB
+ *     region, the caller must fence MTE3 before overwriting UB (e.g. SetFlag/
+ *     WaitFlag on MTE3_S event), otherwise UB data may be overwritten before
+ *     MTE3 has finished reading.
+ * - UDMA path: the atomic add is issued asynchronously over UDMA. The caller
+ *   must call aclshmemx_udma_quiet(pe) before reading the result to guarantee
+ *   the operation has completed on the target PE.
+ *
+ * The MTE UB buffer offset defaults to 0 and can be adjusted via
+ * aclshmemx_set_mte_config(offset, ub_size, sync_id).
+ *
  * @par Parameters
  * - **dst**    - [in] Pointer on local device of the destination data.
  * - **value**  - [in] Value atomic add to destination.

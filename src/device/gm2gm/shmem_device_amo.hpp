@@ -26,14 +26,16 @@
                     "MTE atomic add supports: int8, int16, int32, float, half, bfloat16. \n");                         \
             } else {                                                                                                   \
                 auto ptr = aclshmem_ptr(dst, pe);                                                                      \
-                AscendC::TEventID my_sync_id = (AscendC::TEventID)device_state->mte_config.sync_id;                    \
-                __gm__ TYPE *remote_ptr = reinterpret_cast<__gm__ TYPE *>(ptr);                                        \
-                __ubuf__ TYPE *buf = reinterpret_cast<__ubuf__ TYPE *>(device_state->mte_config.aclshmem_ub);          \
-                *buf = value;                                                                                          \
+                __gm__ TYPE* remote_ptr = reinterpret_cast<__gm__ TYPE*>(ptr);                                         \
+                __ubuf__ TYPE* buf = reinterpret_cast<__ubuf__ TYPE*>(device_state->mte_config.aclshmem_ub);           \
+                AscendC::LocalTensor<TYPE> ub_tensor(                                                                  \
+                    AscendC::TPosition::VECIN, device_state->mte_config.aclshmem_ub, 1);                               \
+                ub_tensor.SetValue(0, value);                                                                          \
+                AscendC::TEventID sync_id = device_state->mte_config.sync_id;                                          \
+                AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(sync_id);                                                 \
+                AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(sync_id);                                                \
                 AscendC::SetAtomicAdd<TYPE>();                                                                         \
                 aclshmemi_copy_ub2gm(remote_ptr, buf, sizeof(TYPE));                                                   \
-                AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(my_sync_id);                                           \
-                AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(my_sync_id);                                          \
                 AscendC::SetAtomicNone();                                                                              \
             }                                                                                                          \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                            \

@@ -62,6 +62,7 @@ public:
 
 private:
     Result ExportInner(const std::shared_ptr<MemSlice> &slice, MemShareHandle &sHandle) noexcept;
+    Result ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept;
 
     std::vector<MemExportInfo> imports_;
     uint8_t *globalVirtualAddress_{nullptr};
@@ -69,6 +70,7 @@ private:
     uint64_t totalVirtualSize_{0UL};
     uint64_t allocatedSize_{0UL};
     uint16_t sliceCount_{0};
+    bool singleReservation_{false};
 
     std::map<uint16_t, MemSliceStatus> slices_;
     std::map<uint16_t, std::string> exportMap_;

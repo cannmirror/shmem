@@ -11,6 +11,10 @@
 #include <csignal>
 #include <iostream>
 #include <algorithm>
+#include <array>
+#include <cerrno>
+#include <unistd.h>
+#include <vector>
 #include "acl/acl.h"
 #include "shmem.h"
 #include "shmemi_host_common.h"
@@ -213,6 +217,186 @@ void test_mutil_task(std::function<void(int, int, uint64_t)> func, uint64_t loca
     }
     for (int i = 0; i < process_count; ++i) {
         waitpid(pids[i], &status[i], 0);
+        if (WIFSIGNALED(status[i])) {
+            int sig = WTERMSIG(status[i]);
+            if (sig != SIGUSR1) {
+                FAIL();
+            }
+        } else {
+            FAIL();
+        }
+    }
+}
+
+static ssize_t read_full(int fd, void* buf, size_t count)
+{
+    size_t total = 0;
+    while (total < count) {
+        ssize_t n = read(fd, static_cast<char*>(buf) + total, count - total);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (n == 0) return static_cast<ssize_t>(total);
+        total += static_cast<size_t>(n);
+    }
+    return static_cast<ssize_t>(total);
+}
+
+static ssize_t write_full(int fd, const void* buf, size_t count)
+{
+    size_t total = 0;
+    while (total < count) {
+        ssize_t n = write(fd, static_cast<const char*>(buf) + total, count - total);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        total += static_cast<size_t>(n);
+    }
+    return static_cast<ssize_t>(total);
+}
+
+void test_mutil_task_with_uid(
+    std::function<void(int, int, uint64_t, aclshmemx_uniqueid_t&)> func,
+    uint64_t local_mem_size,
+    int process_count)
+{
+    if (process_count == 0) return;
+
+    pid_t pids[process_count];
+    int status[process_count];
+
+    std::vector<std::array<int, 2>> dist_pipes(process_count);
+    std::array<int, 2> uid_pipe;
+    if (pipe(uid_pipe.data()) != 0) {
+        ADD_FAILURE() << "pipe(uid_pipe) failed: " << strerror(errno);
+        return;
+    }
+
+    for (int i = 0; i < process_count; ++i) {
+        if (pipe(dist_pipes[i].data()) != 0) {
+            ADD_FAILURE() << "pipe(dist_pipes[" << i << "]) failed: " << strerror(errno);
+            close(uid_pipe[0]);
+            close(uid_pipe[1]);
+            for (int k = 0; k < i; ++k) {
+                close(dist_pipes[k][0]);
+                close(dist_pipes[k][1]);
+                kill(pids[k], SIGKILL);
+                waitpid(pids[k], &status[k], 0);
+            }
+            return;
+        }
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            ADD_FAILURE() << "fork[" << i << "] failed: " << strerror(errno);
+            close(uid_pipe[0]);
+            close(uid_pipe[1]);
+            for (int k = 0; k <= i; ++k) {
+                close(dist_pipes[k][0]);
+                close(dist_pipes[k][1]);
+            }
+            for (int k = 0; k < i; ++k) {
+                kill(pids[k], SIGKILL);
+                waitpid(pids[k], &status[k], 0);
+            }
+            return;
+        }
+        if (pids[i] == 0) {
+            close(uid_pipe[0]);
+            for (int j = 0; j < process_count; ++j) {
+                close(dist_pipes[j][1]);
+                if (j != i) close(dist_pipes[j][0]);
+            }
+
+            aclshmemx_uniqueid_t uid{};
+            if (i == 0) {
+                setenv("SHMEM_UID_SESSION_ID", "127.0.0.1:8666", 1);
+                int ret = aclshmemx_get_uniqueid(&uid);
+                if (ret != ACLSHMEM_SUCCESS || uid.version != ACLSHMEM_UNIQUEID_VERSION) {
+                    ret = (ret != ACLSHMEM_SUCCESS) ? ret : ACLSHMEM_INVALID_VALUE;
+                }
+                if (write_full(uid_pipe[1], &ret, sizeof(ret)) != sizeof(ret) ||
+                    write_full(uid_pipe[1], &uid, sizeof(uid)) != sizeof(uid)) {
+                    close(uid_pipe[1]);
+                    raise(SIGUSR2);
+                }
+                close(uid_pipe[1]);
+                func(i + test_first_rank, test_global_ranks, local_mem_size, uid);
+                raise(::testing::Test::HasFailure() ? SIGUSR2 : SIGUSR1);
+            }
+            close(uid_pipe[1]);
+
+            if (read_full(dist_pipes[i][0], &uid, sizeof(uid)) != sizeof(uid)) {
+                close(dist_pipes[i][0]);
+                raise(SIGUSR2);
+            }
+            close(dist_pipes[i][0]);
+
+            func(i + test_first_rank, test_global_ranks, local_mem_size, uid);
+            raise(::testing::Test::HasFailure() ? SIGUSR2 : SIGUSR1);
+        }
+    }
+
+    close(uid_pipe[1]);
+    close(dist_pipes[0][1]);
+    for (int i = 0; i < process_count; ++i) {
+        close(dist_pipes[i][0]);
+    }
+
+    aclshmemx_uniqueid_t uid{};
+    int get_uid_ret = ACLSHMEM_SUCCESS;
+    if (read_full(uid_pipe[0], &get_uid_ret, sizeof(get_uid_ret)) != sizeof(get_uid_ret) ||
+        read_full(uid_pipe[0], &uid, sizeof(uid)) != sizeof(uid)) {
+        ADD_FAILURE() << "read uid_pipe failed: " << strerror(errno);
+        close(uid_pipe[0]);
+        for (int i = 1; i < process_count; ++i) {
+            close(dist_pipes[i][1]);
+        }
+        for (int i = 0; i < process_count; ++i) {
+            kill(pids[i], SIGKILL);
+            waitpid(pids[i], &status[i], 0);
+        }
+        return;
+    }
+    close(uid_pipe[0]);
+
+    if (get_uid_ret != ACLSHMEM_SUCCESS) {
+        ADD_FAILURE() << "aclshmemx_get_uniqueid failed in rank 0, ret=" << get_uid_ret;
+        for (int i = 1; i < process_count; ++i) {
+            close(dist_pipes[i][1]);
+        }
+        for (int i = 0; i < process_count; ++i) {
+            kill(pids[i], SIGKILL);
+            waitpid(pids[i], &status[i], 0);
+        }
+        return;
+    }
+
+    for (int i = 1; i < process_count; ++i) {
+        if (write_full(dist_pipes[i][1], &uid, sizeof(uid)) != sizeof(uid)) {
+            ADD_FAILURE() << "write dist_pipes[" << i << "] failed: " << strerror(errno);
+            close(dist_pipes[i][1]);
+            for (int k = i + 1; k < process_count; ++k) {
+                close(dist_pipes[k][1]);
+            }
+            for (int k = 0; k < process_count; ++k) {
+                kill(pids[k], SIGKILL);
+            }
+            for (int k = 0; k < process_count; ++k) {
+                waitpid(pids[k], &status[k], 0);
+            }
+            return;
+        }
+        close(dist_pipes[i][1]);
+    }
+
+    for (int i = 0; i < process_count; ++i) {
+        pid_t pid_ret = waitpid(pids[i], &status[i], 0);
+        if (pid_ret == -1) {
+            ADD_FAILURE() << "waitpid[" << i << "] failed: " << strerror(errno);
+            continue;
+        }
         if (WIFSIGNALED(status[i])) {
             int sig = WTERMSIG(status[i]);
             if (sig != SIGUSR1) {

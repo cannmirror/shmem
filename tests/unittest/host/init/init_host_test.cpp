@@ -478,33 +478,36 @@ TEST(TestInitAPI, TestShmemRepeatInit)
     test_mutil_task(test_aclshmem_repeatedly_init, local_mem_size, process_count);
 }
 
-TEST(TestInitAPI, TestShmemGetUniqueIdAndInit)
+void test_shmem_get_uniqueid_and_init(int rank_id, int n_ranks, uint64_t local_mem_size, aclshmemx_uniqueid_t& uid)
 {
-    const uint64_t local_mem_size = 64UL * 1024UL * 1024UL;
-    const int process_count = 1;
-
-    uint32_t device_id = 0;
+    uint32_t device_id = rank_id % test_gnpu_num + test_first_npu;
 
     EXPECT_EQ(aclInit(nullptr), 0);
     EXPECT_EQ(aclrtSetDevice(device_id), 0);
-    ASSERT_EQ(setenv("SHMEM_UID_SESSION_ID", "127.0.0.1:8666", 1), 0);
-    aclshmemx_uniqueid_t uid;
-    int ret = aclshmemx_get_uniqueid(&uid);
-    EXPECT_EQ(ret, ACLSHMEM_SUCCESS);
-    EXPECT_EQ(uid.version, ACLSHMEM_UNIQUEID_VERSION);
 
     aclshmemx_init_attr_t attr;
-    ret = aclshmemx_set_attr_uniqueid_args(0, 1, (int64_t)local_mem_size, &uid, &attr);
+    int ret = aclshmemx_set_attr_uniqueid_args(rank_id, n_ranks, (int64_t)local_mem_size, &uid, &attr);
     EXPECT_EQ(ret, ACLSHMEM_SUCCESS);
 
-    EXPECT_EQ(attr.my_pe, 0);
-    EXPECT_EQ(attr.n_pes, 1);
-    EXPECT_EQ(attr.local_mem_size, 64UL * 1024UL * 1024UL);
+    EXPECT_EQ(attr.my_pe, rank_id);
+    EXPECT_EQ(attr.n_pes, n_ranks);
+    EXPECT_EQ(attr.local_mem_size, local_mem_size);
     EXPECT_NE(attr.comm_args, nullptr);
+
+    ret = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attr);
+    EXPECT_EQ(ret, ACLSHMEM_SUCCESS);
 
     EXPECT_EQ(aclshmem_finalize(), ACLSHMEM_SUCCESS);
     EXPECT_EQ(aclrtResetDevice(device_id), 0);
     EXPECT_EQ(aclFinalize(), 0);
+}
+
+TEST(TestInitAPI, TestShmemGetUniqueIdAndInit)
+{
+    const uint64_t local_mem_size = 64UL * 1024UL * 1024UL;
+    const int process_count = test_gnpu_num;
+
+    test_mutil_task_with_uid(test_shmem_get_uniqueid_and_init, local_mem_size, process_count);
 }
 
 TEST(TestInitAPI, TestShmemInvalidIP)

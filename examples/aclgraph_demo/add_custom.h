@@ -10,6 +10,7 @@
 #ifndef ADD_CUSTOM_H
 #define ADD_CUSTOM_H
 
+#include <algorithm>
 #include "acl/acl.h"
 #include "kernel_operator.h"
 #include "host_device/shmem_common_types.h"

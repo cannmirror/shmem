@@ -93,7 +93,10 @@ public:
 
         std::vector<mstxMemPermissionsAssignRegionsDesc_t> permAssignDesc(target_handles.size());
         for (size_t i = 0; i < target_handles.size(); ++i) {
-            permAssignDesc[i].flags = MSTX_MEM_PERMISSIONS_REGION_FLAGS_SHARED;
+            permAssignDesc[i].flags =
+                MSTX_MEM_PERMISSIONS_REGION_FLAGS_READ |
+                MSTX_MEM_PERMISSIONS_REGION_FLAGS_WRITE |
+                MSTX_MEM_PERMISSIONS_REGION_FLAGS_SHARED;
             permAssignDesc[i].region.refType = MSTX_MEM_REGION_REF_TYPE_HANDLE;
             permAssignDesc[i].region.handle = target_handles[i];
         }

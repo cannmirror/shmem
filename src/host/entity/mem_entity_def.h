@@ -42,8 +42,9 @@ constexpr uint64_t DEVMM_HEAP_SIZE = (1UL << 30UL);     // same definition in de
 constexpr uint64_t HYBM_HOST_CONN_START_ADDR = 0x30000000000UL;  // 48T
 constexpr uint64_t HYBM_HOST_CONN_ADDR_SIZE = 0x100000000000UL;  // 16T
 
-constexpr uint64_t HYBM_GVM_START_ADDR = 0x280000000000UL;      // 40T
-constexpr uint64_t HYBM_GVM_END_ADDR = 0xA80000000000UL;        // 168T
+constexpr uint64_t HYBM_GVM_START_ADDR = 0x140000000000UL;      // 20T
+constexpr uint64_t HYBM_GVM_END_ADDR = 0x180000000000UL;        // 24T
+constexpr uint64_t HYBM_MAX_SINGLE_RESERVE_SIZE = 128UL * 1024UL * 1024UL * 1024UL;  // 128GB, ACL interface single virtual memory allocation limit
 
 inline bool IsVirtualAddressNpu(uint64_t address)
 {

@@ -16,7 +16,7 @@
 
 namespace ShmemKernel {
 
-int aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAddr, void* k_cache,
+void aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAddr, void* k_cache,
     void* v_cache,
     void* global_shuffle_table,
     void* src_block_table,

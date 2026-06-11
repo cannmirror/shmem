@@ -158,7 +158,7 @@ void KVShuffleOps::compute(
 }
 namespace ShmemKernel {
 
-int aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAddr, void* k_cache,
+void aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAddr, void* k_cache,
     void* v_cache,
     void* global_shuffle_table,
     void* src_block_table,
@@ -167,8 +167,6 @@ int aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAdd
     int64_t block_nums,
     int64_t kv_head_num, int64_t page_size, int64_t head_dim, int32_t sync_count)
 {
-    int status = 0;
-    // kv_shuffle
     ShmemKVShuffle<<<block_dim, nullptr, stream>>>(
         fftsAddr,
         (uint8_t *)k_cache,
@@ -179,7 +177,6 @@ int aclshmem_kv_shuffle(uint32_t block_dim, aclrtStream stream, uint64_t fftsAdd
         (uint8_t *)sync_ptr,
         block_nums,
         kv_head_num, page_size, head_dim, sync_count);
-    return status;
 }
 
 }

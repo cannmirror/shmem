@@ -53,21 +53,52 @@
     FUNC(uint64, uint64_t);             \
     FUNC(char, char)
 
+/*****************************************************************************
+ *                    Highlevel Atomic Operation Type Macros                  *
+ *****************************************************************************/
+
 #define ACLSHMEM_ATOMIC_ADD_FUNC_TYPE_HOST(FUNC) \
     FUNC(bfloat16, op::bfloat16);                \
     FUNC(half, op::fp16_t);                      \
     FUNC(float, float);                          \
     FUNC(int8, int8_t);                          \
-    FUNC(int16, int16_t);                        \
-    FUNC(int32, int32_t)
+    FUNC(int16, int16_t)
 
 #define ACLSHMEM_ATOMIC_ADD_FUNC_TYPE_KERNEL(FUNC) \
     FUNC(bfloat16, bfloat16_t);                    \
     FUNC(half, half);                              \
     FUNC(float, float);                            \
     FUNC(int8, int8_t);                            \
-    FUNC(int16, int16_t);                          \
-    FUNC(int32, int32_t)
+    FUNC(int16, int16_t)
+
+#define ACLSHMEM_ATOMIC_ADD_910_FUNC_TYPE(FUNC) FUNC(int32, int32_t)
+
+#define ACLSHMEM_ATOMIC_ADD_EXT_FUNC_TYPE(FUNC) \
+    FUNC(uint32, uint32_t)
+
+#define ACLSHMEM_ATOMIC_SWAP_FUNC_TYPE(FUNC) \
+    FUNC(uint32, uint32_t);                  \
+    FUNC(uint64, uint64_t);                  \
+    FUNC(int32, int32_t);                    \
+    FUNC(int64, int64_t);                    \
+    FUNC(float, float)
+
+#define ACLSHMEM_ATOMIC_CAS_FUNC_TYPE(FUNC) \
+    FUNC(uint32, uint32_t);                 \
+    FUNC(uint64, uint64_t);                 \
+    FUNC(int32, int32_t);                   \
+    FUNC(int64, int64_t)
+
+#define ACLSHMEM_ATOMIC_ADD_950_FUNC_TYPE(FUNC) \
+    FUNC(uint32, uint32_t);                     \
+    FUNC(int32, int32_t);                       \
+    FUNC(int64, int64_t)
+
+#define ACLSHMEM_ATOMIC_LOGIC_FUNC_TYPE(FUNC) \
+    FUNC(uint32, uint32_t);                   \
+    FUNC(uint64, uint64_t);                   \
+    FUNC(int32, int32_t);                     \
+    FUNC(int64, int64_t)
 
 /*****************************************************************************
  *                    RDMA Atomic Operation Type Macros                        *

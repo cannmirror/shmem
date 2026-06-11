@@ -16,35 +16,133 @@
 #include "device/gm2gm/engine/shmem_device_mte.h"
 
 /**
+ * @brief Type Function Macros for Atomic Operations
+ *
+ * Each macro is used to generate atomic operation functions for specific data types.
+ *
+ * | Macro Name                         | Used by Atomic Interfaces                                         |
+ * |------------------------------------|-------------------------------------------------------------------|
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_ADD      | atomic_add                                                        |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_910  | atomic_add                                                        |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT  | atomic_add                                                        |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP     | atomic_set, atomic_swap, atomic_compare_swap                      |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST| atomic_set, atomic_swap, atomic_compare_swap (CAST types)         |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_CAS_CAST | atomic_compare_swap (CAST types)                                  |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950  | atomic_fetch_add, atomic_inc, atomic_fetch_inc, atomic_fetch      |
+ * | ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC    | atomic_and, atomic_or, atomic_xor, atomic_fetch_and,              |
+ * |                                    | atomic_fetch_or, atomic_fetch_xor                                 |
+ */
+
+/**
  * @brief Standard Atomic Add Types and Names
  *
  * |NAME       | TYPE      |
  * |-----------|-----------|
- * |int8       | int8      |
- * |int16      | int16     |
- * |int32      | int32     |
- * |uint32     | uint32    |
- * |int64      | int64     |
- * |uint64     | uint64    |
+ * |int8       | int8_t    |
+ * |int16      | int16_t   |
+ * |int32      | int32_t   |
+ * |bfloat16   | bfloat16_t|
  * |half       | half      |
- * |bfloat16   | bfloat16  |
- * |float      | float     |
  */
 #define ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(FUNC) \
     FUNC(int8, int8_t);                     \
     FUNC(int16, int16_t);                   \
-    FUNC(int32, int32_t);                   \
-    FUNC(uint32, uint32_t);                 \
-    FUNC(int64, int64_t);                   \
-    FUNC(uint64, uint64_t);                 \
-    FUNC(half, half);                       \
     FUNC(bfloat16, bfloat16_t);             \
+    FUNC(half, half)
+/**
+ * @brief Ascend_910 operations - support types for atomic_add
+ * |NAME   | TYPE     |
+ * |-------|----------|
+ * |int32  | int32_t  |
+ * |float  | float    |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_910(FUNC) \
+    FUNC(int32, int32_t);                       \
     FUNC(float, float)
 
 /**
- * @brief  Automatically generates aclshmem atomic add functions for different data types
- *         (MTE supports int8, int16, int32, float, half, bfloat16; UDMA supports int32, uint32, int64, uint64, float).
+ * @brief Ascend950 operations - support types for atomic_add
+ * |NAME   | TYPE     |
+ * |-------|----------|
+ * |uint32 | uint32_t |
+ * |uint64 | uint64_t |
+ * |int64  | int64_t  |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT(FUNC) \
+    FUNC(uint32, uint32_t);                     \
+    FUNC(uint64, uint64_t);                     \
+    FUNC(int64, int64_t)
+
+/** @brief Integer-only operations - direct support types
+ * |NAME   | TYPE     |
+ * |-------|----------|
+ * |uint32 | uint32_t |
+ * |uint64 | uint64_t |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP(FUNC) \
+    FUNC(uint32, uint32_t);                  \
+    FUNC(uint64, uint64_t)
+
+/** @brief Integer-only operations - CAST support types
+ * |NAME   | TYPE     | CAST TYPE |
+ * |-------|----------|-----------|
+ * |int32  | int32_t  | uint32_t  |
+ * |int64  | int64_t  | uint64_t  |
+ * |float  | float    | uint32_t  |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(FUNC) \
+    FUNC(int32, int32_t, uint32_t);               \
+    FUNC(int64, int64_t, uint64_t);               \
+    FUNC(float, float, uint32_t)
+
+/** @brief Integer-only operations - CAST support types
+ * |NAME   | TYPE     | CAST TYPE |
+ * |-------|----------|-----------|
+ * |int32  | int32_t  | uint32_t  |
+ * |int64  | int64_t  | uint64_t  |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_CAS_CAST(FUNC) \
+    FUNC(int32, int32_t, uint32_t);              \
+    FUNC(int64, int64_t, uint64_t)
+
+/** @brief Ascend950 operations - support types for atomic_add
+ * |NAME   | TYPE     |
+ * |-------|----------|
+ * |uint32 | uint32_t |
+ * |uint64 | uint64_t |
+ * |int32  | int32_t  |
+ * |int64  | int64_t  |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(FUNC) \
+    FUNC(uint32, uint32_t);                     \
+    FUNC(uint64, uint64_t);                     \
+    FUNC(int32, int32_t);                       \
+    FUNC(int64, int64_t)
+
+/** @brief Logic operations - support types for atomic_and, atomic_or, atomic_xor, atomic_fetch_and,
+ * |NAME   | TYPE     |
+ * |-------|----------|
+ * |uint32 | uint32_t |
+ * |uint64 | uint64_t |
+ * |int32  | int32_t  |
+ * |int64  | int64_t  |
+ */
+#define ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(FUNC) \
+    FUNC(uint32, uint32_t);                   \
+    FUNC(uint64, uint64_t);                   \
+    FUNC(int32, int32_t);                     \
+    FUNC(int64, int64_t)
+
+/**
+ * @brief  Automatically generates aclshmem atomic add functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform                |
+ * |-------|---------------------------------------|----------------------------------|
+ * | MTE   | int8, int16, bf16, half, int32, float | Ascend910B/Ascend910C/Ascend950  |
+ * | MTE   | uint32, uint64, int64                 | Ascend950                        |
+ * | ROCE  | int32, uint32, int64, uint64,         | Ascend950                        |
+ * | UDMA  | int32, uint32, int64, uint64, float   | Ascend950                        |
  *
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_add(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
  *
@@ -74,361 +172,529 @@
  * The MTE UB buffer offset defaults to 0 and can be adjusted via
  * aclshmemx_set_mte_config(offset, ub_size, sync_id).
  *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ *
  * @par Parameters
  * - **dst**    - [in] Pointer on local device of the destination data.
  * - **value**  - [in] Value atomic add to destination.
  * - **pe**     - [in] PE number of the remote PE.
  */
 #define ACLSHMEM_ATOMIC_ADD_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_add(__gm__ TYPE *dst, TYPE value, int32_t pe)
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_add(__gm__ TYPE* dst, TYPE value, int32_t pe)
+
+#define ACLSHMEM_ATOMIC_ADD_910_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_add(__gm__ TYPE* dst, TYPE value, int32_t pe)
+
+#define ACLSHMEM_ATOMIC_ADD_EXT_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_add(__gm__ TYPE* dst, TYPE value, int32_t pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(ACLSHMEM_ATOMIC_ADD_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_910(ACLSHMEM_ATOMIC_ADD_910_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT(ACLSHMEM_ATOMIC_ADD_EXT_TYPENAME);
 /** \endcond */
-#define shmem_int8_atomic_add aclshmem_int8_atomic_add
-#define shmem_int16_atomic_add aclshmem_int16_atomic_add
-#define shmem_int32_atomic_add aclshmem_int32_atomic_add
-#define shmem_half_atomic_add aclshmem_half_atomic_add
-#define shmem_bfloat16_atomic_add aclshmem_bfloat16_atomic_add
+
+#define shmem_int8_atomic_add aclshmem_int8_atomic_add 
+#define shmem_int16_atomic_add aclshmem_int16_atomic_add 
+#define shmem_int32_atomic_add aclshmem_int32_atomic_add 
+#define shmem_half_atomic_add aclshmem_half_atomic_add 
+#define shmem_bfloat16_atomic_add aclshmem_bfloat16_atomic_add 
 #define shmem_float_atomic_add aclshmem_float_atomic_add
 
 /**
- * @brief Standard Atomic Fetch Types and Names (supported types for fetch_add and compare swap)
- *
- * |NAME       | TYPE      |
- * |-----------|-----------|
- * |int32      | int32     |
- * |uint32     | uint32    |
- * |int64      | int64     |
- * |uint64     | uint64    |
- */
-#define ACLSHMEM_TYPE_FUNC_ATOMIC(FUNC) \
-    FUNC(int32, int32_t);                     \
-    FUNC(uint32, uint32_t);                   \
-    FUNC(int64, int64_t);                     \
-    FUNC(uint64, uint64_t)
-
-/**
- * @brief  Automatically generates aclshmem atomic fetch add functions for different data types
- *         (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic fetch add functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_add(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | int32, uint32, uint64, int64, float   | Ascend950         |
+ * | ROCE  | int32, uint32, int64, uint64          | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_add(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Add value to dst (remote symmetric address) on the specified PE pe,
- * and return the previous content of dst.
+ * Synchronous interface. Atomically adds value to the value at dest and returns the old value.
  *
  * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
+ * - **dest**   - [in] Pointer on local device of the destination data.
  * - **value**  - [in] Value atomic add to destination.
  * - **pe**     - [in] PE number of the remote PE.
  *
- * @par Returns
- *      Return the previous content of dst.
+ * @par Return
+ * The old value at dest before the addition.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
  */
 #define ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_add(__gm__ TYPE *dst, TYPE value, int32_t pe)
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_add(__gm__ TYPE* dest, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
 /** \endcond */
 
 /**
- * @brief  Automatically generates aclshmem atomic compare swap functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic inc functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_compare_swap(\_\_gm\_\_ TYPE *dst, TYPE cond, TYPE value, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Conditionally update dst (remote symmetric address) on the specified PE pe
- * and return the previous content of dst. If cond and the remote dst value are equal,
- * then value is swapped into the remote dst; otherwise, the remote dst is unchanged. In either case, the old
- * value of the remote dest is returned.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **cond**   - [in] Condition compared to the remote dst value.
- * - **value**  - [in] Value atomic swap to destination.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the previous content of dst.
- */
-#define ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_compare_swap(__gm__ TYPE *dst, TYPE cond, TYPE value, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic fetch functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch(\_\_gm\_\_ TYPE *dst, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Fetch the contents of dst (remote symmetric address) on the specified PE pe
- * and return the contents.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the contents of dst.
- */
-#define ACLSHMEM_ATOMIC_FETCH_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch(__gm__ TYPE *dst, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic set functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Set value to dst (remote symmetric address) on the specified PE pe
- * without returning a value.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Value to be atomically written to the remote PE.
- * - **pe**     - [in] PE number of the remote PE.
- */
-#define ACLSHMEM_ATOMIC_SET_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_set(__gm__ TYPE *dst, TYPE value, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_SET_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic swap functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_swap(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Swap value to dst (remote symmetric address) on the specified PE pe
- * and return the previous contents of dst.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Value to be atomically written to the remote PE.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the previous contents of dst.
- */
-#define ACLSHMEM_ATOMIC_SWAP_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_swap(__gm__ TYPE *dst, TYPE value, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_SWAP_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic fetch inc functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_inc(\_\_gm\_\_ TYPE *dst, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
- * and return the previous contents of dst.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the previous contents of dst.
- */
-#define ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_inc(__gm__ TYPE *dst, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic inc functions for different data types
- *        (e.g., int32, uint32, int64, uint64, float).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | int32, uint32, uint64, int64,         | Ascend950         |
+ * | ROCE  | int32, uint32, int64, uint64, float   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64, float   | Ascend950         |
  *
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_inc(\_\_gm\_\_ TYPE *dst, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
- * without returning a value.
+ * Synchronous interface. Perform atomic increment operation on
+ * symmetric memory from the specified PE to address on the local PE.
+ * Increments the value at the destination by 1.
  *
  * @par Parameters
  * - **dst**    - [in] Pointer on local device of the destination data.
  * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
  */
 #define ACLSHMEM_ATOMIC_INC_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_inc(__gm__ TYPE *dst, int32_t pe)
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_inc(__gm__ TYPE* dst, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC_ADD(ACLSHMEM_ATOMIC_INC_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_INC_TYPENAME);
 /** \endcond */
 
 /**
- * @brief  Automatically generates aclshmem atomic fetch and functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic fetch inc functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_and(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | int32, uint32, uint64, int64, float   | Ascend950         |
+ * | ROCE  | int32, uint32, int64, uint64          | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_inc(\_\_gm\_\_ TYPE *dest, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, and return the previous contents of dst.
+ * Synchronous interface. Atomically increments the value at dest by 1 and returns the old value.
  *
  * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise AND operation.
+ * - **dest**   - [in] Pointer on local device of the destination data.
  * - **pe**     - [in] PE number of the remote PE.
  *
- * @par Returns
- *      Return the previous contents of dst.
+ * @par Return
+ * The old value at dest before the increment.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
  */
-#define ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_and(__gm__ TYPE *dst, TYPE value, int32_t pe)
+#define ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_inc(__gm__ TYPE* dest, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME);
 /** \endcond */
 
 /**
- * @brief  Automatically generates aclshmem atomic and functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic and functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_and(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_and(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, without returning a value.
+ * Synchronous interface. Atomically performs bitwise AND operation between the value at dest
+ * and the specified value.
  *
  * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise AND operation.
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise AND with.
  * - **pe**     - [in] PE number of the remote PE.
  */
 #define ACLSHMEM_ATOMIC_AND_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_and(__gm__ TYPE *dst, TYPE value, int32_t pe)
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_and(__gm__ TYPE* dest, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_AND_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_AND_TYPENAME);
 /** \endcond */
 
 /**
- * @brief  Automatically generates aclshmem atomic fetch or functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic or functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_or(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_or(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, and return the previous contents of dst.
+ * Synchronous interface. Atomically performs bitwise OR operation between the value at dest
+ * and the specified value.
  *
  * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise OR operation.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the previous contents of dst.
- */
-#define ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_or(__gm__ TYPE *dst, TYPE value, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic or functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_or(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, without returning a value.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise OR operation.
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise OR with.
  * - **pe**     - [in] PE number of the remote PE.
  */
 #define ACLSHMEM_ATOMIC_OR_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_or(__gm__ TYPE *dst, TYPE value, int32_t pe)
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_or(__gm__ TYPE* dest, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_OR_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_OR_TYPENAME);
 /** \endcond */
 
 /**
- * @brief  Automatically generates aclshmem atomic fetch xor functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
+ * @brief  Automatically generates aclshmem atomic xor functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
  *
- * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_xor(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_xor(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, and return the previous contents of dst.
+ * Synchronous interface. Atomically performs bitwise XOR operation between the value at dest
+ * and the specified value.
  *
  * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise XOR operation.
- * - **pe**     - [in] PE number of the remote PE.
- *
- * @par Returns
- *      Return the previous contents of dst.
- */
-#define ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_xor(__gm__ TYPE *dst, TYPE value, int32_t pe)
-
-/** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME);
-/** \endcond */
-
-/**
- * @brief  Automatically generates aclshmem atomic xor functions for different data types
- *        (e.g., int32, uint32, int64, uint64).
- *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- *
- * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_xor(\_\_gm\_\_ TYPE *dst, TYPE value, int32_t pe)
- *
- * @par Function Description
- * Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
- * specified PE pe with the operand value, without returning a value.
- *
- * @par Parameters
- * - **dst**    - [in] Pointer on local device of the destination data.
- * - **value**  - [in] Operand of bitwise XOR operation.
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise XOR with.
  * - **pe**     - [in] PE number of the remote PE.
  */
 #define ACLSHMEM_ATOMIC_XOR_TYPENAME(NAME, TYPE) \
-    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_xor(__gm__ TYPE *dst, TYPE value, int32_t pe)
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_xor(__gm__ TYPE* dest, TYPE value, int32_t pe)
 
 /** \cond */
-ACLSHMEM_TYPE_FUNC_ATOMIC(ACLSHMEM_ATOMIC_XOR_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_XOR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch and functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_and(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically performs bitwise AND operation between the value at dest
+ * and the specified value, and returns the old value.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise AND with.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the operation.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_and(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch or functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_or(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically performs bitwise OR operation between the value at dest
+ * and the specified value, and returns the old value.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise OR with.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the operation.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_or(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch xor functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                | Hardware Platform |
+ * |-------|--------------------------------|-------------------|
+ * | ROCE  | int32, uint32, int64, uint64   | Ascend950         |
+ * | UDMA  | int32, uint32, int64, uint64   | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch_xor(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically performs bitwise XOR operation between the value at dest
+ * and the specified value, and returns the old value.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to perform bitwise XOR with.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the operation.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch_xor(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic fetch functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_fetch(const TYPE *source, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically reads the value from source and returns it.
+ * This operation does not modify the data at source.
+ *
+ * @par Parameters
+ * - **source**  - [in] Pointer on local device of the source data to read.
+ * - **pe**      - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The value at source.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_FETCH_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_fetch(__gm__ const TYPE* source, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_TYPENAME);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic set functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically sets the value at dest to the specified value.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to set.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_SET_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_set(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/**
+ * @brief  Automatically generates aclshmem atomic set functions for types requiring CAST.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type,
+ *        SUBNAME is the underlying type name, SUBTYPE is the underlying type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically sets the value at dest to the specified value.
+ * Types are CAST to underlying unsigned integer types for the atomic operation.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to set.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_SET_TYPENAME_CAST(NAME, TYPE, SUBTYPE) \
+    ACLSHMEM_DEVICE void aclshmem_##NAME##_atomic_set(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP(ACLSHMEM_ATOMIC_SET_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SET_TYPENAME_CAST);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic swap functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_swap(TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically swaps the value at dest with the specified value
+ * and returns the old value.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to swap.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the swap.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_SWAP_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_swap(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/**
+ * @brief  Automatically generates aclshmem atomic swap functions for types requiring CAST.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type,
+ *        SUBNAME is the underlying type name, SUBTYPE is the underlying type.
+ *
+ * | Path  | Supported Types                       | Hardware Platform |
+ * |-------|---------------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64, float   | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64          | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_swap(TYPE *dest, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically swaps the value at dest with the specified value
+ * and returns the old value. Types are CAST to underlying unsigned integer types
+ * for the atomic operation.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **value**  - [in] Value to swap.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the swap.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST(NAME, TYPE, SUBTYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_swap(__gm__ TYPE* dest, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP(ACLSHMEM_ATOMIC_SWAP_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST);
+/** \endcond */
+
+/**
+ * @brief  Automatically generates aclshmem atomic compare swap functions for different data types.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
+ *
+ * | Path  | Supported Types               | Hardware Platform |
+ * |-------|-------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64  | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64  | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64  | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_compare_swap(TYPE *dest, TYPE cond, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically compares the value at dest with cond.
+ * If they are equal, the value at dest is set to value. Returns the old value at dest.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **cond**   - [in] Value to compare against.
+ * - **value**  - [in] Value to set if comparison succeeds.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the operation.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME(NAME, TYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_compare_swap(__gm__ TYPE* dest, TYPE cond, TYPE value, int32_t pe)
+
+/**
+ * @brief  Automatically generates aclshmem atomic compare swap functions for types requiring CAST.
+ *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type,
+ *        SUBNAME is the underlying type name, SUBTYPE is the underlying type.
+ *
+ * | Path  | Supported Types               | Hardware Platform |
+ * |-------|-------------------------------|-------------------|
+ * | MTE   | uint32, uint64, int32, int64  | Ascend950         |
+ * | ROCE  | uint32, uint64, int32, int64  | Ascend950         |
+ * | UDMA  | uint32, uint64, int32, int64  | Ascend950         |
+ *
+ * \remark ACLSHMEM_DEVICE TYPE aclshmem_NAME_atomic_compare_swap(TYPE *dest, TYPE cond, TYPE value, int32_t pe)
+ *
+ * @par Function Description
+ * Synchronous interface. Atomically compares the value at dest with cond.
+ * If they are equal, the value at dest is set to value. Returns the old value at dest.
+ * Types are CAST to underlying unsigned integer types for the atomic operation.
+ *
+ * @par Parameters
+ * - **dest**   - [in] Pointer on local device of the destination data.
+ * - **cond**   - [in] Value to compare against.
+ * - **value**  - [in] Value to set if comparison succeeds.
+ * - **pe**     - [in] PE number of the remote PE.
+ *
+ * @par Return
+ * The old value at dest before the operation.
+ *
+ * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
+ *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
+ */
+#define ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME_CAST(NAME, TYPE, SUBTYPE) \
+    ACLSHMEM_DEVICE TYPE aclshmem_##NAME##_atomic_compare_swap(__gm__ TYPE* dest, TYPE cond, TYPE value, int32_t pe)
+
+/** \cond */
+ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP(ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME);
+ACLSHMEM_TYPE_FUNC_ATOMIC_CAS_CAST(ACLSHMEM_ATOMIC_COMPARE_SWAP_TYPENAME_CAST);
 /** \endcond */
 
 #include "gm2gm/shmem_device_amo.hpp"

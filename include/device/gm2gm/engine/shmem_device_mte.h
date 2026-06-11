@@ -164,6 +164,8 @@ ACLSHMEM_DEVICE void aclshmemx_mte_quiet();
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports int32_t/uint32_t/float/int64_t/uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param src               [in] Symmetric address of the source data.
  * @param pe                [in] PE number of the remote PE.
@@ -179,6 +181,8 @@ ACLSHMEM_DEVICE T aclshmemx_mte_atomic_fetch(__gm__ T *src, int32_t pe);
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports uint32_t and uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param value             [in] Value to be set.
@@ -194,6 +198,8 @@ ACLSHMEM_DEVICE void aclshmemx_mte_atomic_set(__gm__ T *dst, T value, int32_t pe
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports uint32_t and uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param cond              [in] Value to compare against.
@@ -211,6 +217,8 @@ ACLSHMEM_DEVICE T aclshmemx_mte_atomic_compare_swap(__gm__ T *dst, T cond, T val
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports uint32_t and uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param value             [in] Value to be swapped.
@@ -228,6 +236,8 @@ ACLSHMEM_DEVICE T aclshmemx_mte_atomic_swap(__gm__ T *dst, T value, int32_t pe);
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports int32_t/uint32_t/float/int64_t/uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param pe                [in] PE number of the remote PE.
@@ -254,6 +264,9 @@ ACLSHMEM_DEVICE void aclshmemx_mte_atomic_inc(__gm__ T *dst, int32_t pe);
  * | int32_t/float                  | ✓                     | ✓         |
  * | uint32_t/int64_t/uint64_t      | ✗                     | ✓         |
  *
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
+ *
  * @param dst               [in] Symmetric address of the destination data.
  * @param value             [in] Value to be added.
  * @param pe                [in] PE number of the remote PE.
@@ -269,6 +282,8 @@ ACLSHMEM_DEVICE void aclshmemx_mte_atomic_add(__gm__ T *dst, T value, int32_t pe
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports int32_t/uint32_t/float/int64_t/uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param pe                [in] PE number of the remote PE.
@@ -285,6 +300,8 @@ ACLSHMEM_DEVICE T aclshmemx_mte_atomic_fetch_inc(__gm__ T *dst, int32_t pe);
  *              If there are data dependencies between the scalar computation unit and the move unit (MTE2/MTE3)
  *              when reading/writing GM, developers need to insert synchronization according to actual situations.
  * @note T only supports int32_t/uint32_t/float/int64_t/uint64_t.
+ * @note The MTE transport operates over the in-die interconnect and does not support
+ *       cross-PCIe (inter-node) communication.
  *
  * @param dst               [in] Symmetric address of the destination data.
  * @param value             [in] Value to be added.

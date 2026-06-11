@@ -73,8 +73,13 @@ ACLSHMEM_DEVICE T aclshmemi_roce_amo_add(
     __gm__ T* dst, __gm__ T* src, uint32_t pe, uint32_t qp_idx, uint64_t add_val, uint64_t boundary,
     AscendC::LocalTensor<uint64_t> ub_local64, AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
-    return aclshmemi_roce_atomic_fetch_and_add<T, IS_MASKED, ACLSHMEMI_K_RDMA_BACKEND>(
-        dst, src, pe, qp_idx, add_val, boundary, ub_local64, ub_local32, sync_id);
+    if constexpr (ACLSHMEMI_K_RDMA_BACKEND == aclshmemi_rdma_backend_t::XSCALE) {
+        return aclshmemi_roce_atomic_fetch_and_add<T, IS_MASKED, ACLSHMEMI_K_RDMA_BACKEND>(
+            dst, src, pe, qp_idx, add_val, boundary, ub_local64, ub_local32, sync_id);
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "ROCE atomic add is only supported on XSCALE backend.\n");
+        return T(0);
+    }
 }
 
 template <typename T, bool IS_MASKED>
@@ -83,8 +88,13 @@ ACLSHMEM_DEVICE T aclshmemi_roce_amo_cas(
     uint64_t swap_mask, uint64_t comp_mask, AscendC::LocalTensor<uint64_t> ub_local64,
     AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
-    return aclshmemi_roce_atomic_compare_and_swap<T, IS_MASKED, ACLSHMEMI_K_RDMA_BACKEND>(
-        dst, src, pe, qp_idx, swap_val, comp_val, swap_mask, comp_mask, ub_local64, ub_local32, sync_id);
+    if constexpr (ACLSHMEMI_K_RDMA_BACKEND == aclshmemi_rdma_backend_t::XSCALE) {
+        return aclshmemi_roce_atomic_compare_and_swap<T, IS_MASKED, ACLSHMEMI_K_RDMA_BACKEND>(
+            dst, src, pe, qp_idx, swap_val, comp_val, swap_mask, comp_mask, ub_local64, ub_local32, sync_id);
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "ROCE atomic cas is only supported on XSCALE backend.\n");
+        return T(0);
+    }
 }
 
 ACLSHMEM_DEVICE __gm__ void* aclshmem_roce_ptr(__gm__ void* ptr, int pe)

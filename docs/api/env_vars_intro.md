@@ -18,8 +18,8 @@ SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
 ### RDMA场景
 使能RDMA场景下，配置TC和SL
 
-* `HCCL_RDMA_TC`: 复用HCCL的环境变量，配置RDMA网卡的traffic class。该环境变量的取值范围为[0, 255]，且需要配置为4的整数倍，默认值: 132。[参考连接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0089.html)
-* `HCCL_RDMA_SL`: 复用HCCL的环境变量，配置RDMA网卡的service lever。该值需要和网卡配置的PFC优先级保持一致，若配置不一致可能导致性能劣化。该环境变量需要配置为整数，取值范围为[0, 7], 默认值: 4。[参考连接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0090.html)
+* `HCCL_RDMA_TC`: 复用HCCL的环境变量，配置RDMA网卡的traffic class。该环境变量的取值范围为[0, 255]，且需要配置为4的整数倍，默认值: 132。[参考链接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0089.html)
+* `HCCL_RDMA_SL`: 复用HCCL的环境变量，配置RDMA网卡的service level。该值需要和网卡配置的PFC优先级保持一致，若配置不一致可能导致性能劣化。该环境变量需要配置为整数，取值范围为[0, 7], 默认值: 4。[参考链接](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0090.html)
 
 ## 多实例相关
 由于每个实例都有独立的bootstrap，每个bootstrap构建时需要提供一个可用端口

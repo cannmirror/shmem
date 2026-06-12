@@ -246,7 +246,7 @@ int32_t MemEntityDefault::FreeLocalMemory(hybm_mem_slice_t slice, uint32_t flags
             SHM_LOG_ERROR("UnregisterMemoryRegion failed, please check input slice.");
         }
     }
-    SHM_LOG_DEBUG("free local memory successed.");
+    SHM_LOG_DEBUG("free local memory succeeded.");
     return ACLSHMEM_SUCCESS;
 }
 
@@ -787,7 +787,7 @@ Result MemEntityDefault::InitTransManager()
     if (((options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_RDMA) == 0) &&
         ((options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_SDMA) == 0) &&
         ((options_.bmDataOpType & HYBM_DOP_TYPE_DEVICE_UDMA) == 0)) {
-        SHM_LOG_DEBUG("Data operator type mathchs none of RDMA, SDMA or UDMA, skip transport init.");
+        SHM_LOG_DEBUG("Data operator type matches none of RDMA, SDMA or UDMA, skip transport init.");
         return ACLSHMEM_SUCCESS;
     }
 

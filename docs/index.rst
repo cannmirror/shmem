@@ -61,8 +61,8 @@ Welcome to Shmem's Documentation!
 
 .. toctree::
     :maxdepth: 2
-    :caption: Security harding and public IP address
-    :name: Security harding and public IP address
+    :caption: Security hardening and public IP address
+    :name: Security hardening and public IP address
 
     SECURITY.md
 

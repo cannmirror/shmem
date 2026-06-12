@@ -140,7 +140,7 @@ bash scripts/build.sh
 # 配置环境变量
 source install/set_env.sh
 ```
-备注：build.sh 的参数可以参考 [compilation_build_guide.md](./docs/compilation_build_guide.md)
+备注：build.sh 的参数可以参考 [compilation_build_guide.md](./compilation_build_guide.md)
 
 #### 5.1.2 方式二：二进制包安装
 获取方式：`bash scripts/build.sh -package`
@@ -203,7 +203,7 @@ bash scripts/run.sh -ranks 8 -ipport tcp://127.0.0.1:8666 -test_filter Init
    bash scripts/build.sh -examples -debug
    ```
 
-注意：此处 `-examples` 参数非必选项，仅提供[使用参考](./debug/Troubleshooting_FAQs.md#SHMEM-常见问题)。
+注意：此处 `-examples` 参数非必选项，仅提供[使用参考](./debug/Troubleshooting_FAQs.md#shmem-常见问题)。
 
 ## 6 Python 侧 test 用例     [Python 接口 API 列表](api/pythonAPI.md)
 1. 在 scripts 目录下编译的时候，带上 build python 的选项

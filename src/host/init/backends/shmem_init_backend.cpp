@@ -570,7 +570,7 @@ int aclshmemi_init_backend::setup_heap(aclshmem_mem_type_t mem_type)
         for (int32_t i = 0; i < host_state->npes; i++) {
             host_state->p2p_host_heap_base[i] = (void *)((uintptr_t)elem->dram_gva + aligned * static_cast<uint32_t>(i));
         }
-        SHM_LOG_DEBUG("host side dram heap setup successed, host_state->host_heap_base: " << (void *)(uintptr_t)host_state->host_heap_base);
+        SHM_LOG_DEBUG("host side dram heap setup succeeded, host_state->host_heap_base: " << (void *)(uintptr_t)host_state->host_heap_base);
         return ACLSHMEM_SUCCESS;
     }
     // device side heap info save
@@ -583,7 +583,7 @@ int aclshmemi_init_backend::setup_heap(aclshmem_mem_type_t mem_type)
     ACLSHMEM_CHECK_RET(aclrtMalloc((void **)&device_state->p2p_device_heap_base, host_state->npes * sizeof(void *), ACL_MEM_MALLOC_HUGE_FIRST));
     ACLSHMEM_CHECK_RET(aclrtMalloc((void **)&device_state->rdma_device_heap_base, host_state->npes * sizeof(void *), ACL_MEM_MALLOC_HUGE_FIRST));
     ACLSHMEM_CHECK_RET(aclrtMalloc((void **)&device_state->sdma_device_heap_base, host_state->npes * sizeof(void *), ACL_MEM_MALLOC_HUGE_FIRST));
-    SHM_LOG_DEBUG("device side hbm heap setup successed, host_state->heap_base: " << (void *)(uintptr_t)host_state->heap_base << " p2p_device_heap_base: " << (void *)(uintptr_t)device_state->p2p_device_heap_base);
+    SHM_LOG_DEBUG("device side hbm heap setup succeeded, host_state->heap_base: " << (void *)(uintptr_t)host_state->heap_base << " p2p_device_heap_base: " << (void *)(uintptr_t)device_state->p2p_device_heap_base);
     ret = reach_info_init(elem->hbm_gva);
     if (ret != 0) {
         SHM_LOG_ERROR("reach_info_init failed, result: " << ret);

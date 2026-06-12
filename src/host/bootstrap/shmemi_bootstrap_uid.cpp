@@ -726,7 +726,7 @@ static bool matchSubnet(struct ifaddrs local_if, sockaddr_t* remote) {
     
     SHM_LOG_DEBUG("local_if family: " << local_if.ifa_addr->sa_family << " remote family: " << family);
     if (family != local_if.ifa_addr->sa_family) {
-        SHM_LOG_DEBUG(" matchSubnet family unmatch.");
+        SHM_LOG_DEBUG(" matchSubnet family mismatch.");
         return false;
     }
 

@@ -312,7 +312,17 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t* attribut
 
     // 4. replace ip_port in attributes
     std::string ip_port_str(attributes->ip_port);
-    std::size_t pos = ip_port_str.find(':', ip_port_str.find(':') + 1);
+    std::size_t pos;
+    if (ip_port_str.find("tcp6://") == 0) {
+        std::size_t bracketEnd = ip_port_str.find(']');
+        if (bracketEnd == std::string::npos || bracketEnd + 2 >= ip_port_str.size() || ip_port_str[bracketEnd + 1] != ':') {
+            SHM_LOG_ERROR("ip_port format should be tcp6://[ipv6_addr]:port");
+            return ACLSHMEM_INVALID_VALUE;
+        }
+        pos = bracketEnd + 1;
+    } else {
+        pos = ip_port_str.find(':', ip_port_str.find(':') + 1);
+    }
     if (pos == std::string::npos) {
         SHM_LOG_ERROR("ip_port format should be ip:port");
         return ACLSHMEM_INVALID_VALUE;

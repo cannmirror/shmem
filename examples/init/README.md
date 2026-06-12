@@ -57,9 +57,15 @@ bash run.sh -mode uid_default -pesize 2
 ```
 
 ##### 3. 跨机运行
+
+> **注**：`-ipport` 参数支持三种格式：
+> - IPv4 地址：`tcp://192.168.1.100:8666`
+> - IPv6 地址：`tcp6://[::1]:8666`
+> - **主机名**：`tcp://my-server:8666`（主机名通过系统 DNS 解析为实际 IP 地址）
+
 执行 default 流程，双机，每个机器2 pe，在两台机器分别执行如下命令。
 ```bash
-# pe0所在机器
+# pe0所在机器（${该机器的ip:port}也可使用主机名，如my-server:8666）
 bash run.sh -mode default -pesize 4 -fpe 0 -gnpus 2 -ipport ${该机器的ip:port}
 # 其他机器
 bash run.sh -mode default -pesize 4 -fpe 2 -gnpus 2 -ipport ${pe0机器的ip:port}
@@ -84,6 +90,7 @@ bash run.sh -mode mpi -gnpus 2
 ```
 uid流程
 ```bash
+# pe0所在机器（${该机器的ip:port}也可使用主机名，如my-server:8666）
 bash run.sh -mode uid -gnpus 2 -ipport ${pe0机器的ip:port}
 ```
 **如果想再次以 mpi/uid 模式执行单机用例推荐删除hostfile文件**

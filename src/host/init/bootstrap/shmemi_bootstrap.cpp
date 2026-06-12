@@ -9,8 +9,10 @@
  */
 #include "shmemi_host_common.h"
 #include "shmemi_host_def.h"
+#include "bootstrap/config_store/store_net_utils.h"
 #include "dlfcn.h"
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <limits.h>
 #include <cerrno>
 #include <cstdio>
@@ -242,7 +244,19 @@ static bool is_valid_ip_port_url(const char *ip_port)
     if (inet_pton(AF_INET, ip.c_str(), addr_buf) == 1) {
         return true;
     }
-    return inet_pton(AF_INET6, ip.c_str(), addr_buf) == 1;
+    if (inet_pton(AF_INET6, ip.c_str(), addr_buf) == 1) {
+        return true;
+    }
+    constexpr size_t maxHostnameLen = 253;
+    if (ip.size() > maxHostnameLen) {
+        return false;
+    }
+    for (char c : ip) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '.') {
+            return false;
+        }
+    }
+    return true;
 }
 
 int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {

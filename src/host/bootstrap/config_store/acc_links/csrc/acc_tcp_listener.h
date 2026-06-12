@@ -43,7 +43,7 @@ public:
 private:
     void RunInThread() noexcept;
     void ProcessNewConnection(int fd, mf_sockaddr addressIn) noexcept;
-    void PrepareSockAddr(mf_sockaddr& addr) noexcept;
+    bool PrepareSockAddr(mf_sockaddr& addr) noexcept;
     Result StartAcceptThread() noexcept;
     Result CreateSocketForStrat(mf_sockaddr &addr, int &tmpFD) noexcept;
     void FormatIPAddressAndPort(mf_sockaddr addressIn, std::string &ipPort) noexcept;

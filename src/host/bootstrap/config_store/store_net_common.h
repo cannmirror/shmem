@@ -12,6 +12,10 @@
 #ifndef STORE_NET_COMMON_H
 #define STORE_NET_COMMON_H
 
+#include <string>
+#include <cerrno>
+#include <cstring>
+#include <cstdlib>
 #include "sotre_net.h"
 #include "store_utils.h"
 

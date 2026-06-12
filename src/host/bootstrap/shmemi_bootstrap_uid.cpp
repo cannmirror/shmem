@@ -14,14 +14,15 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <sys/resource.h>
 #include <algorithm>
 #include "socket/uid_socket.h"
 #include "socket/uid_utils.h"
+#include "bootstrap/config_store/store_net_utils.h"
 
 #define MAX_ATTEMPTS 500
 #define MAX_IFCONFIG_LENGTH 23
-#define MAX_IP 48
 #define DEFAULT_IFNAME_LNEGTH 4
 #define BOOTSTRAP_IN_PLACE (void*)0x1
 #define SOCKET_MAGIC 0x243ab9f2fc4b9d6cULL
@@ -99,28 +100,6 @@ static bool is_link_local_addr(const sockaddr_t* addr) {
     } else if (addr->type == ADDR_IPv6) {
         return is_ipv6_link_local(&addr->addr.addr6.sin6_addr);
     } else {
-        return false;
-    }
-}
-
-static bool aclshmemi_parse_port(const std::string &portStr, uint16_t &port)
-{
-    constexpr int maxPort = 65535;
-    try {
-        size_t parsedLen = 0;
-        int portInt = std::stoi(portStr, &parsedLen);
-        if (parsedLen != portStr.size()) {
-            SHM_LOG_ERROR("Invalid port format: " << portStr);
-            return false;
-        }
-        if (portInt < 0 || portInt > maxPort) {
-            SHM_LOG_ERROR("Invalid port value: " << portInt << ", must be in range [0, " << maxPort << "]");
-            return false;
-        }
-        port = static_cast<uint16_t>(portInt);
-        return true;
-    } catch (const std::exception &e) {
-        SHM_LOG_ERROR("Invalid port format: " << e.what());
         return false;
     }
 }
@@ -318,15 +297,19 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
         }
         
         uint16_t port = 0;
-        if (!aclshmemi_parse_port(portStr, port)) {
+        if (!shm::utils::aclshmemi_parse_port(portStr, port)) {
             return ACLSHMEM_INVALID_PARAM;
         }
         uid_args->addr.addr.addr6.sin6_port = htons(port);
         uid_args->addr.addr.addr6.sin6_flowinfo = 0;
 
         if (inet_pton(AF_INET6, ipStr.c_str(), &uid_args->addr.addr.addr6.sin6_addr) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv6 failed: " << strerror(errno));
-            return ACLSHMEM_NOT_INITED;
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(ipStr, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            auto sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            uid_args->addr.addr.addr6.sin6_addr = sin6->sin6_addr;
         }
     } else {
         size_t colonPos = ipPortStr.find_last_of(':');
@@ -338,21 +321,52 @@ int32_t aclshmemi_get_ip_from_env(aclshmemi_bootstrap_uid_state_t *uid_args, con
         std::string ipStr = ipPortStr.substr(0, colonPos);
         std::string portStr = ipPortStr.substr(colonPos + 1);
 
-        std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4), 
-                  reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in), 
-                  0);
-        uid_args->addr.type = ADDR_IPv4;
-        uid_args->addr.addr.addr4.sin_family = AF_INET;
-        
         uint16_t port = 0;
-        if (!aclshmemi_parse_port(portStr, port)) {
+        if (!shm::utils::aclshmemi_parse_port(portStr, port)) {
             return ACLSHMEM_INVALID_PARAM;
         }
-        uid_args->addr.addr.addr4.sin_port = htons(port);
 
-        if (inet_pton(AF_INET, ipStr.c_str(), &uid_args->addr.addr.addr4.sin_addr) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv4 failed: " << strerror(errno));
-            return ACLSHMEM_NOT_INITED;
+        char addr_buf[sizeof(struct in6_addr)] = {0};
+        if (inet_pton(AF_INET6, ipStr.c_str(), addr_buf) == 1) {
+            std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr6), 
+                      reinterpret_cast<char*>(&uid_args->addr.addr.addr6) + sizeof(struct sockaddr_in6), 
+                      0);
+            uid_args->addr.type = ADDR_IPv6;
+            uid_args->addr.addr.addr6.sin6_family = AF_INET6;
+            uid_args->addr.addr.addr6.sin6_port = htons(port);
+            uid_args->addr.addr.addr6.sin6_addr = *reinterpret_cast<struct in6_addr*>(addr_buf);
+        } else if (inet_pton(AF_INET, ipStr.c_str(), addr_buf) == 1) {
+            std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4), 
+                      reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in), 
+                      0);
+            uid_args->addr.type = ADDR_IPv4;
+            uid_args->addr.addr.addr4.sin_family = AF_INET;
+            uid_args->addr.addr.addr4.sin_port = htons(port);
+            uid_args->addr.addr.addr4.sin_addr = *reinterpret_cast<struct in_addr*>(addr_buf);
+        } else {
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(ipStr, AF_UNSPEC, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            if (resolved.ss_family == AF_INET) {
+                std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr4),
+                          reinterpret_cast<char*>(&uid_args->addr.addr.addr4) + sizeof(struct sockaddr_in),
+                          0);
+                uid_args->addr.type = ADDR_IPv4;
+                uid_args->addr.addr.addr4.sin_family = AF_INET;
+                uid_args->addr.addr.addr4.sin_port = htons(port);
+                auto sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+                uid_args->addr.addr.addr4.sin_addr = sin->sin_addr;
+            } else {
+                std::fill(reinterpret_cast<char*>(&uid_args->addr.addr.addr6),
+                          reinterpret_cast<char*>(&uid_args->addr.addr.addr6) + sizeof(struct sockaddr_in6),
+                          0);
+                uid_args->addr.type = ADDR_IPv6;
+                uid_args->addr.addr.addr6.sin6_family = AF_INET6;
+                uid_args->addr.addr.addr6.sin6_port = htons(port);
+                auto sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+                uid_args->addr.addr.addr6.sin6_addr = sin6->sin6_addr;
+            }
         }
     }
 
@@ -440,8 +454,12 @@ int32_t aclshmemi_set_ip_info(void *uid, sa_family_t &sockType, char *pta_env_ip
         SHM_LOG_INFO("SockType is AF_INET.");
         innerUID->addr.addr.addr4.sin_family = AF_INET;
         if (inet_pton(AF_INET, pta_env_ip, &(innerUID->addr.addr.addr4.sin_addr)) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv4 failed");
-            return ACLSHMEM_NOT_INITED;
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(pta_env_ip, AF_INET, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            auto sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            innerUID->addr.addr.addr4.sin_addr = sin->sin_addr;
         }
         innerUID->addr.addr.addr4.sin_port = htons(port);
         innerUID->addr.type = ADDR_IPv4;
@@ -449,8 +467,12 @@ int32_t aclshmemi_set_ip_info(void *uid, sa_family_t &sockType, char *pta_env_ip
         SHM_LOG_INFO("SockType is AF_INET6.");
         innerUID->addr.addr.addr6.sin6_family = AF_INET6;
         if (inet_pton(AF_INET6, pta_env_ip, &(innerUID->addr.addr.addr6.sin6_addr)) <= 0) {
-            SHM_LOG_ERROR("inet_pton IPv6 failed");
-            return ACLSHMEM_NOT_INITED;
+            sockaddr_storage resolved{};
+            if (shm::utils::ResolveAddress(pta_env_ip, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_NOT_INITED;
+            }
+            auto sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            innerUID->addr.addr.addr6.sin6_addr = sin6->sin6_addr;
         }
         innerUID->addr.addr.addr6.sin6_port = htons(port);
         innerUID->addr.type = ADDR_IPv6;

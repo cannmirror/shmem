@@ -8,17 +8,21 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <net/if.h>
-
-#include <vector>
-#include <map>
-#include <regex>
-#include "shmemi_string_util.h"
 #include "store_net_common.h"
+
+#include <arpa/inet.h>
+#include <cctype>
+#include <ifaddrs.h>
+#include <map>
+#include <net/if.h>
+#include <netdb.h>
+#include <regex>
+#include <vector>
+
 #include "host/shmem_host_def.h"
 #include "shmemi_logger.h"
+#include "shmemi_string_util.h"
+#include "store_net_utils.h"
 
 namespace shm {
 namespace store {
@@ -68,20 +72,42 @@ inline void Split(const std::string &src, const std::string &sep, std::vector<st
 
 bool IsValidIp(const std::string &address)
 {
-    // 校验输入长度，防止正则表达式栈溢出
+    constexpr size_t maxIpLenV4 = 15;
+    constexpr size_t maxIpLenV6 = 39;
+    constexpr size_t maxHostnameLen = 253;
+
+    char addr_buf[sizeof(struct in6_addr)] = {0};
+
     if (type == PROTOCOLTYPE::PROTOCOLV4) {
-        constexpr size_t maxIpLenV4 = 15;
-        if (address.size() > maxIpLenV4) {
+        if (inet_pton(AF_INET, address.c_str(), addr_buf) == 1) {
+            return address.size() <= maxIpLenV4;
+        }
+        if (inet_pton(AF_INET6, address.c_str(), addr_buf) == 1) {
             return false;
         }
-        return true;
     } else if (type == PROTOCOLTYPE::PROTOCOLV6) {
-        constexpr size_t maxIpLenV6 = 39;
-        if (address.size() > maxIpLenV6) {
+        if (inet_pton(AF_INET6, address.c_str(), addr_buf) == 1) {
+            return address.size() <= maxIpLenV6;
+        }
+        if (inet_pton(AF_INET, address.c_str(), addr_buf) == 1) {
             return false;
         }
     } else {
+        if (inet_pton(AF_INET, address.c_str(), addr_buf) == 1) {
+            return address.size() <= maxIpLenV4;
+        }
+        if (inet_pton(AF_INET6, address.c_str(), addr_buf) == 1) {
+            return address.size() <= maxIpLenV6;
+        }
+    }
+
+    if (address.empty() || address.size() > maxHostnameLen) {
         return false;
+    }
+    for (char c : address) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '.') {
+            return false;
+        }
     }
     return true;
 }
@@ -100,6 +126,29 @@ Result ExtractTcpURL(const std::string &url, std::map<std::string, std::string> 
         return ACLSHMEM_INVALID_PARAM;
     }
 
+    if (tmpUrl[0] == '[') {
+        size_t bracketEnd = tmpUrl.find(']');
+        if (bracketEnd == std::string::npos || bracketEnd + 2 >= tmpUrl.size() || tmpUrl[bracketEnd + 1] != ':') {
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        std::string ipPart = tmpUrl.substr(1, bracketEnd - 1);
+        std::string portPart = tmpUrl.substr(bracketEnd + 2);
+        uint16_t port = 0;
+        if (!shm::utils::aclshmemi_parse_port(portPart, port)) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        size_t slashPos = ipPart.find('/');
+        if (slashPos == std::string::npos) {
+            details["ip"] = ipPart;
+            details["port"] = portPart;
+            return ACLSHMEM_SUCCESS;
+        }
+        details["ip"] = ipPart.substr(0, slashPos);
+        details["mask"] = ipPart.substr(slashPos + 1);
+        details["port"] = portPart;
+        return ACLSHMEM_SUCCESS;
+    }
+
     /* split */
     std::vector<std::string> splits;
     Split(tmpUrl, ":", splits);
@@ -108,6 +157,10 @@ Result ExtractTcpURL(const std::string &url, std::map<std::string, std::string> 
     }
 
     /* assign port */
+    uint16_t port = 0;
+    if (!shm::utils::aclshmemi_parse_port(splits[1], port)) {
+        return ACLSHMEM_INVALID_PARAM;
+    }
     details["port"] = splits[1];
     if (splits[0].find('/') == std::string::npos) {
         /* assign ip */
@@ -196,8 +249,19 @@ static Result DetermineTargetIpType(const std::string &target, struct in_addr &t
     } else if (inet_pton(AF_INET6, target.c_str(), &targetIpV6) == 1) {
         isTargetV6 = true;
     } else {
-        SHM_LOG_ERROR("target ip address invalid.");
-        return ACLSHMEM_INVALID_PARAM;
+        sockaddr_storage resolved{};
+        if (shm::utils::ResolveAddress(target, AF_UNSPEC, resolved) != ACLSHMEM_SUCCESS) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        if (resolved.ss_family == AF_INET) {
+            isTargetV6 = false;
+            auto sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            targetIpV4 = sin->sin_addr;
+        } else {
+            isTargetV6 = true;
+            auto sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            targetIpV6 = sin6->sin6_addr;
+        }
     }
     return ACLSHMEM_SUCCESS;
 }

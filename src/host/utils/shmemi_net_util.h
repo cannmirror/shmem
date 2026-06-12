@@ -27,7 +27,6 @@ constexpr int MIN_PORT = 1024;
 constexpr int MAX_PORT = 65536;
 constexpr int MAX_ATTEMPTS = 1000;
 constexpr int MAX_IFCONFIG_LENGTH = 23;
-constexpr int MAX_IP = 48;
 constexpr int DEFAULT_IFNAME_LNEGTH = 4;
 
 inline std::string get_default_network_interface()

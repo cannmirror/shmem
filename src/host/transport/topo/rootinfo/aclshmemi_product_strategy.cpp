@@ -20,6 +20,7 @@ namespace shm {
 namespace topo {
 
 static constexpr const char* TOPO_FILE_DIR_PATH = "driver/topo/950";
+static constexpr const char* ROCE_PLANE_ID = "roce";
 
 static std::string build_topo_file_path(const std::string& driver_path, const std::string& topo_filename)
 {
@@ -228,6 +229,7 @@ std::optional<aclshmemi_net_layer_t> aclshmemi_card_product_t::process_roce_laye
         return std::nullopt;
     }
     aclshmemi_addr_set_ip(addr, ip_addr);
+    aclshmemi_addr_set_plane_id(addr, ROCE_PLANE_ID);
     aclshmemi_addr_add_port(addr, "d2h");
 
     aclshmemi_net_layer_add_addr(layer, addr);

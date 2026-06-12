@@ -19,7 +19,6 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <ifaddrs.h>
-#include <libgen.h>
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -28,6 +27,7 @@
 #include <securec.h>
 
 #include "aclshmemi_hal.h"
+#include "pcie_nic_matcher.h"
 #include "utils/shmemi_logger.h"
 
 constexpr int MAX_NIC_PATH = 256 + 32;
@@ -48,15 +48,6 @@ typedef struct _stNPU {
     char nic_path[MAX_NIC_PATH] = {0};
     char nic_name[MAX_NIC_PATH] = {0};
 } NPU;
-
-static size_t get_common_prefix_len(const char* a, const char* b)
-{
-    size_t len = 0;
-    while (a[len] == b[len] && a[len] != '\0' && b[len] != '\0') {
-        len++;
-    }
-    return len;
-}
 
 static int get_abs_path(const char* path, char* abs_path, size_t abs_path_len)
 {
@@ -104,7 +95,7 @@ int get_nics(nic* nics, size_t* nic_len)
     return 0;
 }
 
-static int get_pcie_nics(NPU* npu, size_t pos, size_t npu_count)
+static int get_pcie_nics(NPU* npu, size_t pos, const nic* nics, size_t nic_len)
 {
     char dev_path[MAX_NIC_PATH] = {0};
     char abs_path[MAX_NIC_PATH] = {0};
@@ -113,40 +104,21 @@ static int get_pcie_nics(NPU* npu, size_t pos, size_t npu_count)
     if (ret < 0) {
         return -1;
     }
-    get_abs_path(dev_path, abs_path, abs_path_len);
-
-    nic nics[MAX_NIC_COUNT];
-    memset_s(nics, sizeof(nics), 0, sizeof(nics));
-    size_t nic_len = MAX_NIC_COUNT;
-    ret = get_nics(nics, &nic_len);
-    if (ret != 0) {
+    if (get_abs_path(dev_path, abs_path, abs_path_len) != 0) {
         return -1;
     }
 
-    int max_pos = -1;
-    size_t maxlen = PCIE_ROOT_MIN_LEN;
-    for (size_t i = 0; i < nic_len; ++i) {
-        size_t common_prefix_len = get_common_prefix_len(abs_path, nics[i].pcie_path);
-        if (common_prefix_len > maxlen) {
-            int skip = 0;
-            for (size_t j = 0; j < npu_count; ++j) {
-                if (strcmp(nics[i].pcie_path, npu[j].nic_path) == 0) {
-                    skip = 1;
-                    break;
-                }
-            }
-            if (skip) {
-                continue;
-            }
-            max_pos = i;
-            maxlen = common_prefix_len;
-        }
+    const char* nic_pcie_paths[MAX_NIC_COUNT] = {0};
+    for (size_t i = 0; i < nic_len && i < MAX_NIC_COUNT; ++i) {
+        nic_pcie_paths[i] = nics[i].pcie_path;
     }
+
+    int max_pos = shm::topo::select_closest_nic_path_index(abs_path, nic_pcie_paths, nic_len, PCIE_ROOT_MIN_LEN);
     if (max_pos < 0) {
         return -1;
     }
     (void)strcpy_s(npu[pos].nic_path, sizeof(npu[pos].nic_path), nics[max_pos].pcie_path);
-    (void)strcpy_s(npu[pos].nic_name, sizeof(npu[pos].nic_name), basename(nics[max_pos].pcie_path));
+    (void)strcpy_s(npu[pos].nic_name, sizeof(npu[pos].nic_name), shm::topo::get_path_basename(nics[max_pos].pcie_path));
     return 0;
 }
 
@@ -227,8 +199,20 @@ int get_npu_roce_ip(int npu_id, char* ip_addr, size_t ip_addr_len)
     std::vector<NPU> npus(npu_count);
     init_npus(npus.data(), npu_count);
 
+    nic nics[MAX_NIC_COUNT];
+    memset_s(nics, sizeof(nics), 0, sizeof(nics));
+    size_t nic_len = 0;
+    if (get_nics(nics, &nic_len) != 0) {
+        SHM_LOG_DEBUG("get_npu_roce_ip: get_nics failed");
+        return -1;
+    }
+    if (nic_len == 0) {
+        SHM_LOG_DEBUG("get_npu_roce_ip: no NIC found");
+        return -1;
+    }
+
     for (int i = 0; i < npu_count; ++i) {
-        int ret = get_pcie_nics(npus.data(), i, npu_count);
+        int ret = get_pcie_nics(npus.data(), i, nics, nic_len);
         if (ret != 0) {
             SHM_LOG_DEBUG("get_npu_roce_ip: get_pcie_nics failed for npu_id=" << i);
             continue;
@@ -237,6 +221,11 @@ int get_npu_roce_ip(int npu_id, char* ip_addr, size_t ip_addr_len)
 
     for (int i = 0; i < npu_count; ++i) {
         if (npus[i].id == npu_id) {
+            if (npus[i].nic_name[0] == '\0') {
+                SHM_LOG_DEBUG("get_npu_roce_ip: no matched PCIe NIC for npu_id=" << npu_id);
+                errno = ENODEV;
+                return -1;
+            }
             return get_ip_by_if_name(npus[i].nic_name, ip_addr, ip_addr_len);
         }
     }

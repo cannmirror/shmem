@@ -32,7 +32,7 @@ target_link_directories(root_info_generate PRIVATE
 )
 
 target_link_libraries(root_info_generate PRIVATE
-    shmem_rootinfo
+    shmem
     dl
     c_sec
 )

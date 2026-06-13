@@ -236,7 +236,7 @@ Error: topo_addr_info_get_size failed with ret=-1
 
 ### 问题1：工具找不到
 
-**症状**:
+**现象**:
 ```bash
 ./root_info_generate: command not found
 ```
@@ -248,14 +248,14 @@ Error: topo_addr_info_get_size failed with ret=-1
 
 ### 问题2：库依赖缺失
 
-**症状**:
+**现象**:
 ```bash
-error while loading shared libraries: libshmem_rootinfo.so: cannot open shared object file
+error while loading shared libraries: libshmem.so: cannot open shared object file
 ```
 
 **解决方案**:
 ```bash
-# 设置库路径
+# root_info_generate 依赖 SHMEM 主库，设置库路径
 export LD_LIBRARY_PATH=install/shmem/lib:$LD_LIBRARY_PATH
 
 # 或复制库到标准位置
@@ -265,7 +265,7 @@ ldconfig
 
 ### 问题3：驱动未初始化
 
-**症状**:
+**现象**:
 ```bash
 Error: topo_addr_info_get_size failed with ret=-1
 ```
@@ -277,7 +277,7 @@ Error: topo_addr_info_get_size failed with ret=-1
 
 ### 问题4：权限拒绝
 
-**症状**:
+**现象**:
 ```bash
 Error: cannot access /dev/davinci0
 ```
@@ -296,7 +296,7 @@ sudo ./root_info_generate 0
 
 ### 问题5：无效物理ID
 
-**症状**:
+**现象**:
 ```bash
 Error: get_mainboard_id returned null for phy_id=100
 ```
@@ -333,4 +333,3 @@ dmesg | grep -i ascend
 # 检查应用日志
 journalctl -u ascend-driver
 ```
-

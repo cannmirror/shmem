@@ -54,6 +54,11 @@ endif()
 if(NOT (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
     list(FILTER ACLSHMEM_HOST_FILES EXCLUDE REGEX "host/transport/device_rdma/device_rdma_transport_manager_v2")
 endif()
+if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
+    file(GLOB_RECURSE ROOT_INFO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/transport/topo/rootinfo/*.cpp)
+    list(APPEND ROOT_INFO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/utils/under_api/dl_dcmi_api.cpp)
+    list(APPEND ACLSHMEM_HOST_FILES ${ROOT_INFO_FILES})
+endif()
 
 add_library(aclshmem_host OBJECT ${ACLSHMEM_HOST_FILES})
 target_compile_options(aclshmem_host
@@ -80,7 +85,12 @@ target_include_directories(aclshmem_host
     ${PROJECT_SOURCE_DIR}/src/host/mem/heap/driver/userspace
 )
 if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
-    target_include_directories(aclshmem_host PUBLIC ${PROJECT_SOURCE_DIR}/3rdparty/json/single_include)
+    target_include_directories(aclshmem_host PUBLIC
+        ${PROJECT_SOURCE_DIR}/3rdparty/json/single_include
+        ${ASCEND_HOME_PATH}/include/driver/
+        ${ASCEND_HOME_PATH}/pkg_inc/
+        ${PROJECT_SOURCE_DIR}/src/host/transport/topo/rootinfo
+    )
 endif()
 
 file(GLOB_RECURSE ACLSHMEM_UTILS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/utils/*.cpp)
@@ -109,7 +119,7 @@ install(TARGETS shmem_utils
 add_library(shmem SHARED $<TARGET_OBJECTS:aclshmem_device> $<TARGET_OBJECTS:aclshmem_host>)
 target_link_options(shmem PRIVATE --cce-fatobj-link)
 if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
-    target_link_libraries(shmem PRIVATE shmem_utils shmem_rootinfo hcomm)
+    target_link_libraries(shmem PRIVATE shmem_utils hcomm)
 else()
     target_link_libraries(shmem PRIVATE shmem_utils)
 endif()
@@ -186,56 +196,6 @@ target_link_libraries(aclshmem_bootstrap_config_store PRIVATE shmem_utils)
 install(TARGETS aclshmem_bootstrap_config_store
         LIBRARY DESTINATION lib)
 
-
-if(ACLSHMEM_UDMA_SUPPORT)
-add_library(shmem_rootinfo SHARED)
-file(GLOB_RECURSE ROOT_INFO_FILES ${PROJECT_SOURCE_DIR}/src/host/transport/topo/rootinfo/*.cpp ${PROJECT_SOURCE_DIR}/src/host/utils/under_api/dl_dcmi_api.cpp)
-
-target_sources(shmem_rootinfo PRIVATE 
-        ${ROOT_INFO_FILES}
-)
-target_compile_options(shmem_rootinfo PRIVATE
-     -Werror
-     -Wfloat-equal
-     -Wall
-     -fno-common
-     -fno-strict-aliasing
-     -pipe
-     -O3
-     -fstack-protector-all
-     $<$<CONFIG:Debug>:-g>
-)
- 
-target_link_options(shmem_rootinfo PRIVATE
-     -Wl,-z,relro
-     -Wl,-z,now
-     -Wl,-z,noexecstack
-     -s
-)
-
-target_include_directories(shmem_rootinfo PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${ASCEND_HOME_PATH}/include/
-    ${ASCEND_HOME_PATH}/include/driver/
-    ${ASCEND_HOME_PATH}/pkg_inc/
-    ${PROJECT_SOURCE_DIR}/src/host
-    ${PROJECT_SOURCE_DIR}/src/host/utils/under_api
-    ${PROJECT_SOURCE_DIR}/src/host/transport/topo
-    ${PROJECT_SOURCE_DIR}/src/host/transport/topo/rootinfo
-)
-
-target_link_directories(shmem_rootinfo PRIVATE
-    ${ASCEND_HOME_PATH}/lib64
-)
-target_link_libraries(shmem_rootinfo PRIVATE
-    shmem_utils
-    dl
-    c_sec
-)
-install(TARGETS shmem_rootinfo
-        LIBRARY DESTINATION lib)
-
-endif()
 
 # 安装配置
 install(TARGETS shmem

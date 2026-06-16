@@ -136,6 +136,7 @@ HYBM_API int32_t hybm_init(int32_t deviceId, uint64_t flags)
     SHM_LOG_ERROR_RETURN_IT_IF_NOT_OK(hybm_load_library(), "load library failed");
     auto ret = shm::DlAclApi::RtGetLogicDevIdByUserDevId(deviceId, &initedLogicDeviceId);
     if (ret != 0 || initedLogicDeviceId < 0) {
+        shm::DlApi::CleanupLibrary();
         SHM_LOG_ERROR("fail to get logic device id " << deviceId << ", ret=" << ret);
         return ACLSHMEM_INNER_ERROR;
     }

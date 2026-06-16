@@ -84,6 +84,13 @@ int DevmmMapShareMemory(const char *name, void *expectAddr, uint64_t size, uint6
     if (ret != 0) {
         SHM_LOG_ERROR("prefetch share memory failed:" << ret << " : " << errno << " : " << strerror(errno) <<
             ", name = " << arg.data.openParam.name << ", device id = " << gDeviceId << ", fd = " << gDeviceFd);
+        std::fill_n(reinterpret_cast<char *>(&arg.data), sizeof(arg.data), 0);
+        arg.data.freePagesPara.va = reinterpret_cast<uint64_t>(expectAddr);
+        auto closeRet = ioctl(gDeviceFd, DEVMM_SVM_IPC_MEM_CLOSE, &arg);
+        if (closeRet != 0) {
+            SHM_LOG_ERROR("cleanup close after prefetch failure failed: " << closeRet
+                << " : " << strerror(errno) << ", name = " << name);
+        }
         return -1;
     }
     SHM_LOG_INFO("prefetch share memory success, name=" << name << ", device id: " << gDeviceId << ", fd: " << gDeviceFd);

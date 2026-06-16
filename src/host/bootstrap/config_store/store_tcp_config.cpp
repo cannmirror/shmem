@@ -484,6 +484,11 @@ Result TcpConfigStore::Unwatch(uint32_t wid) noexcept
 std::shared_ptr<shm::acc::AccTcpRequestContext> TcpConfigStore::SendMessageBlocked(
     const std::vector<uint8_t> &reqBody) noexcept
 {
+    if (accClientLink_ == nullptr) {
+        SHM_LOG_ERROR("accClientLink_ is null, connection not established");
+        return nullptr;
+    }
+
     auto seqNo = reqSeqGen_.fetch_add(1U);
 
     std::mutex waitRespMutex;
@@ -548,6 +553,11 @@ Result TcpConfigStore::SendWatchRequest(const std::vector<uint8_t> &reqBody,
                                         const std::function<void(int result, const std::vector<uint8_t> &)> &notify,
                                         uint32_t &id) noexcept
 {
+    if (accClientLink_ == nullptr) {
+        SHM_LOG_ERROR("accClientLink_ is null, connection not established");
+        return SM_ERROR;
+    }
+
     auto seqNo = reqSeqGen_.fetch_add(1U);
 
     auto watchContext = std::make_shared<ClientWatchContext>(notify);

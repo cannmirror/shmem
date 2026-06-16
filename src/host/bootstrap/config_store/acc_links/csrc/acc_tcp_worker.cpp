@@ -35,8 +35,20 @@ Result AccTcpWorker::Start()
 
     threadStarted_.store(false);
 
-    std::thread tmpThread(&AccTcpWorker::RunInThread, this, &threadStarted_);
-    epollThread_ = std::move(tmpThread);
+    try {
+        std::thread tmpThread(&AccTcpWorker::RunInThread, this, &threadStarted_);
+        epollThread_ = std::move(tmpThread);
+    } catch (const std::system_error& e) {
+        LOG_ERROR("Failed to create worker thread: " << e.what());
+        SafeCloseFd(epollFD_);
+        started_.store(false);
+        return ACC_ERROR;
+    } catch (...) {
+        LOG_ERROR("Unknown error creating worker thread");
+        SafeCloseFd(epollFD_);
+        started_.store(false);
+        return ACC_ERROR;
+    }
 
     while (!threadStarted_.load()) {
         usleep(UNO_32);

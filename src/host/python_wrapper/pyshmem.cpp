@@ -1268,9 +1268,12 @@ Returns:
         m.def(                                                                                                         \
             funcName.c_str(),                                                                                          \
             [](intptr_t ivars_ptr, size_t nelems, intptr_t status_ptr, int cmp, TYPE cmp_value, intptr_t res_out_ptr) {\
-                auto ivar_addrs = (TYPE *)ivars_ptr;                                                                   \
+                if (ivars_ptr == 0 || res_out_ptr == 0) {                                                            \
+                    throw py::value_error("ivars and res_out must be non-null");                                    \
+                }                                                                                                    \
+                auto ivar_addrs = reinterpret_cast<TYPE *>(ivars_ptr);                                               \
                 auto status = (status_ptr == 0) ? nullptr : reinterpret_cast<const int *>(status_ptr);                 \
-                auto res_out = reinterpret_cast<size_t *>(res_out_ptr);                                                \
+                auto res_out = reinterpret_cast<size_t *>(res_out_ptr);                                               \
                 aclshmem_##NAME##_wait_until_any(ivar_addrs, nelems, status, cmp, cmp_value, res_out);                 \
             },                                                                                                         \
             py::call_guard<py::gil_scoped_release>(),                                                                  \

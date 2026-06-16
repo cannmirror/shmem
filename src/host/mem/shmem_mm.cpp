@@ -72,7 +72,7 @@ void *aclshmem_calloc(size_t nmemb, size_t size)
     auto total_size = nmemb * size;
     auto ptr = aclshmemi_memory_manager->allocate(total_size);
     if (ptr != nullptr) {
-        auto ret = aclrtMemset(ptr, size, 0, size);
+        auto ret = aclrtMemset(ptr, total_size, 0, total_size);
         if (ret != 0) {
             SHM_LOG_ERROR("aclshmem_calloc(" << nmemb << ", " << size << ") memset failed: " << ret);
             aclshmemi_memory_manager->release(ptr);
@@ -220,7 +220,7 @@ void *aclshmemx_calloc(size_t nmemb, size_t size, aclshmem_mem_type_t mem_type)
     auto total_size = nmemb * size;
     auto ptr = mem_manager->allocate(total_size);
     if (ptr != nullptr) {
-        auto ret = aclrtMemset(ptr, size, 0, size);
+        auto ret = aclrtMemset(ptr, total_size, 0, total_size);
         if (ret != 0) {
             SHM_LOG_ERROR("aclshmem_calloc(" << nmemb << ", " << size << ") memset failed: " << ret);
             mem_manager->release(ptr);

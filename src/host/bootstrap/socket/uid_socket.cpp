@@ -290,21 +290,31 @@ static int socket_try_accept(socket_t* sock) {
         return ACLSHMEM_BOOTSTRAP_ERROR;
     }
     ACLSHMEM_CHECK_RET(socket_poll_fd(sock->accept_fd, POLLIN, SOCKET_ACCEPT_TIMEOUT_MS), "socket_poll_fd failed.");
-    struct sockaddr sa;
-    socklen_t socklen = sizeof(sa);
+    struct sockaddr_storage sa_storage;
+    std::fill(reinterpret_cast<char*>(&sa_storage),
+              reinterpret_cast<char*>(&sa_storage) + sizeof(sa_storage),
+              0);
+    struct sockaddr* sa = reinterpret_cast<struct sockaddr*>(&sa_storage);
+    socklen_t socklen = sizeof(sa_storage);
 
-    sock->fd = accept(sock->accept_fd, &sa, &socklen);
+    sock->fd = accept(sock->accept_fd, sa, &socklen);
     if (sock->fd != -1) {
-        if (sa.sa_family == AF_INET) {
+        if (sa->sa_family == AF_INET) {
             sock->addr.type = ADDR_IPv4;
-            std::copy_n(reinterpret_cast<const char*>(&sa), 
-                        sizeof(struct sockaddr_in), 
+            std::copy_n(reinterpret_cast<const char*>(sa),
+                        sizeof(struct sockaddr_in),
                         reinterpret_cast<char*>(&sock->addr.addr.addr4));
-        } else {
+        } else if (sa->sa_family == AF_INET6) {
             sock->addr.type = ADDR_IPv6;
-            std::copy_n(reinterpret_cast<const char*>(&sa), 
-                        sizeof(struct sockaddr_in6), 
+            std::copy_n(reinterpret_cast<const char*>(sa),
+                        sizeof(struct sockaddr_in6),
                         reinterpret_cast<char*>(&sock->addr.addr.addr6));
+        } else {
+            SHM_LOG_ERROR("socket_try_accept: unsupported address family " << sa->sa_family);
+            close(sock->fd);
+            sock->fd = -1;
+            sock->state = SOCKET_STATE_ERROR;
+            return ACLSHMEM_BOOTSTRAP_ERROR;
         }
         sock->state = SOCKET_STATE_ACCEPTED;
     } else if (errno != EAGAIN && errno != EWOULDBLOCK) {

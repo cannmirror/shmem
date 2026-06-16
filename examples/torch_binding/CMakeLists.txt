@@ -12,11 +12,39 @@ else()
     message("Using python: ${Python3_EXECUTABLE}")
 endif()
 
-find_package(Python3 COMPONENTS Interpreter Development)
-list(APPEND CMAKE_PREFIX_PATH "${Python3_SITELIB}")
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import torch;print(torch.utils.cmake_prefix_path)"
+    OUTPUT_VARIABLE TORCH_CMAKE_PREFIX_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_VARIABLE _torch_error
+    RESULT_VARIABLE _torch_query_result
+)
+if(NOT _torch_query_result EQUAL 0)
+    message(FATAL_ERROR "Failed to locate torch via ${Python3_EXECUTABLE}. "
+                        "Make sure torch is installed for this interpreter."
+                        "\nError: ${_torch_error}")
+endif()
+list(APPEND CMAKE_PREFIX_PATH "${TORCH_CMAKE_PREFIX_PATH}")
+
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import os,torch_npu;print(os.path.dirname(torch_npu.__file__))"
+    OUTPUT_VARIABLE TORCH_NPU_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_VARIABLE _torch_npu_error
+    RESULT_VARIABLE _torch_npu_query_result
+)
+if(NOT _torch_npu_query_result EQUAL 0)
+    message(FATAL_ERROR "Failed to locate torch_npu via ${Python3_EXECUTABLE}. "
+                        "Make sure torch_npu is installed for this interpreter."
+                        "\nError: ${_torch_npu_error}")
+endif()
+
 find_package(Torch REQUIRED)
 message(STATUS "Found Torch: ${Torch_DIR}")
 message(STATUS "Torch Libraries: ${TORCH_LIBRARIES}")
+message(STATUS "Found torch_npu: ${TORCH_NPU_PATH}")
 
 if(NOT DEFINED ACLSHMEM_ALL_KERNEL_TARGETS OR ACLSHMEM_ALL_KERNEL_TARGETS STREQUAL "")
     message(FATAL_ERROR "No kernel targets passed from parent! Please check collective example build.")
@@ -34,9 +62,16 @@ set_target_properties(aclshmem_torch PROPERTIES
     PREFIX ""
 )
 
+if(NOT EXISTS "${TORCH_NPU_PATH}/lib")
+    message(WARNING "torch_npu lib directory not found: ${TORCH_NPU_PATH}/lib")
+endif()
+if(NOT EXISTS "${TORCH_NPU_PATH}/include")
+    message(WARNING "torch_npu include directory not found: ${TORCH_NPU_PATH}/include")
+endif()
+
 target_link_directories(aclshmem_torch PRIVATE
     ${CMAKE_BINARY_DIR}
-    ${Python3_SITELIB}/torch_npu/lib
+    ${TORCH_NPU_PATH}/lib
 )
 
 target_link_libraries(aclshmem_torch PRIVATE
@@ -49,7 +84,7 @@ target_link_libraries(aclshmem_torch PRIVATE
 include_directories(
     ${Python3_INCLUDE_DIRS}
     ${TORCH_INCLUDE_DIRS}
-    ${Python3_SITELIB}/torch_npu/include
+    ${TORCH_NPU_PATH}/include
     ${ACLSHMEM_SHARED_LIB_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include

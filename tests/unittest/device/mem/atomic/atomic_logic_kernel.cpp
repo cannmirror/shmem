@@ -27,6 +27,9 @@ constexpr uint64_t MESSAGE_SIZE = 64;
         int64_t pe = aclshmem_my_pe();                                                                       \
         int64_t pe_size = aclshmem_n_pes();                                                                  \
         __gm__ TYPE* dst_addr;                                                                               \
+        __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                           \
+        uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                            \
+        uint32_t sync_id = device_state->rdma_config.sync_id;                                                \
                                                                                                              \
         for (int64_t peer = 0; peer < pe_size; peer++) {                                                     \
             if (peer == pe) {                                                                                \
@@ -36,6 +39,7 @@ constexpr uint64_t MESSAGE_SIZE = 64;
             if ASCEND_IS_AIV {                                                                               \
                 if (AscendC::GetSubBlockIdx() == 0) {                                                        \
                     aclshmem_##NAME##_atomic_and((__gm__ TYPE*)dst_addr, ~(TYPE)(1LLU << pe), peer);         \
+                    aclshmemx_roce_quiet(peer, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);          \
                 }                                                                                            \
             }                                                                                                \
         }                                                                                                    \
@@ -109,6 +113,9 @@ ACLSHMEM_ATOMIC_LOGIC_FUNC_TYPE(ATOMIC_FETCH_AND_TEST);
         int64_t pe = aclshmem_my_pe();                                                                      \
         int64_t pe_size = aclshmem_n_pes();                                                                 \
         __gm__ TYPE* dst_addr;                                                                              \
+        __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                          \
+        uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                           \
+        uint32_t sync_id = device_state->rdma_config.sync_id;                                               \
                                                                                                             \
         for (int64_t peer = 0; peer < pe_size; peer++) {                                                    \
             if (peer == pe) {                                                                               \
@@ -118,6 +125,7 @@ ACLSHMEM_ATOMIC_LOGIC_FUNC_TYPE(ATOMIC_FETCH_AND_TEST);
             if ASCEND_IS_AIV {                                                                              \
                 if (AscendC::GetSubBlockIdx() == 0) {                                                       \
                     aclshmem_##NAME##_atomic_or((__gm__ TYPE*)dst_addr, (TYPE)(1LLU << pe), peer);          \
+                    aclshmemx_roce_quiet(peer, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);         \
                 }                                                                                           \
             }                                                                                               \
         }                                                                                                   \
@@ -192,6 +200,9 @@ ACLSHMEM_ATOMIC_LOGIC_FUNC_TYPE(ATOMIC_FETCH_OR_TEST);
         int64_t pe = aclshmem_my_pe();                                                                       \
         int64_t pe_size = aclshmem_n_pes();                                                                  \
         __gm__ TYPE* dst_addr;                                                                               \
+        __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                           \
+        uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                            \
+        uint32_t sync_id = device_state->rdma_config.sync_id;                                                \
                                                                                                              \
         for (int64_t peer = 0; peer < pe_size; peer++) {                                                     \
             if (peer == pe) {                                                                                \
@@ -201,6 +212,7 @@ ACLSHMEM_ATOMIC_LOGIC_FUNC_TYPE(ATOMIC_FETCH_OR_TEST);
             if ASCEND_IS_AIV {                                                                               \
                 if (AscendC::GetSubBlockIdx() == 0) {                                                        \
                     aclshmem_##NAME##_atomic_xor((__gm__ TYPE*)dst_addr, (TYPE)(1LLU << pe), peer);          \
+                    aclshmemx_roce_quiet(peer, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);          \
                 }                                                                                            \
             }                                                                                                \
         }                                                                                                    \

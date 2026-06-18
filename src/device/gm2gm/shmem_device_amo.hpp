@@ -119,7 +119,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT(ACLSHMEM_ATOMIC_ADD_EXT_TYPENAME);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                 \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                                \
             /* MTE path - supports Ascend_950 only */                                                              \
-            return aclshmemx_mte_atomic_fetch_add(dest, value, pe);                                                \
+            TYPE res = aclshmemx_mte_atomic_fetch_add(dest, value, pe);                                            \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                        \
+            return res;                                                                                            \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                        \
             /* ROCE path - supports Ascend_950 only */                                                             \
             if constexpr (std::is_same_v<TYPE, float>) {                                                           \
@@ -177,7 +179,10 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_INC_TYPENAME);
     {                                                                                                              \
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                 \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                                \
-            return aclshmemx_mte_atomic_fetch_inc(dest, pe);                                                       \
+            /* MTE path - supports Ascend_950 only */                                                              \
+            TYPE res = aclshmemx_mte_atomic_fetch_inc(dest, pe);                                                   \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                        \
+            return res;                                                                                            \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                        \
             if constexpr (std::is_same_v<TYPE, float>) {                                                           \
                 ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "ROCE does not support float for atomic_fetch_inc\n"); \
@@ -212,9 +217,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                 \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                               \
             /* ROCE path - supports Ascend_950 only */                                                             \
-            aclshmemx_roce_atomic_fetch_and(dest, value, pe);                                                      \
+            aclshmemx_roce_atomic_and(dest, value, pe);                                                            \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                        \
-            aclshmemx_udma_atomic_fetch_and(dest, value, pe);                                                      \
+            aclshmemx_udma_atomic_and(dest, value, pe);                                                            \
         } else {                                                                                                   \
             ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "atomic_and is only supported on ROCE and UDMA path. \n"); \
         }                                                                                                          \
@@ -233,9 +238,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_AND_TYPENAME);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                              \
             /* ROCE path - supports Ascend_950 only */                                                            \
-            aclshmemx_roce_atomic_fetch_or(dest, value, pe);                                                      \
+            aclshmemx_roce_atomic_or(dest, value, pe);                                                            \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                       \
-            aclshmemx_udma_atomic_fetch_or(dest, value, pe);                                                      \
+            aclshmemx_udma_atomic_or(dest, value, pe);                                                            \
         } else {                                                                                                  \
             ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "atomic_or is only supported on ROCE and UDMA path. \n"); \
         }                                                                                                         \
@@ -254,9 +259,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_OR_TYPENAME);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                 \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                               \
             /* ROCE path - supports Ascend_950 only */                                                             \
-            aclshmemx_roce_atomic_fetch_xor(dest, value, pe);                                                      \
+            aclshmemx_roce_atomic_xor(dest, value, pe);                                                            \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                        \
-            aclshmemx_udma_atomic_fetch_xor(dest, value, pe);                                                      \
+            aclshmemx_udma_atomic_xor(dest, value, pe);                                                            \
         } else {                                                                                                   \
             ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "atomic_xor is only supported on ROCE and UDMA path. \n"); \
         }                                                                                                          \
@@ -344,7 +349,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                               \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                              \
             /* MTE path - supports Ascend_950 only */                                                            \
-            return aclshmemx_mte_atomic_fetch(const_cast<__gm__ TYPE*>(source), pe);                             \
+            TYPE res = aclshmemx_mte_atomic_fetch(const_cast<__gm__ TYPE*>(source), pe);                         \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                      \
+            return res;                                                                                          \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                      \
             /* ROCE path - supports Ascend_950 only */                                                           \
             return aclshmemx_roce_atomic_fetch(const_cast<__gm__ TYPE*>(source), pe);                            \
@@ -432,7 +439,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SET_TYPENAME_CAST);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                       \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                      \
             /* MTE path - supports Ascend_950 only */                                                    \
-            return aclshmemx_mte_atomic_swap(dest, value, pe);                                           \
+            TYPE res = aclshmemx_mte_atomic_swap(dest, value, pe);                                       \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                              \
+            return res;                                                                                  \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                              \
             /* ROCE path - supports Ascend_950 only */                                                   \
             return aclshmemx_roce_atomic_swap(dest, value, pe);                                          \
@@ -460,6 +469,7 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SET_TYPENAME_CAST);
             /* MTE path - supports Ascend_950 only */                                                         \
             SUBTYPE temp =                                                                                    \
                 aclshmemx_mte_atomic_swap(reinterpret_cast<__gm__ SUBTYPE*>(dest), *((SUBTYPE*)&value), pe);  \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                   \
             return *((TYPE*)&temp);                                                                           \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                   \
             /* ROCE path - supports Ascend_950 only */                                                        \
@@ -495,7 +505,9 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST);
         __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                   \
         if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                                  \
             /* MTE path - supports Ascend_950 only */                                                                \
-            return aclshmemx_mte_atomic_compare_swap(dest, cond, value, pe);                                         \
+            TYPE res = aclshmemx_mte_atomic_compare_swap(dest, cond, value, pe);                                     \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                          \
+            return res;                                                                                              \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                          \
             /* ROCE path - supports Ascend_950 only */                                                               \
             return aclshmemx_roce_atomic_compare_swap(dest, cond, value, pe);                                        \
@@ -523,6 +535,7 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST);
             /* MTE path - supports Ascend_950 only */                                                                \
             SUBTYPE temp = aclshmemx_mte_atomic_compare_swap(                                                        \
                 reinterpret_cast<__gm__ SUBTYPE*>(dest), *((SUBTYPE*)&cond), *((SUBTYPE*)&value), pe);               \
+            AscendC::PipeBarrier<PIPE_ALL>();                                                                          \
             return *((TYPE*)&temp);                                                                                  \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {                                          \
             /* ROCE path - supports Ascend_950 only */                                                               \

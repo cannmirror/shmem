@@ -278,6 +278,9 @@ ACLSHMEM_DEVICE void aclshmemi_signal_set(__gm__ int32_t *addr, int pe, int32_t 
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_ROCE) {
         if constexpr (ACLSHMEM_RDMA_V2_SUPPORTED) {
             aclshmemx_roce_atomic_set(addr, val, pe);
+            uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;
+            uint32_t sync_id = device_state->rdma_config.sync_id;
+            aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub), sync_id);
         } else {
             __gm__ int32_t *sig_addr_int32 = reinterpret_cast<__gm__ int32_t *>(device_state->signal_addr);
             aclshmemi_store(sig_addr_int32, val);

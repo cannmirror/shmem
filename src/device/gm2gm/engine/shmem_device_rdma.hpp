@@ -347,7 +347,6 @@ ACLSHMEM_DEVICE void aclshmemx_roce_atomic_set(__gm__ T* dst, T value, int32_t p
     aclshmemi_roce_amo_cas<T, true>(
         reinterpret_cast<__gm__ T*>(remote_ptr), nullptr, pe, 0, value, 0, UINT64_MAX, 0, ub_tensor_64, ub_tensor_32,
         sync_id);
-    aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);
 }
 
 template <typename T>
@@ -417,7 +416,6 @@ ACLSHMEM_DEVICE void aclshmemx_roce_atomic_add(__gm__ T* dst, T value, int32_t p
     auto remote_ptr = aclshmem_ptr(dst, pe);
     aclshmemi_roce_amo_add<T, true>(
         reinterpret_cast<__gm__ T*>(remote_ptr), nullptr, pe, 0, value, 0, ub_tensor_64, ub_tensor_32, sync_id);
-    aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);
 }
 
 template <typename T>
@@ -483,7 +481,6 @@ ACLSHMEM_DEVICE void aclshmemx_roce_atomic_and(__gm__ T* dst, T value, int32_t p
     aclshmemi_roce_amo_cas<T, true>(
         reinterpret_cast<__gm__ T*>(remote_ptr), nullptr, pe, 0, (uint64_t)value, 0, swap_mask, 0, ub_tensor_64,
         ub_tensor_32, sync_id);
-    aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);
 }
 
 template <typename T>
@@ -508,7 +505,6 @@ ACLSHMEM_DEVICE void aclshmemx_roce_atomic_or(__gm__ T* dst, T value, int32_t pe
     aclshmemi_roce_amo_cas<T, true>(
         reinterpret_cast<__gm__ T*>(remote_ptr), nullptr, pe, 0, (uint64_t)value, 0, (uint64_t)value, 0, ub_tensor_64,
         ub_tensor_32, sync_id);
-    aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);
 }
 
 template <typename T>
@@ -533,7 +529,6 @@ ACLSHMEM_DEVICE void aclshmemx_roce_atomic_xor(__gm__ T* dst, T value, int32_t p
     aclshmemi_roce_amo_add<T, true>(
         reinterpret_cast<__gm__ T*>(remote_ptr), nullptr, pe, 0, (uint64_t)value, UINT64_MAX, ub_tensor_64,
         ub_tensor_32, sync_id);
-    aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);
 }
 
 template <typename T>

@@ -150,27 +150,41 @@
  * Asynchronous interface. Perform contiguous data atomic add operation on
  * symmetric memory from the specified PE to address on the local PE.
  *
- * The implementation dispatches to MTE or UDMA based on the transport topology.
- * Pipeline synchronization requirements differ by transport and must be ensured
- * externally by the caller:
- * - MTE path: writes operands to UB via Scalar, then MTE3 reads UB and performs
- *   the remote atomic add to GM.
- *   - Before calling: if another unit (e.g. MTE2) is also writing to the same UB
+ * The implementation dispatches to MTE, ROCE, or UDMA based on the transport topology.
+ * Pipeline synchronization requirements differ by transport and data type, and must
+ * be ensured externally by the caller.
+ *
+ * @par MTE Path Synchronization
+ * MTE path behavior differs by data type:
+ * - **int8, int16, bf16, half, int32, float** (UB + MTE3):
+ *   The Scalar unit writes operands to UB, then MTE3 reads UB and performs the
+ *   remote atomic add to GM via the MTE3 atomic add hardware.
+ *   - **Before calling**: if another unit (e.g. MTE2) is also writing to the same UB
  *     region, the caller must fence those writes before Scalar writes to UB
- *     (e.g. SetFlag/WaitFlag on MTE2_S event), otherwise UB data may be
- *     corrupted.
- *   - After calling: if there is a data dependency on the atomic add result, the
+ *     (e.g. SetFlag/WaitFlag on MTE2_S event), otherwise UB data may be corrupted.
+ *   - **After calling**: if there is a data dependency on the atomic add result, the
  *     caller must fence MTE3 before reading GM (e.g. SetFlag/WaitFlag on
  *     MTE3_MTE2 event). Likewise, if new values will be written to the same UB
  *     region, the caller must fence MTE3 before overwriting UB (e.g. SetFlag/
  *     WaitFlag on MTE3_S event), otherwise UB data may be overwritten before
  *     MTE3 has finished reading.
- * - UDMA path: the atomic add is issued asynchronously over UDMA. The caller
- *   must call aclshmemx_udma_quiet(pe) before reading the result to guarantee
- *   the operation has completed on the target PE.
+ * - **uint32, uint64, int64** (Scalar AtomicAdd):
+ *   The atomic add is performed directly by the Scalar unit (Scalar AtomicAdd) on
+ *   Ascend950, without going through UB and MTE3. Since the Scalar unit writes
+ *   directly to GM, the synchronization model differs from the UB+MTE3 path.
+ *   The caller must follow the general MTE synchronization rules
+ *   (see the "Atomic Interface Synchronization Model" section below):
+ *   if there are data dependencies between the Scalar computation unit and the
+ *   transfer units (MTE2/MTE3) when reading/writing GM, insert appropriate
+ *   SetFlag/WaitFlag synchronization based on the actual data flow.
  *
  * The MTE UB buffer offset defaults to 0 and can be adjusted via
  * aclshmemx_set_mte_config(offset, ub_size, sync_id).
+ *
+ * @par ROCE Path Synchronization
+ * The atomic add is issued asynchronously over ROCE. The caller must call
+ * aclshmemx_roce_quiet before reading the result to guarantee the operation
+ * has completed on the target PE.
  *
  * @note The MTE transport for this operation does not support cross-PCIe (inter-node)
  *       communication. Use the ROCE or UDMA transport paths for cross-PCIe scenarios.
@@ -202,6 +216,34 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT(ACLSHMEM_ATOMIC_ADD_EXT_TYPENAME);
 #define shmem_bfloat16_atomic_add aclshmem_bfloat16_atomic_add 
 #define shmem_float_atomic_add aclshmem_float_atomic_add
 
+/** ============================================================================
+ * @section amo_sync_model Atomic Interface Synchronization Model
+ *
+ * - **Return value** (fetch_add, fetch_inc, fetch_and, fetch_or, fetch_xor,
+ *   fetch, swap, compare_swap): **Synchronous**. Completes before returning.
+ *   Caller needs no additional synchronization.
+ *
+ * - **Void return** (add, inc, and, or, xor, set): **Asynchronous**. May not
+ *   have completed on return. Caller must synchronize:
+ *   - **ROCE**: aclshmemx_roce_quiet
+ *   - **UDMA**: aclshmemx_udma_quiet
+ *   - **MTE**: Insert SetFlag/WaitFlag per data dependency (see below)
+ *
+ * @par MTE Path Synchronization
+ * MTE atomic ops use Scalar→UB→MTE2/MTE3→GM path. When data dependencies exist,
+ * insert SetFlag/WaitFlag at Kernel level:
+ * - **Pre-call**: Fence prior UB writes (SetFlag/WaitFlag on MTE2_S)
+ * - **Post-call**: Fence MTE3 before reading GM (MTE3_MTE2) or reusing UB (MTE3_S)
+ * MTE UB buffer offset defaults to 0; adjust via aclshmemx_set_mte_config().
+ *
+ * @par ROCE Path Synchronization
+ * Synchronous interfaces auto-quiet. Asynchronous interfaces require an explicit
+ * quiet call to ensure completion.
+ *
+ * @warning Concurrent RMA/AMO to the same PE over RDMA (ROCE) is not supported.
+ *          Use sync_id in device_state.rdma_config for pipeline synchronization.
+ * ============================================================================ */
+
 /**
  * @brief  Automatically generates aclshmem atomic fetch add functions for different data types.
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
@@ -216,6 +258,16 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_EXT(ACLSHMEM_ATOMIC_ADD_EXT_TYPENAME);
  *
  * @par Function Description
  * Synchronous interface. Atomically adds value to the value at dest and returns the old value.
+ * The function returns after the remote atomic operation has completed and the result
+ * is visible on the remote PE. An internal quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -248,9 +300,21 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_ADD_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_inc(\_\_gm\_\_ TYPE *dst, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Perform atomic increment operation on
- * symmetric memory from the specified PE to address on the local PE.
- * Increments the value at the destination by 1.
+ * Asynchronous interface. Perform atomic increment operation on symmetric memory
+ * from the specified PE to address on the local PE. Increments the value at the
+ * destination by 1.
+ * This is an asynchronous operation. The caller must explicitly synchronize to
+ * ensure the operation has completed and the result is visible on the remote PE.
+ *
+ * @par Synchronization
+ * - **MTE path**: The operation is issued via Scalar→UB→MTE3 and returns immediately.
+ *   If there are data dependencies between the Scalar computation unit and MTE2/MTE3
+ *   transfer units when reading/writing GM or sharing UB, the caller must insert
+ *   appropriate SetFlag/WaitFlag synchronization at the Kernel Runtime level based
+ *   on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dst**    - [in] Pointer on local device of the destination data.
@@ -280,6 +344,16 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_INC_TYPENAME);
  *
  * @par Function Description
  * Synchronous interface. Atomically increments the value at dest by 1 and returns the old value.
+ * The function returns after the remote atomic operation has completed and the result
+ * is visible on the remote PE. An internal quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -310,8 +384,12 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_INC_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_and(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Atomically performs bitwise AND operation between the value at dest
- * and the specified value.
+ * Atomically performs bitwise AND operation between the value at dest and the specified value.
+ *
+ * @par Synchronization
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -337,8 +415,12 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_AND_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_or(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Atomically performs bitwise OR operation between the value at dest
- * and the specified value.
+ * Atomically performs bitwise OR operation between the value at dest and the specified value.
+ *
+ * @par Synchronization
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -364,8 +446,12 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_OR_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_xor(\_\_gm\_\_ TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Atomically performs bitwise XOR operation between the value at dest
- * and the specified value.
+ * Atomically performs bitwise XOR operation between the value at dest and the specified value.
+ *
+ * @par Synchronization
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -392,7 +478,13 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_XOR_TYPENAME);
  *
  * @par Function Description
  * Synchronous interface. Atomically performs bitwise AND operation between the value at dest
- * and the specified value, and returns the old value.
+ * and the specified value, and returns the old value. The function returns after the remote
+ * atomic operation has completed and the result is visible on the remote PE. An internal
+ * quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -422,7 +514,13 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_AND_TYPENAME);
  *
  * @par Function Description
  * Synchronous interface. Atomically performs bitwise OR operation between the value at dest
- * and the specified value, and returns the old value.
+ * and the specified value, and returns the old value. The function returns after the remote
+ * atomic operation has completed and the result is visible on the remote PE. An internal
+ * quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -452,7 +550,13 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_OR_TYPENAME);
  *
  * @par Function Description
  * Synchronous interface. Atomically performs bitwise XOR operation between the value at dest
- * and the specified value, and returns the old value.
+ * and the specified value, and returns the old value. The function returns after the remote
+ * atomic operation has completed and the result is visible on the remote PE. An internal
+ * quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -484,6 +588,16 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_LOGIC(ACLSHMEM_ATOMIC_FETCH_XOR_TYPENAME);
  * @par Function Description
  * Synchronous interface. Atomically reads the value from source and returns it.
  * This operation does not modify the data at source.
+ * The function returns after the remote atomic operation has completed and the result
+ * is visible on the remote PE. An internal quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **source**  - [in] Pointer on local device of the source data to read.
@@ -515,7 +629,17 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Atomically sets the value at dest to the specified value.
+ * Atomically sets the value at dest to the specified value.
+ *
+ * @par Synchronization
+ * - **MTE path**: The operation is issued via Scalar→UB→MTE3 and returns immediately.
+ *   If there are data dependencies between the Scalar computation unit and MTE2/MTE3
+ *   transfer units when reading/writing GM or sharing UB, the caller must insert
+ *   appropriate SetFlag/WaitFlag synchronization at the Kernel Runtime level based
+ *   on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -542,8 +666,18 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_ADD_950(ACLSHMEM_ATOMIC_FETCH_TYPENAME);
  * \remark ACLSHMEM_DEVICE void aclshmem_NAME_atomic_set(TYPE *dest, TYPE value, int32_t pe)
  *
  * @par Function Description
- * Synchronous interface. Atomically sets the value at dest to the specified value.
+ * Atomically sets the value at dest to the specified value.
  * Types are CAST to underlying unsigned integer types for the atomic operation.
+ *
+ * @par Synchronization
+ * - **MTE path**: The operation is issued via Scalar→UB→MTE3 and returns immediately.
+ *   If there are data dependencies between the Scalar computation unit and MTE2/MTE3
+ *   transfer units when reading/writing GM or sharing UB, the caller must insert
+ *   appropriate SetFlag/WaitFlag synchronization at the Kernel Runtime level based
+ *   on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: This is an asynchronous operation. The caller must invoke
+ *   aclshmemx_roce_quiet to guarantee the operation has completed and the
+ *   data is visible on the remote PE.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -575,7 +709,17 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SET_TYPENAME_CAST);
  *
  * @par Function Description
  * Synchronous interface. Atomically swaps the value at dest with the specified value
- * and returns the old value.
+ * and returns the old value. The function returns after the remote atomic operation
+ * has completed and the result is visible on the remote PE. An internal quiet
+ * operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -607,7 +751,17 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SET_TYPENAME_CAST);
  * @par Function Description
  * Synchronous interface. Atomically swaps the value at dest with the specified value
  * and returns the old value. Types are CAST to underlying unsigned integer types
- * for the atomic operation.
+ * for the atomic operation. The function returns after the remote atomic operation
+ * has completed and the result is visible on the remote PE. An internal quiet
+ * operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -643,6 +797,16 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST);
  * @par Function Description
  * Synchronous interface. Atomically compares the value at dest with cond.
  * If they are equal, the value at dest is set to value. Returns the old value at dest.
+ * The function returns after the remote atomic operation has completed and the result
+ * is visible on the remote PE. An internal quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.
@@ -676,6 +840,16 @@ ACLSHMEM_TYPE_FUNC_ATOMIC_SWAP_CAST(ACLSHMEM_ATOMIC_SWAP_TYPENAME_CAST);
  * Synchronous interface. Atomically compares the value at dest with cond.
  * If they are equal, the value at dest is set to value. Returns the old value at dest.
  * Types are CAST to underlying unsigned integer types for the atomic operation.
+ * The function returns after the remote atomic operation has completed and the result
+ * is visible on the remote PE. An internal quiet operation is performed before returning.
+ *
+ * @par Synchronization
+ * - **MTE path**: Internally synchronized. However, if there are data dependencies between
+ *   the Scalar computation unit and MTE2/MTE3 transfer units when reading/writing GM or
+ *   sharing UB, the caller must insert appropriate SetFlag/WaitFlag synchronization at the
+ *   Kernel Runtime level based on the actual data flow. See @ref amo_sync_model for details.
+ * - **ROCE path**: Internally synchronized via built-in quiet. No additional
+ *   aclshmemx_roce_quiet call is required.
  *
  * @par Parameters
  * - **dest**   - [in] Pointer on local device of the destination data.

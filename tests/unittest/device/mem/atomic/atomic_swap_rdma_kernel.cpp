@@ -78,6 +78,9 @@ ACLSHMEM_RDMA_ATOMIC_SWAP_FUNC_TYPE(RDMA_ATOMIC_FETCH_TEST);
         int64_t pe = aclshmem_my_pe();                                                                            \
         int64_t pe_size = aclshmem_n_pes();                                                                       \
         __gm__ TYPE* dst_addr;                                                                                    \
+        __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();                                \
+        uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                                 \
+        uint32_t sync_id = device_state->rdma_config.sync_id;                                                     \
                                                                                                                   \
         for (int64_t peer = 0; peer < pe_size; peer++) {                                                          \
             if (peer == pe)                                                                                       \
@@ -85,6 +88,7 @@ ACLSHMEM_RDMA_ATOMIC_SWAP_FUNC_TYPE(RDMA_ATOMIC_FETCH_TEST);
             dst_addr = gva + pe * MESSAGE_SIZE / sizeof(TYPE);                                                    \
             if (g_coreType == AscendC::AIV && AscendC::GetSubBlockIdx() == 0) {                                   \
                 aclshmemx_roce_atomic_set((__gm__ TYPE*)dst_addr, static_cast<TYPE>(1), peer);                    \
+                aclshmemx_roce_quiet(peer, reinterpret_cast<__ubuf__ char*>(copy_ub), sync_id);                   \
             }                                                                                                     \
         }                                                                                                         \
         aclshmem_barrier_all();                                                                                   \

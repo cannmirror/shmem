@@ -61,13 +61,13 @@ ACLSHMEM_DEVICE void aclshmemi_dump_cqe(__gm__ ACLSHMEMJfcCqeCtx* cqeAddr)
     AscendC::printf("CQE: DW2 - localNumH: %d, rmtIdx: %d\n", localNumH, rmtIdx);
     AscendC::printf("CQE: DW3 - tpn: %d\n", tpn);
     AscendC::printf("CQE: DW4 - byteCnt: %d\n", cqeAddr->byteCnt);
-    AscendC::printf("CQE: DW5-DW6 - userData: 0x%08x%08x\n", cqeAddr->userDataH, cqeAddr->userDataL);
+    AscendC::printf("CQE: DW5-DW6 - userData: 0x%x%x\n", cqeAddr->userDataH, cqeAddr->userDataL);
     AscendC::printf(
-        "CQE: DW7-DW10 - rmtEid: [0x%08x, 0x%08x, 0x%08x, 0x%08x]\n", cqeAddr->rmtEid[0], cqeAddr->rmtEid[1],
+        "CQE: DW7-DW10 - rmtEid: [0x%x, 0x%x, 0x%x, 0x%x]\n", cqeAddr->rmtEid[0], cqeAddr->rmtEid[1],
         cqeAddr->rmtEid[2], cqeAddr->rmtEid[3]);
-    AscendC::printf("CQE: DW11-DW12 - data: 0x%08x%08x\n", cqeAddr->dataH, cqeAddr->dataL);
+    AscendC::printf("CQE: DW11-DW12 - data: 0x%x%x\n", cqeAddr->dataH, cqeAddr->dataL);
     AscendC::printf(
-        "CQE: DW13-DW15 - inlineData: [0x%08x, 0x%08x, 0x%08x]\n", cqeAddr->inlineData[0], cqeAddr->inlineData[1],
+        "CQE: DW13-DW15 - inlineData: [0x%x, 0x%x, 0x%x]\n", cqeAddr->inlineData[0], cqeAddr->inlineData[1],
         cqeAddr->inlineData[2]);
 }
 
@@ -385,12 +385,21 @@ ACLSHMEM_DEVICE void assert_qp_params_valid(__gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry
     }
 }
 
+ACLSHMEM_DEVICE void assert_not_self_send(uint32_t pe)
+{
+    if (pe == static_cast<uint32_t>(aclshmem_my_pe())) {
+        AscendC::printf("udma_post_send: pe(%d) == my_pe, self-send not allowed\n", pe);
+        trap();
+    }
+}
+
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
     const aclshmemi_udma_params_t<T, OP_CODE>& params)
 {
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
+    ACLSHMEM_DEBUG_FUNC(assert_not_self_send, pe);
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
     auto wqeSize = 1 << qpCtxEntry->baseBkShift; // basebk_shift
     auto curHardwareHeadAddr = qpCtxEntry->headAddr;

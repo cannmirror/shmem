@@ -107,7 +107,7 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
         /* UDMA */
-        aclshmemx_udma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
+        aclshmemx_udma_get_nbi<char, PIPE_S>(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
             (__ubuf__ char *)nullptr, elem_size, pe);
         aclshmemx_udma_quiet(pe);
     }
@@ -143,7 +143,7 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                           \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                          \
             /* UDMA */                                                                                               \
-            aclshmemx_udma_get_nbi(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                               \
+            aclshmemx_udma_get_nbi<TYPE, PIPE_S>(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                     \
             aclshmemx_udma_quiet(pe);                                                                                \
         }                                                                                                            \
     }
@@ -332,7 +332,7 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
         /* UDMA */
-        aclshmemx_udma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
+        aclshmemx_udma_put_nbi<char, PIPE_S>(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
             (__ubuf__ char *)nullptr, elem_size, pe);
         aclshmemx_udma_quiet(pe);
     }
@@ -368,7 +368,7 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                              \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                             \
             /* UDMA */                                                                                                  \
-            aclshmemx_udma_put_nbi(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                                  \
+            aclshmemx_udma_put_nbi<TYPE, PIPE_S>(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                    \
             aclshmemx_udma_quiet(pe);                                                                                   \
         }                                                                                                               \
     }

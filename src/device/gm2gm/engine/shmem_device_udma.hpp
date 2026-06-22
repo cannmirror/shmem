@@ -234,27 +234,33 @@ ACLSHMEM_DEVICE constexpr uint32_t get_wqe_bb_cnt()
     }
 }
 
-template <typename T, aclshmemi_udma_opcode_t OP_CODE>
-ACLSHMEM_DEVICE void aclshmemi_fill_reduce(__gm__ ACLSHMEMSqeCtx* sqeCtx)
+template <typename T, aclshmemi_udma_opcode_t OP_CODE, typename SQE_PTR>
+ACLSHMEM_DEVICE void aclshmemi_fill_reduce(SQE_PTR sqeCtx)
 {
-    if constexpr (OP_CODE != aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
-        return;
-    }
+    if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
+        static_assert(AscendC::IsSameType<SQE_PTR, __gm__ ACLSHMEMSqeCtx*>::value,
+                      "WRITE_WITH_REDUCE requires SQE in HBM (PIPE_S path); UB-staged SQE not supported");
 
-    sqeCtx->udfType = 0;              // inline reduce
-    sqeCtx->reduceOpcode = 0xa;       // reduce add
-    if constexpr (std::is_same_v<T, float>) {
-        sqeCtx->reduceDataType = 0x7; // fp32
+        sqeCtx->udfType = 0;              // inline reduce
+        sqeCtx->reduceOpcode = 0xa;       // reduce add
+        if constexpr (AscendC::IsSameType<T, float>::value) {
+            sqeCtx->reduceDataType = 0x7; // fp32
+        }
     }
 }
 
-template <typename T, aclshmemi_udma_opcode_t OP_CODE>
+template <typename T, aclshmemi_udma_opcode_t OP_CODE, typename SQE_PTR>
 ACLSHMEM_DEVICE void aclshmemi_fill_notify_data(
-    __gm__ ACLSHMEMSqeCtx* sqeCtx, uint32_t tid, uint32_t tokenValue, const aclshmemi_udma_params_t<T, OP_CODE>& params)
+    SQE_PTR sqeCtx, uint32_t tid, uint32_t tokenValue, const aclshmemi_udma_params_t<T, OP_CODE>& params)
 {
     if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY) {
-        __gm__ ACLSHMEMNotifyCtx* notifyCtx =
-            (__gm__ ACLSHMEMNotifyCtx*)((__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx));
+        // The notify ctx lives immediately after the SQE in the same address space.
+        using NotifyPtr = typename AscendC::Std::conditional<
+            AscendC::IsSameType<SQE_PTR, __ubuf__ ACLSHMEMSqeCtx*>::value, __ubuf__ ACLSHMEMNotifyCtx*,
+            __gm__ ACLSHMEMNotifyCtx*>::type;
+        using BytePtr = typename AscendC::Std::conditional<
+            AscendC::IsSameType<SQE_PTR, __ubuf__ ACLSHMEMSqeCtx*>::value, __ubuf__ uint8_t*, __gm__ uint8_t*>::type;
+        NotifyPtr notifyCtx = (NotifyPtr)((BytePtr)sqeCtx + sizeof(ACLSHMEMSqeCtx));
         notifyCtx->notifyTokenId = tid & 0xFFFFF; // 20 bits
         notifyCtx->notifyTokenValue = tokenValue;
         notifyCtx->notifyAddrL = reinterpret_cast<uint64_t>(params.sig_addr) & 0xFFFFFFFF;
@@ -318,12 +324,14 @@ ACLSHMEM_DEVICE void poll_cq_when_sq_overflow(
     }
 }
 
-template <typename T, aclshmemi_udma_opcode_t OP_CODE>
+template <typename T, aclshmemi_udma_opcode_t OP_CODE, typename SQE_PTR = __gm__ ACLSHMEMSqeCtx*>
 ACLSHMEM_DEVICE void aclshmemi_udma_fill_sqe_ctx(
-    __gm__ ACLSHMEMSqeCtx* sqeCtx, __gm__ uint8_t* remoteAddr, __gm__ ACLSHMEMUBmemInfo* remoteMemInfo,
+    SQE_PTR sqeCtx, __gm__ uint8_t* remoteAddr, __gm__ ACLSHMEMUBmemInfo* remoteMemInfo,
     uint32_t curHead, const aclshmemi_udma_params_t<T, OP_CODE>& params)
 {
-    // Fill SQE control information (reference udma_fill_write_sqe logic)
+    // Fill SQE control information (reference udma_fill_write_sqe logic).
+    // Templated on SQE_PTR so the same fill logic targets either HBM (PIPE_S path)
+    // or UB scratch (PIPE_MTE3 path).
     if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
         sqeCtx->opcode = static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_WRITE);
         // udf_flag = 1 for write with reduce; last 2 bits = 00 (NO, no ordering) for higher throughput.
@@ -440,6 +448,107 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm
     return;
 }
 
+ACLSHMEM_DEVICE void aclshmemi_udma_copy_wqe_from_ub(
+    __gm__ uint8_t* dstGm, AscendC::LocalTensor<uint8_t>& ubLocal, uint32_t copyLen, uint32_t syncId)
+{
+    AscendC::GlobalTensor<uint8_t> gmTensor;
+    gmTensor.SetGlobalBuffer(dstGm);
+    AscendC::DataCopyExtParams copyParams{1, copyLen, 0, 0, 0};
+
+    AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(syncId);
+    AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(syncId);
+    AscendC::DataCopyPad(gmTensor, ubLocal, copyParams);
+    AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(syncId);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(syncId);
+}
+
+// ---- MTE3-staged WQE construction (PIPE_MTE3 path) -------------------------------
+// The PIPE_S path above (aclshmemi_udma_post_send) writes the SQE/SGE directly to HBM
+// via scalar stores + dcci_cachelines. The MTE3 path stages the full WQE block in
+// caller-provided UB scratch and lands it on the SQ ring with a single DataCopyPad.
+// Useful for hot loops where the per-iteration scalar->HBM bursts dominate.
+//
+// MTE3 path only supports UDMA_OP_WRITE / UDMA_OP_WRITE_WITH_NOTIFY / UDMA_OP_READ
+// (the data-mover opcodes). FAA / CAS / WRITE_WITH_REDUCE remain on PIPE_S because
+// their SGE side fills GM-resident AMO data which is incompatible with UB staging.
+template <typename T, aclshmemi_udma_opcode_t OP_CODE>
+ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
+    __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    __ubuf__ uint8_t* ubScratch, uint32_t syncId,
+    const aclshmemi_udma_params_t<T, OP_CODE>& params = {})
+{
+    static_assert(
+        OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE ||
+            OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY ||
+            OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_READ,
+        "PIPE_MTE3 WQE path only supports UDMA_OP_WRITE / UDMA_OP_WRITE_WITH_NOTIFY / UDMA_OP_READ");
+
+    __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
+    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
+    auto wqeSize = 1 << qpCtxEntry->baseBkShift;
+    auto curHardwareHeadAddr = qpCtxEntry->headAddr;
+    uint32_t curHead = ld_dev((__gm__ uint32_t*)(curHardwareHeadAddr), 0);
+    ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
+    auto wqeCntAddr = qpCtxEntry->wqeCntAddr;
+    uint32_t wqeCnt = ld_dev((__gm__ uint32_t*)(wqeCntAddr), 0);
+    poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, pe, qpIdx);
+
+    __gm__ ACLSHMEMUBmemInfo* remoteMemInfo =
+        (__gm__ ACLSHMEMUBmemInfo*)(udmaInfo->memPtr + sizeof(ACLSHMEMUBmemInfo) * pe);
+
+    // Stage WQE (SQE + optional notify + SGE) in caller's UB scratch. Reuse the
+    // address-space-templated fill helper so SQE field assignments are not duplicated.
+    __ubuf__ ACLSHMEMSqeCtx* sqeUb = (__ubuf__ ACLSHMEMSqeCtx*)ubScratch;
+    aclshmemi_udma_fill_sqe_ctx<T, OP_CODE, __ubuf__ ACLSHMEMSqeCtx*>(
+        sqeUb, remoteAddr, remoteMemInfo, curHead, params);
+
+    constexpr size_t sgeOff =
+        (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY)
+            ? sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMNotifyCtx)
+            : sizeof(ACLSHMEMSqeCtx);
+    __ubuf__ ACLSHMEMSgeCtx* sgeUb = (__ubuf__ ACLSHMEMSgeCtx*)((__ubuf__ uint8_t*)ubScratch + sgeOff);
+    // OP_CODE is restricted to non-AMO/non-REDUCE here, so the SGE only needs
+    // len + va. The full FAA/CAS/REDUCE fan-out is intentionally unused in this path.
+    sgeUb->len = messageLen;
+    sgeUb->va = reinterpret_cast<uint64_t>(localAddr);
+
+    // Single-shot DMA UB -> SQ ring entry. The helper uses the same S->MTE3 and
+    // MTE3->S ordering as the RDMA backend before ringing the SQ doorbell.
+    __gm__ ACLSHMEMSqeCtx* sqeGm = aclshmemi_udma_get_sqe_ctx(qpCtxEntry, curHead, wqeSize);
+    constexpr uint32_t wqeBbCnt = get_wqe_bb_cnt<OP_CODE>();
+    AscendC::LocalTensor<uint8_t> ubLocal;
+    ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
+    ubLocal.address_.bufferAddr = reinterpret_cast<uint64_t>(ubScratch);
+    aclshmemi_udma_copy_wqe_from_ub(
+        (__gm__ uint8_t*)sqeGm, ubLocal, static_cast<uint32_t>(wqeSize * wqeBbCnt), syncId);
+
+    curHead += wqeBbCnt;
+    aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
+    wqeCnt++;
+    st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemi_udma_write_mte3(
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    __ubuf__ uint8_t* ubScratch, uint32_t syncId)
+{
+    aclshmemi_udma_post_send_mte3<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE>(
+        reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), pe, qpIdx,
+        messageLen, ubScratch, syncId);
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemi_udma_write_notify_mte3(
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    const aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY>& params,
+    __ubuf__ uint8_t* ubScratch, uint32_t syncId)
+{
+    aclshmemi_udma_post_send_mte3<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY>(
+        reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), pe, qpIdx,
+        messageLen, ubScratch, syncId, params);
+}
+
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write(
     __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen)
@@ -491,20 +600,38 @@ ACLSHMEM_DEVICE void aclshmemi_udma_get_nbi(__gm__ T* dst, __gm__ T* src, uint32
     }
 }
 
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(__gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe)
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    (void)buf;
-    aclshmemi_udma_get_nbi(dst, src, elem_size, pe);
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            auto ptr = aclshmem_ptr(src, pe);
+            // For UDMA_OP_READ, the SQE's "remoteAddr" slot carries the src (remote)
+            // and "localAddr" carries dst (local), matching aclshmemi_udma_read().
+            aclshmemi_udma_post_send_mte3<T, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0,
+                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id);
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemi_udma_get_nbi(dst, src, elem_size, pe);
+        }
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
 }
 
-template <typename T>
+template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(
     const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src, const AscendC::LocalTensor<T>& buf,
-    uint32_t elem_size, int pe)
+    uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    (void)buf;
-    aclshmemi_udma_get_nbi((__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(), elem_size, pe);
+    aclshmemx_udma_get_nbi<T, WQE_PIPE>(
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
+        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, sync_id);
 }
 
 template <typename T>
@@ -518,23 +645,51 @@ ACLSHMEM_DEVICE void aclshmemi_udma_put_nbi(__gm__ T* dst, __gm__ T* src, uint32
     }
 }
 
-template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(__gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe)
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    (void)buf;
-    aclshmemi_udma_put_nbi(dst, src, elem_size, pe);
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            auto ptr = aclshmem_ptr(dst, pe);
+            aclshmemi_udma_write_mte3<T>(
+                (__gm__ T*)ptr, src, static_cast<uint32_t>(pe), 0, elem_size * sizeof(T),
+                reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id);
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemi_udma_put_nbi(dst, src, elem_size, pe);
+        }
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
 }
 
-template <typename T>
+template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src, const AscendC::LocalTensor<T>& buf,
     uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    (void)buf;
-    (void)sync_id;
-    auto dstPhyAddr = (__gm__ T*)dst.GetPhyAddr();
-    auto srcPhyAddr = (__gm__ T*)src.GetPhyAddr();
-    aclshmemi_udma_put_nbi(dstPhyAddr, srcPhyAddr, elem_size, pe);
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+        auto dstPhyAddr = (__gm__ T*)dst.GetPhyAddr();
+        auto srcPhyAddr = (__gm__ T*)src.GetPhyAddr();
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            auto ptr = aclshmem_ptr(dstPhyAddr, pe);
+            aclshmemi_udma_write_mte3<T>(
+                (__gm__ T*)ptr, srcPhyAddr, static_cast<uint32_t>(pe), 0, elem_size * sizeof(T),
+                reinterpret_cast<__ubuf__ uint8_t*>(buf.GetPhyAddr()), sync_id);
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemi_udma_put_nbi(dstPhyAddr, srcPhyAddr, elem_size, pe);
+        }
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
 }
 
 template <typename T>
@@ -553,6 +708,34 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
     }
 }
 
+// Buf-taking overload. PIPE_MTE3 (default) stages the WRITE_WITH_NOTIFY WQE in the
+// caller-provided UB scratch (size one full WQE block; wqe_size * 2 bytes, 256 B is
+// safe for the current SQ basebk_shift). PIPE_S falls through to the no-buf path and
+// ignores buf/sync_id, mirroring the put_nbi(buf) overload's S/MTE3 split.
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
+    __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe,
+    __ubuf__ uint8_t* buf, uint32_t sync_id)
+{
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            auto ptr = aclshmem_ptr(dst, pe);
+            auto sig_addr_dst = aclshmem_ptr(sig_addr, pe);
+            aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY> signal_params{
+                .sig_addr = (__gm__ uint64_t*)(sig_addr_dst), .signal = signal};
+            aclshmemi_udma_write_notify_mte3<T>(
+                (__gm__ T*)ptr, src, static_cast<uint32_t>(pe), 0, elem_size * sizeof(T), signal_params, buf, sync_id);
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemx_udma_put_signal_nbi<T>(dst, src, elem_size, sig_addr, signal, pe);
+        }
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
+}
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE constexpr bool aclshmemi_udma_check_atomic_len()
 {
@@ -606,7 +789,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_add(__gm__ T* dst, T value, int32_t p
         auto ptr = aclshmem_ptr(dst, pe);
         aclshmemi_udma_params_t<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE> atomic_params{
             .value = value, .cond = 0};
-        if constexpr (std::is_same_v<T, float>) { // float使用write with reduce逻辑处理
+        if constexpr (AscendC::IsSameType<T, float>::value) { // float使用write with reduce逻辑处理
             aclshmemi_udma_post_send<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE>(
                 reinterpret_cast<__gm__ uint8_t*>(ptr), nullptr, pe, 0, sizeof(T), atomic_params);
         } else {

@@ -12,8 +12,12 @@
 #include "shmem.h"
 
 constexpr uint64_t INIT_DUMP_SIZE = 200 * 1024 * 1024;
+// PIPE_MTE3 path stages one full WQE block in caller UB; 256 B fits both
+// UDMA_OP_WRITE (1 BB) and UDMA_OP_WRITE_WITH_NOTIFY (2 BB) at the current
+// SQ basebk_shift.
+constexpr uint32_t UDMA_WQE_SCRATCH_BYTES = 256;
 
-// Minimal all-gather implementation using UDMA.
+// Minimal all-gather implementation using UDMA on the default PIPE_MTE3 path.
 extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_all_gather_kernel(
     GM_ADDR gva, GM_ADDR dump, int message_length)
 {
@@ -22,9 +26,9 @@ extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_all_gat
     AscendC::InitDump(false, dump, INIT_DUMP_SIZE);
 #endif
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    // A user-provided LocalTensor of at least 64 bytes is required to submit UDMA tasks.
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UDMA_WQE_SCRATCH_BYTES);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UDMA_WQE_SCRATCH_BYTES, 0);
+    constexpr uint32_t SYNC_ID = 0;
 
     int64_t my_pe = aclshmem_my_pe();
     int64_t pe_size = aclshmem_n_pes();
@@ -35,7 +39,7 @@ extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_all_gat
         }
         aclshmemx_udma_put_nbi(
             gva + message_length * my_pe, gva + message_length * my_pe, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
-            message_length, i);
+            message_length, i, SYNC_ID);
         aclshmemx_udma_quiet(i);
     }
     aclshmemx_barrier_all_vec();
@@ -46,13 +50,18 @@ void launch_udma_all_gather(uint32_t block_dim, void* stream, uint8_t* gva, uint
     udma_all_gather_kernel<<<block_dim, nullptr, stream>>>(gva, dump, elements);
 }
 
-// UDMA put with signal example
+// UDMA put with signal example on the default PIPE_MTE3 path.
 extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_put_signal_kernel(
     GM_ADDR gva, GM_ADDR sig_addr, GM_ADDR dump_addr, int message_length, uint64_t signal)
 {
+    AscendC::TPipe pipe;
 #if ASCENDC_DUMP == 1
     AscendC::InitDump(false, dump_addr, INIT_DUMP_SIZE);
 #endif
+    AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
+    pipe.InitBuffer(buf, UDMA_WQE_SCRATCH_BYTES);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UDMA_WQE_SCRATCH_BYTES, 0);
+    constexpr uint32_t SYNC_ID = 0;
 
     int64_t my_pe = aclshmem_my_pe();
     int64_t pe_size = aclshmem_n_pes();
@@ -66,7 +75,7 @@ extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_put_sig
         auto dst_sig_addr = sig_addr + sizeof(uint64_t) * my_pe;
         aclshmemx_udma_put_signal_nbi(
             gva + message_length * my_pe, gva + message_length * my_pe, message_length, (__gm__ uint64_t*)dst_sig_addr,
-            signal, i);
+            signal, i, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), SYNC_ID);
         aclshmemx_udma_quiet(i);
     }
     aclshmemx_barrier_all_vec();

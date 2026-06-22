@@ -28,7 +28,7 @@ extern "C" __global__ __aicore__ void UDMAGetTest(GM_ADDR gva)
             continue;
         }
         dest_addr = gva + peer * MESSAGE_SIZE;
-        aclshmemx_udma_get_nbi(dest_addr, dest_addr, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), MESSAGE_SIZE, peer);
+        aclshmemx_udma_get_nbi<uint8_t, PIPE_S>(dest_addr, dest_addr, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), MESSAGE_SIZE, peer);
         aclshmemx_udma_quiet(peer);
     }
 }
@@ -54,7 +54,7 @@ extern "C" __global__ __aicore__ void UDMAPutTest(GM_ADDR gva)
             continue;
         }
         src_addr = gva + rank * MESSAGE_SIZE;
-        aclshmemx_udma_put_nbi(src_addr, src_addr, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), MESSAGE_SIZE, peer);
+        aclshmemx_udma_put_nbi<uint8_t, PIPE_S>(src_addr, src_addr, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), MESSAGE_SIZE, peer);
         aclshmemx_udma_quiet(peer);
     }
 }

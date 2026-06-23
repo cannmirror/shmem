@@ -14,6 +14,7 @@
 #include "device/shmem_def.h"
 #include "ub2gm/mte/shmemi_device_mte.h"
 #include "shmemi_device_simt_common.h"
+#include "utils/shmemi_simt_kernel_debug.h"
 
 namespace simt {
 
@@ -29,20 +30,19 @@ __simt_callee__ inline bool is_host_mem_heap(__gm__ void *ptr)
     return (ptr_uint >= base_uint && ptr_uint < end_uint);
 }
 
-__simt_callee__ inline bool assert_remote_ptr_valid(__gm__ void *ptr, uint64_t remote_ptr, int pe)
+__simt_callee__ inline void assert_remote_ptr_valid(__gm__ void *ptr, uint64_t remote_ptr, int pe)
 {
     if (!is_host_mem_heap(ptr)) {
-        return true;
+        return;
     }
     __gm__ aclshmem_device_host_state_simt_t *device_state = aclshmemi_get_state();
     uint64_t host_heap_offset =
         reinterpret_cast<uint64_t>(ptr) - reinterpret_cast<uint64_t>(device_state->host_heap_base);
     uint64_t remote_host_ptr = reinterpret_cast<uint64_t>(((__gm__ uint64_t*)(device_state->p2p_host_heap_base))[pe]) + host_heap_offset;
     if (remote_host_ptr != remote_ptr) {
-        // ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "Host mem remote ptr %ld is invalid, expect: %ld\n", remote_ptr, remote_host_ptr);
-        return false;
+        ACLSHMEM_DEBUG_FUNC(simt::aclshmemi_kernel_abort, "Host mem remote ptr %lu is invalid, expect: %lu\n", remote_ptr, remote_host_ptr);
     }
-    return true;
+    return;
 }
 
 __simt_callee__ inline __gm__ void *aclshmem_ptr(__gm__ void *ptr, int pe)
@@ -53,16 +53,7 @@ __simt_callee__ inline __gm__ void *aclshmem_ptr(__gm__ void *ptr, int pe)
     ptrdiff_t offset = reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(device_state->heap_base);
     // Address translate
     uintptr_t remote_ptr = reinterpret_cast<uintptr_t>(((__gm__ uint64_t*)(device_state->p2p_device_heap_base))[pe]) + offset;
-    
-    {
-        #if defined(ASCENDC_DEBUG) && defined(ASCENDC_DUMP) && (ASCENDC_DUMP == 1) && defined(DEBUG_MODE)
-        // ACLSHMEM_DEBUG_FUNC(assert_remote_ptr_valid, ptr, (uint64_t)remote_ptr, pe);
-        if (assert_remote_ptr_valid(ptr, (uint64_t)remote_ptr, pe)) {
-            return;
-        }
-        #endif
-    }
-
+    ACLSHMEM_DEBUG_FUNC(assert_remote_ptr_valid, ptr, (uint64_t)remote_ptr, pe);
     return reinterpret_cast<__gm__ void *>(remote_ptr);
 }
 

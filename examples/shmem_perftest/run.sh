@@ -15,8 +15,10 @@ PROJECT_ROOT=$(dirname $(dirname "$SCRIPT_DIR"))
 
 # 默认测试类型为put
 TEST_TYPE="put"
+TEST_TYPE_PROVIDED="0"
 # 默认数据类型为float
 DATA_TYPE="float"
+DATA_TYPE_PROVIDED="0"
 # 默认核数范围
 MIN_BLOCK_SIZE="32"
 MAX_BLOCK_SIZE="32"
@@ -32,7 +34,7 @@ UB_SIZE="16"
 MEMORY_TYPE="hbm"
 # 批量提交粒度（仅 BW 路径，当前仅支持 udma_perftest）：0=全异步(默认)，1=同步
 BATCH="0"
-# 默认运行模式: ascendc/shmem/all (all表示全跑)
+# 默认运行模式: ascendc/mte/udma/simt/all (all表示全跑)
 MODE="all"
 # 分析模式: none/plot/md (none表示都不生成, plot表示只生成图, md表示同时生成图和md), 默认none
 ANALYSE_MODE="none"
@@ -51,7 +53,7 @@ function usage() {
     echo "  -d|--datatype <type>      设置数据类型 (float|int8|int16|int32|int64|uint8|uint16|uint32|uint64|char|all)"
     echo "  -b|--block-size <size>          设置核数"
     echo "  --block-range <min> <max>       设置连续核数范围"
-    echo "  --block-list <b1,b2,...>        设置离散核数列表（ascendc/mte_perftest），如 2,4,6,8"
+    echo "  --block-list <b1,b2,...>        设置离散核数列表（ascendc/mte/simt_rma_perftest），如 2,4,6,8"
     echo "  -e|--exponent <exponent>        设置数据量的幂数"
     echo "  --exponent-range <min> <max>    设置数据量的幂数范围"
     echo "  --loop-count <count>            设置循环次数"
@@ -63,7 +65,7 @@ function usage() {
     echo "  -gnpus <num>                   设置NPU数量"
     echo "  -fnpu <id>                     设置首个NPU ID"
     echo "  -fpe <id>                      设置首个PE ID"
-    echo "  -m|--mode <ascendc|mte|udma|all>    设置运行模式 (ascendc=只跑ascendc, mte=只跑mte, udma=只跑udma, all=全跑), 默认all"
+    echo "  -m|--mode <ascendc|mte|udma|simt|all>    设置运行模式 (ascendc=只跑ascendc, mte=只跑mte, udma=只跑udma, simt=只跑simt, all=全跑), 默认all"
     echo "  -a|--analyse <none|plot|md>    设置分析模式 (none=不生成, plot=只生成图, md=同时生成图和md), 默认none"
     exit 1
 }
@@ -77,6 +79,7 @@ while [[ $# -gt 0 ]]; do
         -t|--test-type)
             if [ -n "$2" ]; then
                 TEST_TYPE="$2"
+                TEST_TYPE_PROVIDED="1"
                 shift 2
             else
                 echo "Error: -t|--test-type requires a value."
@@ -86,6 +89,7 @@ while [[ $# -gt 0 ]]; do
         -d|--datatype)
             if [ -n "$2" ]; then
                 DATA_TYPE="$2"
+                DATA_TYPE_PROVIDED="1"
                 shift 2
             else
                 echo "Error: -d|--datatype requires a value."
@@ -257,7 +261,7 @@ if [[ ! " $VALID_MEMORY_TYPES " =~ " $MEMORY_TYPE " ]]; then
 fi
 
 if [ -n "$BLOCK_LIST" ] && [[ "$MODE" == "udma" || "$MODE" == "all" ]]; then
-    echo "WARN: --block-list only takes effect for ascendc/mte_perftest; udma_perftest always uses block_size=1."
+    echo "WARN: --block-list takes effect for ascendc/mte/simt_rma_perftest; udma_perftest always uses block_size=1."
 fi
 
 echo "=============================================="
@@ -295,6 +299,10 @@ fi
 if [[ "$MODE" == "udma" || "$MODE" == "all" ]]; then
     rm -rf "${SCRIPT_DIR}/udma_perftest/output"
     echo "Cleaned: ${SCRIPT_DIR}/udma_perftest/output"
+fi
+if [[ "$MODE" == "simt" || "$MODE" == "all" ]]; then
+    rm -rf "${SCRIPT_DIR}/simt_rma_perftest/output"
+    echo "Cleaned: ${SCRIPT_DIR}/simt_rma_perftest/output"
 fi
 
 # 清理外层output目录
@@ -347,6 +355,41 @@ if [[ "$MODE" == "udma" || "$MODE" == "all" ]]; then
     fi
 fi
 
+if [[ "$MODE" == "simt" || "$MODE" == "all" ]]; then
+    SIMT_VALID_TT="put get none"
+    SIMT_EXEC="${PROJECT_ROOT}/build/bin/simt_rma_perftest"
+    if [[ ! -x "$SIMT_EXEC" ]]; then
+        if [[ "$MODE" == "simt" ]]; then
+            echo "ERROR: simt_rma_perftest binary not found or not executable (${SIMT_EXEC}). Build with SIMT support to run it."
+            exit 1
+        fi
+        echo "WARN: simt_rma_perftest binary not found or not executable (${SIMT_EXEC}). Build with SIMT support to run it. Skipping simt_rma_perftest."
+    elif [[ "$TEST_TYPE_PROVIDED" == "1" && "$TEST_TYPE" == "all" ]]; then
+        echo "WARN: simt_rma_perftest does not support -t all because OP_TYPE is fixed at compile time. Skipping simt_rma_perftest."
+    elif [[ "$TEST_TYPE_PROVIDED" == "1" && ! " $SIMT_VALID_TT " =~ " $TEST_TYPE " ]]; then
+        echo "WARN: simt_rma_perftest does not support -t $TEST_TYPE (supports: $SIMT_VALID_TT). Skipping simt_rma_perftest."
+    elif [[ "$DATA_TYPE_PROVIDED" == "1" && "$DATA_TYPE" == "all" ]]; then
+        echo "WARN: simt_rma_perftest does not support -d all because DATA_SIZE is fixed at compile time. Skipping simt_rma_perftest."
+    else
+        SIMT_ARGS=()
+        if [[ "$TEST_TYPE_PROVIDED" == "1" ]]; then
+            SIMT_ARGS+=("-t" "$TEST_TYPE")
+        fi
+        if [[ "$DATA_TYPE_PROVIDED" == "1" ]]; then
+            SIMT_ARGS+=("-d" "$DATA_TYPE")
+        fi
+        # 核数集合：--block-list（若指定）优先，否则用连续区间。
+        if [ -n "$BLOCK_LIST" ]; then
+            SIMT_ARGS+=("--block-list" "$BLOCK_LIST")
+        else
+            SIMT_ARGS+=("--block-range" "$MIN_BLOCK_SIZE" "$MAX_BLOCK_SIZE")
+        fi
+        echo -e "\n========== Running simt_rma_perftest =========="
+        echo "Command: bash ${SCRIPT_DIR}/simt_rma_perftest/run.sh ${SIMT_ARGS[*]} --exponent-range \"$MIN_EXPONENT\" \"$MAX_EXPONENT\" --loop-count \"$LOOP_COUNT\" -pes \"$PE_SIZE\" -ipport \"$IPPORT\" -gnpus \"$GNPU_NUM\" -fnpu \"$FIRST_NPU\" -fpe \"$FIRST_PE\" --ub-size \"$UB_SIZE\""
+        bash "${SCRIPT_DIR}/simt_rma_perftest/run.sh" "${SIMT_ARGS[@]}" --exponent-range "$MIN_EXPONENT" "$MAX_EXPONENT" --loop-count "$LOOP_COUNT" -pes "$PE_SIZE" -ipport "$IPPORT" -gnpus "$GNPU_NUM" -fnpu "$FIRST_NPU" -fpe "$FIRST_PE" --ub-size "$UB_SIZE"
+    fi
+fi
+
 # 拷贝output到外层output目录
 echo -e "\n========== Copying outputs =========="
 mkdir -p "${SCRIPT_DIR}/output"
@@ -372,6 +415,14 @@ if [[ "$MODE" == "udma" || "$MODE" == "all" ]]; then
         mkdir -p "${SCRIPT_DIR}/output/udma_perftest"
         cp -r "${SCRIPT_DIR}/udma_perftest/output"/* "${SCRIPT_DIR}/output/udma_perftest/"
         echo "Copied: udma_perftest -> ${SCRIPT_DIR}/output/udma_perftest"
+    fi
+fi
+
+if [[ "$MODE" == "simt" || "$MODE" == "all" ]]; then
+    if [ -d "${SCRIPT_DIR}/simt_rma_perftest/output" ]; then
+        mkdir -p "${SCRIPT_DIR}/output/simt_rma_perftest"
+        cp -r "${SCRIPT_DIR}/simt_rma_perftest/output"/* "${SCRIPT_DIR}/output/simt_rma_perftest/"
+        echo "Copied: simt_rma_perftest -> ${SCRIPT_DIR}/output/simt_rma_perftest"
     fi
 fi
 

@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 #include "kernel_operator.h"
 #include "shmem.h"
 #include "team_allgather_kernel.h"
@@ -32,4 +32,45 @@ extern "C" __global__ __aicore__ void device_team_all_gather_test(uint64_t confi
 void team_allgather(uint32_t block_dim, void* stream, uint64_t config, uint8_t* gva, aclshmem_team_t team_id)
 {
     device_team_all_gather_test<<<block_dim, nullptr, stream>>>(config, gva, (int)team_id);
+}
+
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+static __aicore__ void allgather_put_world(__gm__ int32_t *gva_gm)
+{
+    int64_t my_pe = aclshmem_my_pe();
+    int64_t npes = aclshmem_n_pes();
+    for (int i = 0; i < npes - 1; ++i) {
+        int64_t dst_rank = (my_pe + 1 + i) % npes;
+        aclshmem_int32_put_nbi(gva_gm + 16 * my_pe, gva_gm + 16 * my_pe, 16, dst_rank);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+    }
+}
+
+static __aicore__ void allgather_sync(bool use_relay)
+{
+    if (use_relay) {
+        aclshmemx_sync_all_vec_relay();
+    } else {
+        aclshmemx_barrier_all_vec();
+    }
+}
+#endif
+
+extern "C" __global__ __aicore__ void allgather_put_sync(uint64_t config, GM_ADDR gva, int iters, int use_relay)
+{
+    util_set_ffts_config(config);
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+    __gm__ int32_t *gva_gm = reinterpret_cast<__gm__ int32_t *>(gva);
+    const bool relay = (use_relay != 0);
+    for (int iter = 0; iter < iters; ++iter) {
+        allgather_put_world(gva_gm);
+        allgather_sync(relay);
+    }
+#endif
+}
+
+void allgather_put_sync_do(void *stream, uint64_t config, uint8_t *gva, int iters, int use_relay)
+{
+    allgather_put_sync<<<16, nullptr, stream>>>(config, gva, iters, use_relay);
 }

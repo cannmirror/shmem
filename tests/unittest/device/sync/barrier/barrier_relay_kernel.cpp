@@ -16,7 +16,7 @@ extern "C" ACLSHMEM_GLOBAL void relay_put_barrier_perf(uint64_t config, GM_ADDR 
 {
     util_set_ffts_config(config);
 
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     __gm__ int32_t *slots = reinterpret_cast<__gm__ int32_t *>(slots_addr);
     int32_t my_pe = aclshmem_my_pe();
     (void)rank_id;
@@ -38,7 +38,7 @@ extern "C" ACLSHMEM_GLOBAL void relay_put_barrier_perf(uint64_t config, GM_ADDR 
 extern "C" ACLSHMEM_GLOBAL void barrier_perf_v3(uint64_t config, int iters)
 {
     util_set_ffts_config(config);
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     for (int i = 0; i < iters; ++i) {
         aclshmemx_barrier_all_vec();
     }
@@ -48,7 +48,7 @@ extern "C" ACLSHMEM_GLOBAL void barrier_perf_v3(uint64_t config, int iters)
 extern "C" ACLSHMEM_GLOBAL void barrier_perf_relay(uint64_t config, int iters)
 {
     util_set_ffts_config(config);
-#ifdef __DAV_C220_VEC__
+#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     for (int i = 0; i < iters; ++i) {
         aclshmemx_sync_all_vec_relay();
     }

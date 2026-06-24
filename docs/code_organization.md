@@ -70,20 +70,12 @@ include/
 ```
 └── examples
     ├── allgather                              // allgather通信算子样例
-    ├── allgather_matmul                       // allgather+matmul融合算子样例
-    ├── allgather_matmul_padding               // 含padding的allgather+matmul融合算子样例
-    ├── allgather_matmul_with_gather_result    // 融合allgather并保留gather的matmul样例
     ├── cmo                                    // cmo缓存性能样例
     ├── combine                                // moe combine样例
     ├── dispatch                               // moe dispatch样例
-    ├── dispatch_gmm_combine                   // gmm分派与结果合并样例
-    ├── dynamic_tiling                         // 动态分块实现样例
     ├── hccs_sio_link                          // hccs/sio链路测试样例
     ├── init                                   // shmem初始化流程样例
     ├── kv_shuffle                             // kv cache shuffle样例
-    ├── matmul_allreduce                       // matmul+allreduce融合算子样例
-    ├── matmul_reduce_scatter                  // matmul+reduce_scatter融合算子样例
-    ├── matmul_reduce_scatter_padding          // 含padding的matmul+reduce_scatter融合算子样例
     ├── multi_instance                         // 多实例样例
     ├── notifywait                             // sdma notify/wait同步样例
     ├── python_extension                       // Python扩展与torch调用样例

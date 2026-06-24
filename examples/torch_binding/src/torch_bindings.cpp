@@ -242,99 +242,6 @@ private:
     uint32_t BLOCK_NUM_LARGE_DATA = 16;
 };
 
-class AllGatherMatmul : public torch::jit::CustomClassHolder {
-public:
-    // 默认构造函数
-    AllGatherMatmul() : name_("ShmemAllGatherMatmul"), count_(0), fftsAddr_(util_get_ffts_config()), sync_ptr_(nullptr)
-    {
-        int64_t sync_size = (204 * 1024 * 1024) * sizeof(fp16_t);
-        sync_ptr_ = aclshmem_malloc(sync_size);
-        aclrtMemset(sync_ptr_, sync_size, 0, sync_size);
-    }
-
-    ~AllGatherMatmul()
-    {
-        aclshmem_free(sync_ptr_);
-    }
-
-    std::string get_name() const
-    {
-        return name_;
-    }
-    
-    void compute(const at::Tensor &c_tensor,
-                 const at::Tensor &a_tensor,
-                 const at::Tensor &b_tensor)
-    {
-        TORCH_CHECK(a_tensor.dtype() == b_tensor.dtype() && b_tensor.dtype() == c_tensor.dtype(),
-                "Compute Error: Input/Weight/Output dtype mismatch! \n",
-                "A dtype:  ", a_tensor.dtype().name(), "\n",
-                "B dtype:  ", b_tensor.dtype().name(), "\n",
-                "C dtype:  ", c_tensor.dtype().name());
-
-        TORCH_CHECK(a_tensor.device() == b_tensor.device() && b_tensor.device() == c_tensor.device(),
-                    "Compute Error: Input/Weight/Output device mismatch! \n",
-                    "A device:  ", a_tensor.device(), "\n",
-                    "B device:  ", b_tensor.device(), "\n",
-                    "C device:  ", c_tensor.device());
-
-        TORCH_CHECK(a_tensor.device().type() == c10::DeviceType::PrivateUse1,  // PrivateUse1对应NPU
-                    "Compute Error: Only NPU device is supported! Current device: ", a_tensor.device().type());
-
-        TORCH_CHECK(a_tensor.dim() == 2, "A tensor must be 2D! Current dim: ", a_tensor.dim());
-        int64_t m = a_tensor.size(0);
-        int64_t k = a_tensor.size(1);
-
-        TORCH_CHECK(b_tensor.dim() == 2, "B tensor must be 2D! Current dim: ", b_tensor.dim());
-        TORCH_CHECK(b_tensor.size(0) == k, "A/K mismatch! A.size(1)=", k, ", B.size(0)=", b_tensor.size(0));
-        int64_t n = b_tensor.size(1);
-
-        int32_t n_pes = aclshmem_n_pes();
-        int64_t expected_c_rows = n_pes * m;
-        TORCH_CHECK(c_tensor.dim() == 2 && c_tensor.size(0) == expected_c_rows && c_tensor.size(1) == n,
-                    "Compute Error: C tensor shape mismatch! \n",
-                    "Expected shape: (", expected_c_rows, ",", n, "), Current shape: (", c_tensor.size(0), ",", c_tensor.size(1), ")");
-
-        at::Tensor a_contig = a_tensor.contiguous();
-        at::Tensor b_contig = b_tensor.contiguous();
-        at::Tensor c_contig = c_tensor.contiguous();
-
-        void* aDevice = const_cast<void*>(a_contig.storage().data());
-        void* bDevice = const_cast<void*>(b_contig.storage().data());
-        void* cDevice = const_cast<void*>(c_contig.storage().data());
-
-        int64_t a_elements = a_contig.numel();
-        int elem_byte = a_contig.element_size();
-        size_t total_bytes = (size_t)a_elements * elem_byte;
-        int n_blocks = BLOCK_NUM;
-
-        aclrtStream stream = c10_npu::getCurrentNPUStream().stream(false);
-        count_++;
-
-        ShmemKernel::aclshmem_allgather_matmul(
-            n_blocks, 
-            stream, 
-            fftsAddr_, 
-            aDevice, 
-            bDevice, 
-            cDevice, 
-            sync_ptr_, 
-            m, 
-            n, 
-            k
-        );
-    }
-
-
-private:
-    std::string name_;
-    int32_t count_;
-    uint64_t fftsAddr_;
-    void* sync_ptr_;
-
-    uint32_t BLOCK_NUM = 20;
-};
-
 }  // namespace ShmemOps
 
 
@@ -342,4 +249,3 @@ private:
 REGISTER_SHMEM_OPS_CLASS(Manager, attr_init, finalize, malloc_tensor, free_tensor, malloc_like, get_name);
 REGISTER_SHMEM_OPS_CLASS(KVShuffle, compute, get_name);
 REGISTER_SHMEM_OPS_CLASS(AllGather, compute, get_name);
-REGISTER_SHMEM_OPS_CLASS(AllGatherMatmul, compute, get_name);

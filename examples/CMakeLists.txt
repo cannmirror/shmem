@@ -26,7 +26,6 @@ set(ACLSHMEM_ALL_KERNEL_TARGETS "" CACHE INTERNAL "All collective kernel shared 
 set(PYEXPAND_SUPPORTED_TORCH
     kv_shuffle
     allgather
-    allgather_matmul
 )
 
 if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
@@ -50,7 +49,6 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
             ${PROJECT_SOURCE_DIR}/src/device_simt/
@@ -80,7 +78,6 @@ function(aclshmem_add_fusion_example NAME)
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
             ${PROJECT_SOURCE_DIR}/src/device_simt/
@@ -95,11 +92,6 @@ function(aclshmem_add_fusion_example NAME)
         target_link_libraries(${NAME}_kernel PRIVATE shmem)
         target_compile_options(${NAME}_kernel PRIVATE ${MPI_CXX_COMPILE_FLAGS})
         
-        if(${NAME} STREQUAL "dispatch_gmm_combine")
-            target_compile_options(${NAME}_kernel PRIVATE --cce-auto-sync)
-            target_include_directories(${NAME}_kernel PRIVATE ${PROJECT_SOURCE_DIR}/examples/${NAME}/include)
-        endif()
-
         list(APPEND ACLSHMEM_ALL_KERNEL_TARGETS ${NAME}_kernel)
         set(ACLSHMEM_ALL_KERNEL_TARGETS ${ACLSHMEM_ALL_KERNEL_TARGETS} CACHE INTERNAL "Update kernel targets")
         install(TARGETS ${NAME}_kernel
@@ -136,7 +128,6 @@ function(aclshmem_add_collective_example NAME)
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${PROJECT_SOURCE_DIR}/examples/templates/include
             ${PROJECT_SOURCE_DIR}/examples/utils
             ${PROJECT_SOURCE_DIR}/src/device/
             ${PROJECT_SOURCE_DIR}/src/device_simt/
@@ -159,32 +150,13 @@ function(aclshmem_add_collective_example NAME)
 
 endfunction()
 
-set(ACLSHMEM_CATLASS_FUSION_EXAMPLES
-    allgather_matmul
-    allgather_matmul_with_gather_result
-    allgather_matmul_padding
-    dispatch_gmm_combine
-    matmul_allreduce
-    matmul_reduce_scatter
-    matmul_reduce_scatter_padding
-    dynamic_tiling
-)
-
 foreach(EXAMPLE
     combine
     dispatch
     kv_shuffle
     aclgraph_demo
     allgather
-    allgather_matmul
-    allgather_matmul_with_gather_result
-    allgather_matmul_padding
-    dispatch_gmm_combine
-    matmul_allreduce
-    matmul_reduce_scatter
-    matmul_reduce_scatter_padding
     multi_instance
-    dynamic_tiling
     rma_d2h_demo
     sdma
     notifywait
@@ -193,10 +165,6 @@ foreach(EXAMPLE
     udma_demo
     udma_atomic_add
 )
-    if(SOC_TYPE STREQUAL "Ascend950" AND ${EXAMPLE} IN_LIST ACLSHMEM_CATLASS_FUSION_EXAMPLES)
-        message(STATUS "Skip example '${EXAMPLE}' on Ascend950 (catlass not yet supported)")
-        continue()
-    endif()
     add_subdirectory(${EXAMPLE})
 endforeach()
 

@@ -55,8 +55,13 @@ BS、PEs、expertPerPe 可配置
 
 在仓库根目录执行：
 
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh -examples
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950 -examples
 ```
 
 ## 运行

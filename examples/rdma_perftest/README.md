@@ -3,8 +3,13 @@
 
 ## 使用方式
 1.在shmem/目录编译:
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh -enable_rdma -examples
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -examples
 ```
 2.直接在`examples/rdma_perftest`目录下执行`bash run.sh`；或者在shmem/目录运行:
 - 单机2卡执行命令

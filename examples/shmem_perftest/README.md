@@ -4,7 +4,7 @@
 
 shmem_perftest是用于测试AscendC::DataCopy、shmem MTE/UDMA引擎以及SIMT RMA接口性能的参数化测试示例集合，包含四个子示例：
 
-- **ascendc_perftest**：测试AscendC::DataCopy性能
+- **ascendc_perftest**：测试AscendC::DataCopy性能（不支持Ascend950）
 - **mte_perftest**：测试shmem MTE引擎性能
 - **udma_perftest**：测试shmem UDMA低阶接口性能（仅Ascend950）
 - **simt_rma_perftest**：测试SIMT RMA gm2gm接口性能（仅Ascend950，需开启SIMT支持编译）
@@ -28,7 +28,10 @@ pip install pandas matplotlib seaborn numpy tabulate
 ```bash
 # 编译示例
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# Ascend910B/C 平台
 bash scripts/build.sh -examples
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples
 
 # 如需运行 simt_rma_perftest，需启用SIMT支持并指定Ascend950
 bash scripts/build.sh -examples -enable_simt -soc_type Ascend950
@@ -71,8 +74,8 @@ bash run.sh -m all -t put -d float -fpe 0 -a md
 
 ### 运行模式
 
-- **all（默认）**：依次运行ascendc_perftest、mte_perftest、udma_perftest、simt_rma_perftest（udma/simt仅在Ascend950上有效；simt未编译时会跳过）
-- **ascendc**：只运行ascendc_perftest
+- **all（默认）**：依次运行ascendc_perftest（不支持Ascend950，950上运行会报错）、mte_perftest、udma_perftest（udma仅在Ascend950上有效）
+- **ascendc**：只运行ascendc_perftest（不支持Ascend950，950上运行会报错）
 - **mte**：只运行mte_perftest
 - **udma**：只运行udma_perftest
 - **simt**：只运行simt_rma_perftest

@@ -1,5 +1,7 @@
 # 双平面 MoE Dispatch 示例
 
+> **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
+
 本示例实现非量化 MoE dispatch 的双平面版本。它保持与 `examples/dispatch/dispatch_classic` 相同的外部语义和输出格式，但在 payload 传输上同时启用 MTE 与 SDMA，根据 segment 大小自适应选择传输路径。
 
 双平面路径依赖 SHMEM SDMA 能力。SDMA 功能要求 CANN 9.0.0 及以上版本的尝鲜版环境，并需要安装匹配硬件平台的 toolkit 和 ops-legacy 软件包。基础安装和独立 SDMA demo 可参考 `examples/sdma/README.md`。

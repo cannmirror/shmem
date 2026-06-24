@@ -47,7 +47,10 @@ mte_perftest是一个用于**测试shmem MTE（Memory Transfer Engine）性能**
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# Ascend910B/C 平台
 bash scripts/build.sh -examples
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples
 
 # 如需运行 --memory-type dram，需启用CANN模式编译
 bash scripts/build.sh -examples -cann

@@ -1,4 +1,6 @@
 # NotifyWait机制使用说明
+> **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
+
 ## 环境要求和准备
 SDMA功能在9.0.0及以上版本（尝鲜版）新增支持。需要下载并安装以下cann和ops软件包：
 - toolkit包（[CANN master obp镜像网站](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/)）

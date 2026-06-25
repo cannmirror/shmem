@@ -1,3 +1,4 @@
+> **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 ## 环境要求
 同[rdma_demo](../../rdma_demo/README.md)中的环境要求。
 

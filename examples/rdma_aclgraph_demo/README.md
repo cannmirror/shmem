@@ -1,3 +1,4 @@
+> **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 ## 示例场景
 aclGraph图结构如下：
 ![image.png](https://raw.gitcode.com/user-images/assets/8546182/091ff732-56c0-431e-be32-21ab6f725de4/image.png 'image.png')
@@ -5,7 +6,7 @@ aclGraph图结构如下：
 
 ## 环境要求
 
-- 运行本示例需要机器具备RDMA环境（RDMA网卡及驱动已正确安装配置）。
+- 同[rdma_demo](../rdma_demo/README.md)中的环境要求。
 
 ### 检查RDMA环境
 ```bash

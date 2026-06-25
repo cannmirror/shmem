@@ -2,8 +2,13 @@
 
 1. **编译项目**  
    在 `shmem/` 根目录下执行编译脚本：
+   - Ascend910B/C 平台:
    ```bash
    bash scripts/build.sh -examples
+   ```
+   - Ascend950 平台:
+   ```bash
+   bash scripts/build.sh -soc_type Ascend950 -examples
    ```
 
 2. **运行KV_Shuffle示例程序**  

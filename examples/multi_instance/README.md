@@ -5,8 +5,13 @@
 使用方式:
 
 1. 在shmem/目录编译:
-```
+- Ascend910B/C 平台:
+```bash
 bash scripts/build.sh -examples
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950 -examples
 ```
 2. 在shmem/examples/multi_instance目录执行demo:
 ```

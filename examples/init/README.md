@@ -13,8 +13,14 @@ export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
 
 在 `shmem/` 根目录下执行编译脚本：
 
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh
+source install/set_env.sh
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950
 source install/set_env.sh
 ```
 

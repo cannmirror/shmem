@@ -172,7 +172,7 @@ int32_t ret = aclshmemx_set_conf_store_tls(false, NULL, 0);
 
 ### 5.2 样例执行
 
-以 `matmul_allreduce` 为例，验证核心功能： 
+以 `allgather` 为例，验证核心功能：
 
 1.在shmem/目录编译:
 
@@ -180,10 +180,10 @@ int32_t ret = aclshmemx_set_conf_store_tls(false, NULL, 0);
 bash scripts/build.sh -examples
 ```
 
-2.在shmem/examples/matmul_allreduce目录执行demo:
+2.在shmem/examples/allgather目录执行demo:
 
 ```sh
-bash scripts/run.sh -ranks 2 -M 1024 -K 2048 -N 8192
+bash run.sh -pes 2 -type int
 ```
 注：example及其他样例代码仅供参考，在生产环境中请谨慎使用。
 
@@ -309,7 +309,7 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, attributes);
 ## 9 测试框架
 - **单元测试：** 覆盖核心接口（初始化、内存操作、同步等），位于 `tests/unittest/`
 
-- **算子泛化性测试：** 针对 `matmul_allreduce` 等样例，支持动态生成测试数据与精度校验
+- **算子泛化性测试：** 针对通算融合算子样例，支持动态生成测试数据与精度校验
 
 ### 9.1 运行单元测试
 

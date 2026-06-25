@@ -4,7 +4,7 @@
 
 mte_perftest是用于测试AscendC::DataCopy和shmem MTE（Memory Transfer Engine）性能的参数化测试示例集合，包含两个子示例：
 
-- **ascendc_perftest**：测试AscendC::DataCopy性能
+- **ascendc_perftest**：测试AscendC::DataCopy性能（不支持Ascend950）
 - **shmem_perftest**：测试shmem MTE性能
 
 该示例可以帮助用户对比两种数据传输方式的性能表现。**该脚本测试结果仅做参考，性能以实际场景为准**
@@ -26,7 +26,10 @@ pip install pandas matplotlib seaborn numpy tabulate
 ```bash
 # 编译示例
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# Ascend910B/C 平台
 bash scripts/build.sh -examples
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples
 
 # 如需运行 --memory-type dram，需启用CANN模式编译
 bash scripts/build.sh -examples -cann
@@ -66,7 +69,7 @@ bash run.sh -m all -t put -d float -fpe 0 -a md
 ### 运行模式
 
 - **all（默认）**：同时运行ascendc_perftest和shmem_perftest
-- **ascendc**：只运行ascendc_perftest
+- **ascendc**：只运行ascendc_perftest（不支持Ascend950，950上运行会报错）
 - **shmem**：只运行shmem_perftest
 
 ### DRAM内存测试约束

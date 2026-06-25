@@ -28,8 +28,6 @@ template <class T>
 void aclshmem_allgather(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input, void *output, void *gva,
                     int elements, int magic);
 
-void aclshmem_allgather_matmul(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *aDevice, void *bDevice, void *cDevice, void *gmSymmetric, uint32_t m, uint32_t n, uint32_t k);
-
 }
 
 #endif // ACLSHMEM_TORCH_KERNEL_H

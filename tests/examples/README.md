@@ -10,8 +10,8 @@ tests/examples/
 ├── utils.py # 通用工具函数（动态误差计算等）
 ├── np_uniform_generator.py # 均匀分布随机数生成器
 ├── np_normal_generator.py # 正态分布随机数生成器
-├── matmul_allreduce/
-│ ├── test_fusion_matmul_allreduce.py # matmul_allreduce 内核的 pytest 测试脚本
+├── <kernel_name>/
+│ ├── test_<kernel_name>.py # 指定内核的 pytest 测试脚本
 │ └── test_data/ # 持久化的测试数据缓存目录
 ├── readme.md # 本文档
 └── ... # 其他内核的测试目录
@@ -24,7 +24,7 @@ tests/examples/
 
 ## 3. 核心逻辑
 
-测试脚本 (`test_fusion_matmul_allreduce.py`) 的执行流程如下：
+测试脚本 (`test_<kernel_name>.py`) 的执行流程如下：
 
 ### 3.1. 测试用例生成
 -   **参数组合与分类**: `get_test_cases` 函数会生成两类测试用例：
@@ -60,15 +60,15 @@ tests/examples/
         -   对真值中绝对值小于 `1.0` 的部分，进行 **绝对误差** 比较 (`|act - gt| <= err`)。
 
 ## 4. 如何运行测试
-1.  **编译核函数**: 确保目标核函数的 C++ 可执行文件已经编译。例如，对于 `matmul_allreduce`，需要先执行：
+1.  **编译核函数**: 确保目标核函数的 C++ 可执行文件已经编译。例如，对于 `<kernel_name>`，需要先执行：
     ```bash
-    bash examples/matmul_allreduce/scripts/build.sh
+    bash examples/<kernel_name>/scripts/build.sh
     ```
-2.  **设置可执行文件路径**: 在 `test_fusion_matmul_allreduce.py` 脚本的顶部，确认 `EXECUTABLE_PATH` 变量指向了正确的 C++ 可执行文件路径。
+2.  **设置可执行文件路径**: 在 `test_<kernel_name>.py` 脚本的顶部，确认 `EXECUTABLE_PATH` 变量指向了正确的 C++ 可执行文件路径。
 3.  **运行 Pytest**: 在项目根目录下，直接运行 `pytest` 命令。
     ```bash
     export LD_LIBRARY_PATH=<path_to_aclshmem_lib>:$LD_LIBRARY_PATH
-    pytest -sv tests/examples/matmul_allreduce/
+    pytest -sv tests/examples/<kernel_name>/
     ```
     *请将 `<path_to_...>` 替换为实际的库路径。*
 
@@ -81,7 +81,7 @@ tests/examples/
 要为新的内核（例如 `allgather`）添加测试，可以遵循以下步骤：
 1.  在 `tests/examples/` 目录下创建一个新的子目录，例如 `allgather`。
 2.  在该目录中创建一个新的测试脚本，例如 `test_allgather.py`。
-3.  参考 `test_matmul_allreduce.py` 的结构，实现新内核的测试逻辑：
+3.  参考 `test_<kernel_name>.py` 的结构，实现新内核的测试逻辑：
     -   实现数据生成逻辑（可复用 `NP*Generator` 或创建新的生成器）和真值计算。
     -   实现调用 C++ 内核的辅助函数。
     -   实现结果验证逻辑，可复用 `get_rtol` 和双重标准验证方法。

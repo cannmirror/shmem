@@ -4,7 +4,10 @@
 在shmem根目录执行以下命令：
 ```sh
 # 编译example算子用例及其torch扩展
+# Ascend910B/C 平台
 bash scripts/build.sh -python_example
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -python_example
 source install/set_env.sh
 cd examples/python_extension/torch_test
 python xxx.py # 默认拉起八卡用例
@@ -25,7 +28,10 @@ python xxx.py --pes 2 # --pes可以指定卡数，拉起两卡用例
 如需使用内存检测工具（mssanitizer），需要：
 1. **编译时添加编译选项**：
    ```sh
+   # Ascend910B/C 平台
    bash scripts/build.sh -python_example -mssanitizer
+   # Ascend950 平台
+   bash scripts/build.sh -soc_type Ascend950 -python_example -mssanitizer
    ```
 
 2. **运行时使用 mssanitizer 拉起**：

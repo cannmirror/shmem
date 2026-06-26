@@ -41,9 +41,9 @@ function(aclshmem_add_fusion_example NAME)
         if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
             target_compile_definitions(${NAME} PRIVATE ENABLE_ASCENDC_DUMP ASCENDC_DUMP=1 ASCENDC_DEBUG)
         endif()
-        
+
         target_compile_options(${NAME} PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
-        target_include_directories(${NAME} PRIVATE 
+        target_include_directories(${NAME} PRIVATE
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
@@ -70,9 +70,9 @@ function(aclshmem_add_fusion_example NAME)
         if(DEFINED ENABLE_ASCENDC_DUMP AND ENABLE_ASCENDC_DUMP)
             target_compile_definitions(${NAME}_kernel PRIVATE ENABLE_ASCENDC_DUMP ASCENDC_DUMP=1 ASCENDC_DEBUG)
         endif()
-        
+
         target_compile_options(${NAME}_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220 ${SANITIZER_FLAGS})
-        target_include_directories(${NAME}_kernel PRIVATE 
+        target_include_directories(${NAME}_kernel PRIVATE
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
@@ -103,7 +103,7 @@ endfunction()
 function(aclshmem_add_collective_example NAME)
     add_library(${NAME}_kernel SHARED ${NAME}_kernel.cpp)
     target_compile_options(${NAME}_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH_VEC} ${SANITIZER_FLAGS})
-    target_include_directories(${NAME}_kernel PRIVATE 
+    target_include_directories(${NAME}_kernel PRIVATE
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
         ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
@@ -123,7 +123,7 @@ function(aclshmem_add_collective_example NAME)
     if(USE_EXAMPLES)
         add_executable(${NAME} main.cpp)
         target_compile_options(${NAME} PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
-        target_include_directories(${NAME} PRIVATE 
+        target_include_directories(${NAME} PRIVATE
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_SOURCE_DIR}/3rdparty/catlass/examples/common
             ${PROJECT_SOURCE_DIR}/examples/${NAME}
@@ -185,7 +185,7 @@ endif()
 
 if(ACLSHMEM_RDMA_SUPPORT)
     foreach(EXAMPLE
-        rdma_perftest
+        rdma_perftest_demo
         rdma_demo
         rdma_aclgraph_demo
         rdma_handlewait_test/unuse_handlewait

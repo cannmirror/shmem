@@ -8,14 +8,5 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-if (USE_EXAMPLES)
-    add_subdirectory(ascendc_perftest)
-    add_subdirectory(mte_perftest)
-    add_subdirectory(udma_perftest)
-    if (ACLSHMEM_RDMA_SUPPORT)
-        add_subdirectory(rdma_perftest)
-    endif()
-    if (ACLSHMEM_SIMT_SUPPORT)
-        add_subdirectory(simt_rma_perftest)
-    endif()
-endif()
+aclshmem_add_collective_example(rdma_perftest)
+target_include_directories(rdma_perftest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)

@@ -11,13 +11,13 @@ bash scripts/build.sh -enable_rdma -examples
 ```bash
 bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -examples
 ```
-2.直接在`examples/rdma_perftest`目录下执行`bash run.sh`；或者在shmem/目录运行:
+2.直接在`examples/rdma_perftest_demo`目录下执行`bash run.sh`；或者在shmem/目录运行:
 - 单机2卡执行命令
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
-    ./build/bin/rdma_perftest 2 0 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 # PE 0
-    ./build/bin/rdma_perftest 2 1 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 # PE 1
+    ./build/bin/rdma_perftest_demo 2 0 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 # PE 0
+    ./build/bin/rdma_perftest_demo 2 1 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 # PE 1
     ```
     > 注：\<shmem-root-directory\>为SHMEM项目的根目录。
 - 跨机2卡执行命令
@@ -27,19 +27,19 @@ bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -exa
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
-    ./build/bin/rdma_perftest 2 0 tcp://ip1:8765 1 0 0 highlevel_put_pingpong_latency 64 # PE 0
+    ./build/bin/rdma_perftest_demo 2 0 tcp://ip1:8765 1 0 0 highlevel_put_pingpong_latency 64 # PE 0
     ```
     同时，在机器B执行如下命令：
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
-    ./build/bin/rdma_perftest 2 1 tcp://ip1:8765 1 1 0 highlevel_put_pingpong_latency 64 # PE 1
+    ./build/bin/rdma_perftest_demo 2 1 tcp://ip1:8765 1 1 0 highlevel_put_pingpong_latency 64 # PE 1
     ```
     > 注：\<shmem-root-directory\>为SHMEM项目的根目录。
 
 3.命令行参数说明
 ```bash
-    ./rdma_perftest <n_pes> <pe_id> <ipport> <g_npus> <f_pe> <f_npu> <test_type> <msg_len>
+    ./rdma_perftest_demo <n_pes> <pe_id> <ipport> <g_npus> <f_pe> <f_npu> <test_type> <msg_len>
 ```
 - n_pes: 全局PE数量，只支持2个PE。
 - pe_id: 当前进程的PE号。

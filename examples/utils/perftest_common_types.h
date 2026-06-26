@@ -36,12 +36,7 @@ typedef enum {
     TEST_MODE_GM2UB_REMOTE
 } ascendc_mode_t;
 
-typedef enum {
-    TEST_MODE_MTE_PUT,
-    TEST_MODE_BI_PUT,
-    TEST_MODE_MTE_GET,
-    TEST_MODE_BI_GET
-} mte_mode_t;
+typedef enum { TEST_MODE_MTE_PUT, TEST_MODE_BI_PUT, TEST_MODE_MTE_GET, TEST_MODE_BI_GET } mte_mode_t;
 
 typedef enum {
     TEST_MODE_UDMA_PUT,
@@ -52,9 +47,14 @@ typedef enum {
 } udma_mode_t;
 
 typedef enum {
-    PERF_METRIC_BW,
-    PERF_METRIC_LAT
-} perf_metric_t;
+    TEST_MODE_RDMA_PUT,
+    TEST_MODE_RDMA_BI_PUT,
+    TEST_MODE_RDMA_GET,
+    TEST_MODE_RDMA_BI_GET,
+    TEST_MODE_RDMA_INVALID
+} rdma_mode_t;
+
+typedef enum { PERF_METRIC_BW, PERF_METRIC_LAT, PERF_METRIC_INVALID } perf_metric_t;
 
 } // namespace perftest
 

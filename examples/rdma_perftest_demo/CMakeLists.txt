@@ -1,4 +1,3 @@
-#!/bin/bash
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2025 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
@@ -9,29 +8,4 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-project_root="$(cd ${script_dir}/../../ && pwd)"
-export PROJECT_ROOT=${project_root}
-export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
-
-export SHMEM_UID_SESSION_ID=127.0.0.1:8899
-cd $PROJECT_ROOT
-pids=()
-./build/bin/rdma_perftest 2 0 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 & # pe 0
-pid=$!
-pids+=("$pid")
-
-./build/bin/rdma_perftest 2 1 tcp://127.0.0.1:8899 2 0 0 highlevel_put_pingpong_latency 64 & # pe 1
-pid=$!
-pids+=("$pid")
-
-ret=0
-for pid in ${pids[@]}; do
-    wait $pid
-    r=$?
-    if [[ $r -ne 0 ]]; then
-        ret=$r
-    fi
-    echo "wait $pid finished"
-done
-exit $ret
+aclshmem_add_collective_example(rdma_perftest_demo)

@@ -82,7 +82,7 @@ include/
     ├── rdma_aclgraph_demo                     // aclgraph 中调用RDMA allgather样例
     ├── rdma_demo                              // rdma实现样例
     ├── rdma_handlewait_test                   // rdma handle wait测试样例
-    ├── rdma_perftest                          // rdma性能测试样例
+    ├── rdma_perftest_demo                     // rdma性能测试样例
     ├── rma_d2h_demo                           // device访问host内存rma样例
     ├── sdma                                   // sdma实现样例
     ├── simt_rma                               // simt 连续内存访问样例

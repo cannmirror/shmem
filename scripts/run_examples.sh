@@ -20,7 +20,7 @@ function run_allgather()
 {
     echo "begin run allgather"
     if [[ ! -f ${BUILD_DIR}/bin/allgather ]]; then
-        echo "allgather build output doest exist. Execute 'script/build.sh -examples' first"
+        echo "allgather build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
@@ -34,7 +34,7 @@ function run_kv_shuffle()
 {
     echo "begin run kv_shuffle"
     if [[ ! -f ${BUILD_DIR}/bin/kv_shuffle ]]; then
-        echo "kv_shuffle build output doest exist. Execute 'script/build.sh -examples' first"
+        echo "kv_shuffle build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
@@ -48,7 +48,7 @@ function run_rdma_demo()
 {
     echo "begin run rdma_demo"
     if [[ ! -f ${BUILD_DIR}/bin/rdma_demo ]]; then
-        echo "rdma_demo build output doest exist. Execute 'script/build.sh -examples' first"
+        echo "rdma_demo build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
@@ -62,7 +62,7 @@ function run_unuse_handlewait()
 {
     echo "begin run unuse_handlewait"
     if [[ ! -f ${BUILD_DIR}/bin/unuse_handlewait ]]; then
-        echo "unuse_handlewait build output doest exist. Execute 'script/build.sh -examples' first"
+        echo "unuse_handlewait build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
@@ -76,7 +76,7 @@ function run_use_handlewait()
 {
     echo "begin run use_handlewait"
     if [[ ! -f ${BUILD_DIR}/bin/use_handlewait ]]; then
-        echo "use_handlewait build output doest exist. Execute 'script/build.sh -examples' first"
+        echo "use_handlewait build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
@@ -86,15 +86,15 @@ function run_use_handlewait()
     return $?
 }
 
-function run_rdma_perftest()
+function run_rdma_perftest_demo()
 {
-    echo "begin run rdma_perftest"
-    if [[ ! -f ${BUILD_DIR}/bin/rdma_perftest ]]; then
-        echo "rdma_perftest build output doest exist. Execute 'script/build.sh -examples' first"
+    echo "begin run rdma_perftest_demo"
+    if [[ ! -f ${BUILD_DIR}/bin/rdma_perftest_demo ]]; then
+        echo "rdma_perftest_demo build output doesn't exist. Execute 'script/build.sh -examples' first"
         return 1
     fi
 
-    cur_dir=${EXAMPLES_DIR}/rdma_perftest/
+    cur_dir=${EXAMPLES_DIR}/rdma_perftest_demo/
     cd ${cur_dir}
     bash run.sh
     return $?
@@ -116,7 +116,7 @@ function run_all()
     # run_rdma_demo || return 11
     # run_unuse_handlewait || return 12
     # run_use_handlewait || return 13
-    # run_rdma_perftest || return 14
+    # run_rdma_perftest_demo || return 14
     #run_python_extesion || return 15
     return 0
 }
@@ -142,8 +142,8 @@ function main()
         use_handlewait)     # not ready
             run_use_handlewait || return 13
             ;;
-        rdma_perftest)  # not ready
-            run_rdma_perftest || return 14
+        rdma_perftest_demo)  # not ready
+            run_rdma_perftest_demo || return 14
             ;;
         python_extension)
             run_python_extesion || return 15

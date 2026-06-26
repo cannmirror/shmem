@@ -14,7 +14,9 @@
 constexpr uint32_t MAGIC_VAL = 10;
 constexpr uint32_t WARMUP_MESSAGE_LENGTH = 32;
 
-extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highlevel_put_pingpong_latency(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_highlevel_put_pingpong_latency(
+    uint64_t fftsConfig, GM_ADDR gva, int message_length)
+{
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -33,13 +35,15 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highleve
     if (rank == 0) {
         peer = 1;
         aclshmem_uint8_put_nbi(warm_addr, warm_addr, WARMUP_MESSAGE_LENGTH, peer);
-        while (*(__gm__ uint32_t*)(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1)) != peer + MAGIC_VAL) {
+        while (*(__gm__ uint32_t*)(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1)) !=
+               peer + MAGIC_VAL) {
             dcci_cachelines(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1), sizeof(uint32_t));
             AscendC::GetSystemCycle();
         }
     } else {
         peer = 0;
-        while (*(__gm__ uint32_t*)(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1)) != peer + MAGIC_VAL) {
+        while (*(__gm__ uint32_t*)(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1)) !=
+               peer + MAGIC_VAL) {
             dcci_cachelines(gva + rank_size * message_length + WARMUP_MESSAGE_LENGTH * (peer + 1), sizeof(uint32_t));
             AscendC::GetSystemCycle();
         }
@@ -72,11 +76,15 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highleve
     }
 }
 
-void rdma_highlevel_put_pingpong_latency_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length) {
+void rdma_highlevel_put_pingpong_latency_do(
+    uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length)
+{
     rdma_highlevel_put_pingpong_latency<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_postsend_cost(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_postsend_cost(
+    uint64_t fftsConfig, GM_ADDR gva, int message_length)
+{
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -85,7 +93,8 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_postsend
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
     pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
     AscendC::LocalTensor<uint32_t> ubLocal32 = buf.GetWithOffset<uint32_t>(UB_ALIGN_SIZE / sizeof(uint32_t), 0);
-    AscendC::LocalTensor<uint64_t> ubLocal64 = buf.GetWithOffset<uint64_t>(UB_ALIGN_SIZE / sizeof(uint64_t), UB_ALIGN_SIZE);
+    AscendC::LocalTensor<uint64_t> ubLocal64 =
+        buf.GetWithOffset<uint64_t>(UB_ALIGN_SIZE / sizeof(uint64_t), UB_ALIGN_SIZE);
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();
@@ -93,7 +102,7 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_postsend
 
     // Actual test
     GM_ADDR src_addr = gva + rank * message_length;
-    
+
     if (rank == 0) {
         peer = 1;
         GM_ADDR dest_addr = (GM_ADDR)(aclshmem_roce_ptr(src_addr, peer));
@@ -107,11 +116,14 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_postsend
     }
 }
 
-void rdma_postsend_cost_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length) {
+void rdma_postsend_cost_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length)
+{
     rdma_postsend_cost<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highlevel_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length) {
+extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_highlevel_put_bw(
+    uint64_t fftsConfig, GM_ADDR gva, int message_length)
+{
     util_set_ffts_config(fftsConfig);
     if (AscendC::GetSubBlockIdx() != 0) {
         return;
@@ -153,11 +165,14 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_highleve
     }
 }
 
-void rdma_highlevel_put_bw_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length) {
+void rdma_highlevel_put_bw_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length)
+{
     rdma_highlevel_put_bw<<<1, nullptr, stream>>>(fftsConfig, gva, message_length);
 }
 
-extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_bw(uint64_t fftsConfig, GM_ADDR gva, int message_length, int64_t iter) {
+extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_mte_put_bw(
+    uint64_t fftsConfig, GM_ADDR gva, int message_length, int64_t iter)
+{
     util_set_ffts_config(fftsConfig);
     AscendC::LocalTensor<uint32_t> ubLocal;
     ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
@@ -175,10 +190,13 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_
             peer = 1;
             int64_t start = AscendC::GetSystemCycle();
             for (int i = 0; i < 10000; i++) {
-                aclshmemx_roce_put_nbi(src_addr, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), message_length, peer, 0);
+                aclshmemx_roce_put_nbi(
+                    src_addr, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), message_length, peer, 0);
             }
             aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
-            aclshmemx_roce_put_nbi(gva + rank_size * message_length * 2 + 8, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), sizeof(int64_t), peer, 0);
+            aclshmemx_roce_put_nbi(
+                gva + rank_size * message_length * 2 + 8, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+                sizeof(int64_t), peer, 0);
             while (*(__gm__ int64_t*)(gva + message_length * rank_size * 2 + 16) != peer + MAGIC_VAL + iter) {
                 dcci_cachelines(gva + message_length * rank_size * 2 + 16, 8);
                 AscendC::GetSystemCycle();
@@ -193,11 +211,13 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_
                 AscendC::GetSystemCycle();
             }
             AscendC::PipeBarrier<PIPE_ALL>();
-            aclshmemx_roce_put_nbi(gva + rank_size * message_length * 2 + 16, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), sizeof(int64_t), peer, 0);
+            aclshmemx_roce_put_nbi(
+                gva + rank_size * message_length * 2 + 16, src_addr, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+                sizeof(int64_t), peer, 0);
         }
     } else { // core 1, MTE
         GM_ADDR src_addr = gva + (rank + rank_size) * message_length;
-        __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+        __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();
         /* CopyUB Config Set */
         uint64_t copy_ub = device_state->mte_config.aclshmem_ub;
         uint32_t copy_ub_size = device_state->mte_config.ub_size;
@@ -206,10 +226,14 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_
             peer = 1;
             int64_t start = AscendC::GetSystemCycle();
             for (int i = 0; i < 10000; i++) {
-                aclshmemx_mte_put_nbi(src_addr, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub), copy_ub_size, message_length, peer, copy_event_id);
+                aclshmemx_mte_put_nbi(
+                    src_addr, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub), copy_ub_size, message_length,
+                    peer, copy_event_id);
             }
             AscendC::PipeBarrier<PIPE_ALL>();
-            aclshmemx_mte_put_nbi(gva + rank_size * message_length * 2 + 24, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub), copy_ub_size, sizeof(uint32_t), peer, copy_event_id);
+            aclshmemx_mte_put_nbi(
+                gva + rank_size * message_length * 2 + 24, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub),
+                copy_ub_size, sizeof(uint32_t), peer, copy_event_id);
             while (*(__gm__ uint32_t*)(gva + message_length * rank_size * 2 + 32) != peer + MAGIC_VAL + iter) {
                 dcci_cachelines(gva + message_length * rank_size * 2 + 32, 8);
                 AscendC::GetSystemCycle();
@@ -224,11 +248,15 @@ extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void rdma_mte_put_
                 AscendC::GetSystemCycle();
             }
             AscendC::PipeBarrier<PIPE_ALL>();
-            aclshmemx_mte_put_nbi(gva + rank_size * message_length * 2 + 32, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub), copy_ub_size, sizeof(uint32_t), peer, copy_event_id);
+            aclshmemx_mte_put_nbi(
+                gva + rank_size * message_length * 2 + 32, src_addr, reinterpret_cast<__ubuf__ uint8_t*>(copy_ub),
+                copy_ub_size, sizeof(uint32_t), peer, copy_event_id);
         }
     }
 }
 
-void rdma_mte_put_bw_do(uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length, int64_t iter) {
+void rdma_mte_put_bw_do(
+    uint32_t block_dim, void* stream, uint64_t fftsConfig, uint8_t* gva, int message_length, int64_t iter)
+{
     rdma_mte_put_bw<<<2, nullptr, stream>>>(fftsConfig, gva, message_length, iter);
 }

@@ -38,6 +38,8 @@ class MemSegment {
 public:
     static MemSegmentPtr Create(const MemSegmentOptions &options, int entityId);
 
+    static Result GetDeviceInfo(uint32_t &sdId, uint32_t &serverId, uint32_t &superPodId);
+
 public:
     explicit MemSegment(const MemSegmentOptions &options, int eid) : options_{options}, entityId_{eid} {}
     virtual ~MemSegment() = default;

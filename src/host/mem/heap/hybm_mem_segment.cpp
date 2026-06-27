@@ -11,7 +11,6 @@
 #include "dl_api.h"
 #include "dl_acl_api.h"
 #include "shmemi_net_util.h"
-#include "hybm_device_mem_segment.h"
 #include "host/shmem_host_def.h"
 #include "hybm_device_mem_segment.h"
 #include "hybm_vmm_based_segment.h"
@@ -64,6 +63,20 @@ MemSegmentPtr MemSegment::Create(const MemSegmentOptions &options, int entityId)
             SHM_LOG_ERROR("Invalid memory seg type " << int(options.segType));
     }
     return tmpSeg;
+}
+
+Result MemSegment::GetDeviceInfo(uint32_t &sdId, uint32_t &serverId, uint32_t &superPodId)
+{
+    auto ret = MemSegment::InitDeviceInfo();
+    if (ret != ACLSHMEM_SUCCESS) {
+        SHM_LOG_ERROR("MemSegment::InitDeviceInfo failed: " << ret);
+        return ret;
+    }
+
+    sdId = sdid_;
+    serverId = serverId_;
+    superPodId = superPodId_;
+    return ACLSHMEM_SUCCESS;
 }
 
 bool MemSegment::CheckSdmaReaches(uint32_t rankId) const noexcept

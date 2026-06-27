@@ -204,6 +204,60 @@ message(STATUS "ACLSHMEM_SIMT_SUPPORT:${ACLSHMEM_SIMT_SUPPORT}")
 option(ACLSHMEM_UDMA_SUPPORT "ACLSHMEM_UDMA_SUPPORT" OFF)
 message(STATUS "ACLSHMEM_UDMA_SUPPORT:${ACLSHMEM_UDMA_SUPPORT}")
 
+if(ACLSHMEM_UDMA_SUPPORT)
+    set(ACLSHMEM_HCOMM_CHECK_INCLUDES
+        ${ASCEND_HOME_PATH}/include
+        ${ASCEND_HOME_PATH}/pkg_inc
+        ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/include
+        ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/include/hcomm
+    )
+    set(ACLSHMEM_HCOMM_CHECK_LINK_DIRS
+        ${ASCEND_HOME_PATH}/lib64
+        ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/lib64
+    )
+
+    file(WRITE ${CMAKE_BINARY_DIR}/check_hcomm_udma_symbol.cpp "
+#include <hcomm/hcomm_res.h>
+#include <hcomm/hcomm_res_entity_defs.h>
+int main() {
+    EndpointDesc endpointDesc{};
+
+    EndpointHandle endpointHandle = nullptr;
+    HcommEndpointCreate(&endpointDesc, &endpointHandle);
+    HcommEndpointDestroy(endpointHandle);
+
+    CommMem commMem{};
+    HcommMemHandle memHandle = nullptr;
+    HcommMemReg(endpointHandle, \"aclshmem_udma\", &commMem, &memHandle);
+    HcommMemUnreg(endpointHandle, memHandle);
+
+    HcommChannelDesc channelDesc{};
+    ChannelHandle channelHandle = 0;
+    HcommChannelCreate(endpointHandle, COMM_ENGINE_AIV, &channelDesc, 1, &channelHandle);
+    HcommChannelDestroy(&channelHandle, 1);
+    return 0;
+}")
+
+    try_compile(HAS_ACLSHMEM_UDMA_HCOMM_API
+        ${CMAKE_BINARY_DIR}
+        ${CMAKE_BINARY_DIR}/check_hcomm_udma_symbol.cpp
+        LINK_LIBRARIES hcomm
+        CMAKE_FLAGS
+            "-DINCLUDE_DIRECTORIES=${ACLSHMEM_HCOMM_CHECK_INCLUDES}"
+            "-DLINK_DIRECTORIES=${ACLSHMEM_HCOMM_CHECK_LINK_DIRS}"
+        OUTPUT_VARIABLE HCOMM_UDMA_COMPILE_OUTPUT
+    )
+
+    file(REMOVE ${CMAKE_BINARY_DIR}/check_hcomm_udma_symbol.cpp)
+
+    if(HAS_ACLSHMEM_UDMA_HCOMM_API)
+        message(STATUS "Required Hcomm UDMA APIs found, keeping ACLSHMEM_UDMA_SUPPORT enabled")
+    else()
+        message(STATUS "Required Hcomm UDMA APIs not found, disabling ACLSHMEM_UDMA_SUPPORT")
+        set(ACLSHMEM_UDMA_SUPPORT OFF CACHE BOOL "ACLSHMEM_UDMA_SUPPORT" FORCE)
+    endif()
+endif()
+
 option(PYEXPAND_EXAMPLE "PYEXPAND_EXAMPLE" OFF)
 message(STATUS "PYEXPAND_EXAMPLE:${PYEXPAND_EXAMPLE}")
 
@@ -269,6 +323,7 @@ include_directories(
     ${ASCEND_HOME_PATH}/include/experiment/msprof
 
     ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/include/
+    ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/include/hcomm
 
     # adapt to CANN eco package
     ${ASCEND_HOME_PATH}/${CMAKE_SYSTEM_PROCESSOR}-linux/pkg_inc/

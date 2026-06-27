@@ -81,8 +81,7 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uin
     __gm__ ACLSHMEMUDMACqCtx* cqCtxEntry =
         (__gm__ ACLSHMEMUDMACqCtx*)(udmaInfo->scqPtr + (pe * qpNum + qpIdx) * sizeof(ACLSHMEMUDMACqCtx));
     auto cqBaseAddr = cqCtxEntry->bufAddr;
-    auto bbShift = cqCtxEntry->baseBkShift;
-    auto cqeSize = 1 << bbShift;
+    auto cqeSize = cqCtxEntry->cqeSize;
     auto curHardwareTailAddr = cqCtxEntry->tailAddr;
     uint32_t curTail = ld_dev((__gm__ uint32_t*)(curHardwareTailAddr), 0);
     while (curTail != idx) {
@@ -409,7 +408,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     ACLSHMEM_DEBUG_FUNC(assert_not_self_send, pe);
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
-    auto wqeSize = 1 << qpCtxEntry->baseBkShift; // basebk_shift
+    auto wqeSize = qpCtxEntry->wqeSize;
     auto curHardwareHeadAddr = qpCtxEntry->headAddr;
     uint32_t curHead = ld_dev((__gm__ uint32_t*)(curHardwareHeadAddr), 0);
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
@@ -485,7 +484,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
 
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
-    auto wqeSize = 1 << qpCtxEntry->baseBkShift;
+    auto wqeSize = qpCtxEntry->wqeSize;
     auto curHardwareHeadAddr = qpCtxEntry->headAddr;
     uint32_t curHead = ld_dev((__gm__ uint32_t*)(curHardwareHeadAddr), 0);
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
@@ -526,6 +525,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeGm, (uint32_t)sizeof(T));
 }
 
 template <typename T>

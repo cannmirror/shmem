@@ -13,8 +13,8 @@
 namespace shm {
 
 // Qp constant
-constexpr uint32_t UDMA_CQ_DEPTH_DEFAULT = 16384;
-constexpr uint32_t UDMA_SQ_DEPTH_DEFAULT = 4096;
+constexpr uint32_t UDMA_CQ_DEPTH_DEFAULT = 32768;
+constexpr uint32_t UDMA_SQ_DEPTH_DEFAULT = 8192;
 constexpr uint32_t UDMA_RQ_DEPTH_DEFAULT = 256;
 constexpr uint32_t UDMA_MAX_SQE_BB_NUM = 4;
 constexpr uint32_t UDMA_SQ_BASKBLK_CNT = UDMA_SQ_DEPTH_DEFAULT * UDMA_MAX_SQE_BB_NUM;

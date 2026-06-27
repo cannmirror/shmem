@@ -58,7 +58,7 @@ enum class ACLSHMEMUDMADBMode : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
 struct ACLSHMEMUDMAWQCtx {
     uint32_t wqn;         // work queue number
     uint64_t bufAddr;     // start address of ring buffer
-    uint32_t baseBkShift; // log2(size of each WQE)
+    uint32_t wqeSize;     // size in bytes of each WQE
     uint32_t depth;       // depth of ring buffer
     uint64_t headAddr;    // work queue head (Producer Index) address
     uint64_t tailAddr;    // work queue tail (Consumer Index) address
@@ -72,7 +72,7 @@ struct ACLSHMEMUDMAWQCtx {
 struct ACLSHMEMUDMACqCtx {
     uint32_t cqn;         // completion queue number
     uint64_t bufAddr;     // start address of ring buffer
-    uint32_t baseBkShift; // log2(size of each CQE)
+    uint32_t cqeSize;     // size in bytes of each CQE
     uint32_t depth;       // depth of ring buffer
     uint64_t headAddr;    // work queue head (Producer Index) address
     uint64_t tailAddr;    // work queue tail (Consumer Index) address

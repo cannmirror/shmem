@@ -87,6 +87,3 @@ Server Index : 4
 
 1. **通过 Redfish 接口修改**
    - 参考文档：[Redfish 接口修改文档](https://support.huawei.com/enterprise/zh/doc/EDOC1100401665/1f8efb4e?idPath=23710424|251366513|22892968|252309113|261207247)
-
-2. **通过 Computing Toolkit 修改**
-   - 参考文档：[Computing Toolkit 修改文档](https://support.huawei.com/enterprise/zh/doc/EDOC1100526238/df7e6eda?idPath=23710424|251366513|22892968|252309113|258915853)

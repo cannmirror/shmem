@@ -124,7 +124,7 @@ int test_aclshmem_all_gather(int pe_id, int n_pes)
         }
         status = aclrtSynchronizeStream(stream);
 
-        aclshmemx_show_prof(nullptr, true);
+        aclshmemx_get_prof(nullptr, true);
 
         // Result Check
         T *output_host;

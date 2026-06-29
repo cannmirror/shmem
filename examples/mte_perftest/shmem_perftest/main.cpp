@@ -152,7 +152,7 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
             }
             std::cout << "" << std::endl;
 
-            aclshmemx_show_prof(&out_profs, false);
+            aclshmemx_get_prof(&out_profs, false);
             collect_prof_data_to_csv(out_profs, frame_id, block_size, datasize, g_npus, ub_size_kb, csv_data);
 
             aclshmemx_free(dst_ptr, memory_type);
@@ -169,7 +169,7 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
             break;
         }
     }
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
 
     status = aclshmem_finalize();
     status = aclrtDestroyStream(stream);

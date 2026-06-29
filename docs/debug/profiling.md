@@ -51,7 +51,7 @@ Profiling工具核心特性：
             }
             status = aclrtSynchronizeStream(stream);
 
-    +        aclshmemx_show_prof(nullptr, true);
+    +        aclshmemx_get_prof(nullptr, true);
     +
             // Result Check
             T *output_host;

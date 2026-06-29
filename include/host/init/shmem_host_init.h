@@ -67,12 +67,39 @@ ACLSHMEM_HOST_API int aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags,
 #define shmem_init_attr aclshmemx_init_attr
 
 /**
- * @brief Release all resources used by the ACLSHMEM library.
+ * @brief Release all resources used by the CURRENT instance of the ACLSHMEM library.
+ *
+ *        Single-instance mode: finalizes instance 0, behaving identically to the
+ *        legacy no-argument API.
+ *
+ *        Multi-instance mode: finalizes the instance currently active, i.e. the one
+ *        most recently selected via aclshmemx_instance_ctx_set (or instance 0 if no
+ *        instance has been set). To release a specific instance with this API, call
+ *        aclshmemx_instance_ctx_set(instance_id) first, then call this function.
+ *        After finalization, if the destroyed instance was non-zero, the context
+ *        falls back to instance 0.
+ *
+ *        For multi-instance scenarios it is recommended to use aclshmemx_finalize
+ *        directly, which releases a specific instance by id without an explicit
+ *        context switch.
  *
  * @return Returns 0 on success or an error code on failure
  */
-ACLSHMEM_HOST_API int aclshmem_finalize(uint64_t instance_id = 0);
+ACLSHMEM_HOST_API int aclshmem_finalize(void);
 #define shmem_finalize aclshmem_finalize
+
+/**
+ * @brief Release resources of a SPECIFIC instance (multi-instance extension).
+ *        Switches to the target instance context first (if it is not already
+ *        active), then finalizes it. After finalization, if the destroyed
+ *        instance was non-zero, the context falls back to instance 0.
+ *        Recommended for multi-instance scenarios.
+ *
+ * @param instance_id the unique identifier of the instance to finalize.
+ * @return Returns 0 on success or an error code on failure
+ */
+ACLSHMEM_HOST_API int aclshmemx_finalize(uint64_t instance_id);
+#define shmemx_finalize aclshmemx_finalize
 
 
 /**

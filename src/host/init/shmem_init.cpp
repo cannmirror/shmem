@@ -522,11 +522,15 @@ int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_ini
     return ACLSHMEM_SUCCESS;
 }
 
-int32_t aclshmem_finalize(uint64_t instance_id)
+static int32_t aclshmemi_finalize_impl(uint64_t instance_id)
 {
-    std::lock_guard<std::mutex> lock(g_aclshmem_ctx_mutex);
-    // When aclshmem_finalize, first set context; otherwise we will finalize unknown instance
-    aclshmemx_instance_ctx_set_impl(instance_id);
+    // Only switch context when finalizing a non-active instance; finalizing the
+    // currently active instance needs no switch (globals already hold its state).
+    // set_impl also validates that instance_id exists, preventing accidental
+    // release of the active instance when an unknown id is passed.
+    if (instance_id != g_instance_ctx->id) {
+        ACLSHMEM_CHECK_RET(aclshmemx_instance_ctx_set_impl(instance_id));
+    }
 
     SHM_LOG_INFO("The instance : " << instance_id << ", The pe: " << aclshmem_my_pe() << " begins to finalize.");
     if (init_manager == nullptr) {
@@ -574,6 +578,20 @@ int32_t aclshmem_finalize(uint64_t instance_id)
     g_state.is_aclshmem_initialized = false;
     ACLSHMEM_CHECK_RET(aclshmemi_instance_ctx_destroy(instance_id));
     return ACLSHMEM_SUCCESS;
+}
+
+int32_t aclshmemx_finalize(uint64_t instance_id)
+{
+    SHM_LOG_INFO("aclshmemx_finalize called with instance_id=" << instance_id);
+    std::lock_guard<std::mutex> lock(g_aclshmem_ctx_mutex);
+    return aclshmemi_finalize_impl(instance_id);
+}
+
+int32_t aclshmem_finalize(void)
+{
+    SHM_LOG_INFO("aclshmem_finalize called.");
+    std::lock_guard<std::mutex> lock(g_aclshmem_ctx_mutex);
+    return aclshmemi_finalize_impl(g_instance_ctx->id);
 }
 
 void aclshmem_info_get_version(int* major, int* minor)

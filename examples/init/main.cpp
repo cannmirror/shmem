@@ -186,7 +186,7 @@ int uid_multi_instance_create(int pe_id, std::vector<int> &dev_list, uint64_t in
 int uid_multi_instance_destroy(int pe_id, std::vector<int> &dev_list, uint64_t instance_id) {
     int status = 0;
     if (std::find(dev_list.begin(), dev_list.end(), pe_id) != dev_list.end()) {
-        status = aclshmem_finalize(instance_id);
+        status = aclshmemx_finalize(instance_id);
         if (status == ACLSHMEM_SUCCESS) {
             std::cout << "pe " << pe_id << ": shmem finalize instance "<< instance_id << " init SUCCESS" << std::endl;
         }

@@ -79,7 +79,11 @@ bash scripts/build.sh -mssanitizer
 ```sh
 mssanitizer -- application parameter1 parameter2 ...
 ```
-如果需要更详细的工具能力可参考[mssanitizer内存检测工具](https://www.hiascend.com/document/detail/zh/mindstudio/830/ODtools/Operatordevelopmenttools/atlasopdev_16_0039.html)按如下格式控制参数
+执行如下命令，可以在开启竞争检测前提下，额外开启卡间竞争检测功能：
+```sh
+mssanitizer --tool=racecheck --check-cross-npu-races=yes application
+```
+如果需要更详细的工具能力可参考[MindStudio Sanitizer 使用指南](https://gitcode.com/Ascend/mssanitizer/blob/master/docs/zh/user_guide/mssanitizer_user_guide.md)按如下格式控制参数
 ```sh
 mssanitizer <options> -- <user_program> <user_options> 
 ```

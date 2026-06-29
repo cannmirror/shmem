@@ -183,8 +183,8 @@ CSV文件包含以下字段：
 本示例使用`SHMEMI_PROF_START/END`宏进行性能数据采集：
 
 - **采集PE**: 通过环境变量`SHMEM_CYCLE_PROF_PE`指定，默认为0
-- **最大记录核数**: `ACLSHMEM_CYCLE_PROF_MAX_BLOCK`（32核）
-- **最大记录帧数**: `ACLSHMEM_CYCLE_PROF_FRAME_CNT`（32帧）
+- **最大记录核数**: `ACLSHMEM_CYCLE_PROF_MAX_BLOCK`（64核）
+- **最大记录帧数**: `ACLSHMEM_CYCLE_PROF_FRAME_CNT`（1024帧）
 
 只有环境变量指定的PE会输出CSV文件，其他PE的数据不会被采集。
 
@@ -198,8 +198,8 @@ CSV文件包含以下字段：
 2. **数据量计算**: 测试数据量的计算方式为：`2^exponent` 字节
 
 3. **参数范围**: 
-   - 核数范围超过`ACLSHMEM_CYCLE_PROF_MAX_BLOCK`（32核）不做记录
-   - 帧数不能超过`ACLSHMEM_CYCLE_PROF_FRAME_CNT`（32帧）
+   - 核数范围超过`ACLSHMEM_CYCLE_PROF_MAX_BLOCK`（64核）不做记录
+   - 帧数不能超过`ACLSHMEM_CYCLE_PROF_FRAME_CNT`（1024帧）
 
 4. **内存要求**: 大数据量测试需要足够的设备内存
 
@@ -223,15 +223,15 @@ CSV文件包含以下字段：
 
 3. **frame_id超过最大值**
    ```
-   警告: frame_id 超过最大值 32, 停止测试
+   警告: frame_id 超过最大值 1024, 停止测试
    ```
-   解决方案：减小测试范围，确保测试帧数不超过32。
+   解决方案：减小测试范围，确保测试帧数不超过1024。
    
    测试帧数计算公式：
    ```
    测试帧数 = (max_block_size - min_block_size + 1) × (max_exponent - min_exponent + 1)
    ```
    
-   例如：`--block-range 16 32 --exponent-range 10 20` 的测试帧数为：
+   例如：`--block-range 1 64 --exponent-range 10 30` 的测试帧数为：
    ```
-   (32 - 16 + 1) × (20 - 10 + 1) = 17 × 11 = 187 > 32（超出限制）
+   (64 - 1 + 1) × (30 - 10 + 1) = 64 × 21 = 1344 > 1024（超出限制）

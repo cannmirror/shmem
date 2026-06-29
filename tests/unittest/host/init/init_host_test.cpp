@@ -391,7 +391,7 @@ void test_aclshmem_multi_instance_single(int rank_id, int n_ranks, uint64_t loca
     if (joined) {
         EXPECT_EQ(aclshmemx_init_status(), ACLSHMEM_STATUS_IS_INITIALIZED);
         EXPECT_EQ(attr.instance_id, INSTANCE_ID);
-        EXPECT_EQ(aclshmem_finalize(attr.instance_id), ACLSHMEM_SUCCESS);
+        EXPECT_EQ(aclshmemx_finalize(attr.instance_id), ACLSHMEM_SUCCESS);
     }
 
     EXPECT_EQ(aclrtResetDevice(device_id), 0);
@@ -423,7 +423,7 @@ void test_aclshmem_multi_instance_malloc(int rank_id, int n_ranks, uint64_t loca
         EXPECT_EQ(aclrtMemcpy(ptr, 1024, host_buf.data(), 1024, ACL_MEMCPY_HOST_TO_DEVICE), 0);
         aclshmem_free(ptr);
 
-        EXPECT_EQ(aclshmem_finalize(attr.instance_id), ACLSHMEM_SUCCESS);
+        EXPECT_EQ(aclshmemx_finalize(attr.instance_id), ACLSHMEM_SUCCESS);
     }
 
     EXPECT_EQ(aclrtResetDevice(device_id), 0);
@@ -473,7 +473,7 @@ void test_aclshmem_multi_instance_overlap(int rank_id, int n_ranks, uint64_t loc
         void *ptr = aclshmem_malloc(1024);
         EXPECT_NE(ptr, nullptr);
         aclshmem_free(ptr);
-        EXPECT_EQ(aclshmem_finalize(inst2_attr.instance_id), ACLSHMEM_SUCCESS);
+        EXPECT_EQ(aclshmemx_finalize(inst2_attr.instance_id), ACLSHMEM_SUCCESS);
     }
 
     if (joined4) {
@@ -484,7 +484,7 @@ void test_aclshmem_multi_instance_overlap(int rank_id, int n_ranks, uint64_t loc
         void *ptr = aclshmem_malloc(1024);
         EXPECT_NE(ptr, nullptr);
         aclshmem_free(ptr);
-        EXPECT_EQ(aclshmem_finalize(inst4_attr.instance_id), ACLSHMEM_SUCCESS);
+        EXPECT_EQ(aclshmemx_finalize(inst4_attr.instance_id), ACLSHMEM_SUCCESS);
     }
 
     EXPECT_EQ(aclrtResetDevice(device_id), 0);
@@ -736,4 +736,155 @@ TEST(TestInitAPI, TestShmemMultiInstanceInvalidId)
     const int process_count = test_gnpu_num;
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     test_mutil_task(test_aclshmem_multi_instance_invalid_id, local_mem_size, process_count);
+}
+
+void test_aclshmemx_finalize_active(int rank_id, int n_ranks, uint64_t local_mem_size)
+{
+    uint32_t device_id = rank_id % test_gnpu_num + test_first_npu;
+    EXPECT_EQ(aclInit(nullptr), 0);
+    EXPECT_EQ(aclrtSetDevice(device_id), 0);
+    aclshmemx_set_conf_store_tls(false, nullptr, 0);
+
+    uint64_t INSTANCE_ID = 1;
+    aclshmemx_init_attr_t attr;
+    std::vector<int> dev_list;
+    for (int i = 0; i < n_ranks; ++i) dev_list.push_back(i);
+
+    bool joined = false;
+    int ret = multi_instance_init(rank_id, local_mem_size, INSTANCE_ID, dev_list, attr, joined);
+    EXPECT_EQ(ret, ACLSHMEM_SUCCESS);
+
+    if (joined) {
+        EXPECT_EQ(aclshmemx_init_status(), ACLSHMEM_STATUS_IS_INITIALIZED);
+        EXPECT_EQ(attr.instance_id, INSTANCE_ID);
+
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID), ACLSHMEM_SUCCESS);
+    }
+
+    EXPECT_EQ(aclrtResetDevice(device_id), 0);
+    EXPECT_EQ(aclFinalize(), 0);
+}
+
+void test_aclshmemx_finalize_nonactive(int rank_id, int n_ranks, uint64_t local_mem_size)
+{
+    if (n_ranks <= 1) {
+        return;
+    }
+
+    uint32_t device_id = rank_id % test_gnpu_num + test_first_npu;
+    EXPECT_EQ(aclInit(nullptr), 0);
+    EXPECT_EQ(aclrtSetDevice(device_id), 0);
+    aclshmemx_set_conf_store_tls(false, nullptr, 0);
+
+    uint64_t INSTANCE_ID2 = 2;
+    aclshmemx_init_attr_t inst2_attr;
+    std::vector<int> inst2_dev = {0, n_ranks - 1};
+    bool joined2 = false;
+    int ret2 = multi_instance_init(rank_id, local_mem_size, INSTANCE_ID2, inst2_dev, inst2_attr, joined2);
+    EXPECT_EQ(ret2, ACLSHMEM_SUCCESS);
+
+    uint64_t INSTANCE_ID4 = 4;
+    aclshmemx_init_attr_t inst4_attr;
+    std::vector<int> inst4_dev = {n_ranks - 2, n_ranks - 1};
+    bool joined4 = false;
+    int ret4 = multi_instance_init(rank_id, local_mem_size, INSTANCE_ID4, inst4_dev, inst4_attr, joined4);
+    EXPECT_EQ(ret4, ACLSHMEM_SUCCESS);
+
+    if (joined2 && joined4) {
+        int status = aclshmemx_instance_ctx_set(INSTANCE_ID2);
+        EXPECT_EQ(status, ACLSHMEM_SUCCESS);
+
+        void *ptr = aclshmem_malloc(1024);
+        EXPECT_NE(ptr, nullptr);
+        aclshmem_free(ptr);
+
+        // 当前活动实例为 INSTANCE_ID2，直接释放非活跃实例 INSTANCE_ID4
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID4), ACLSHMEM_SUCCESS);
+
+        // 活动实例 INSTANCE_ID2 不受影响
+        EXPECT_EQ(aclshmemx_instance_ctx_set(INSTANCE_ID2), ACLSHMEM_SUCCESS);
+
+        ptr = aclshmem_malloc(1024);
+        EXPECT_NE(ptr, nullptr);
+        aclshmem_free(ptr);
+
+        // 释放当前活动实例
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID2), ACLSHMEM_SUCCESS);
+    }
+
+    if (joined2 && !joined4) {
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID2), ACLSHMEM_SUCCESS);
+    }
+
+    if (joined4 && !joined2) {
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID4), ACLSHMEM_SUCCESS);
+    }
+
+    EXPECT_EQ(aclrtResetDevice(device_id), 0);
+    EXPECT_EQ(aclFinalize(), 0);
+}
+
+void test_aclshmemx_finalize_nonexist(int rank_id, int n_ranks, uint64_t local_mem_size)
+{
+    uint32_t device_id = rank_id % test_gnpu_num + test_first_npu;
+    EXPECT_EQ(aclInit(nullptr), 0);
+    EXPECT_EQ(aclrtSetDevice(device_id), 0);
+    aclshmemx_set_conf_store_tls(false, nullptr, 0);
+
+    uint64_t INSTANCE_ID = 1;
+    aclshmemx_init_attr_t attr;
+    std::vector<int> dev_list;
+    for (int i = 0; i < n_ranks; ++i) dev_list.push_back(i);
+
+    bool joined = false;
+    int ret = multi_instance_init(rank_id, local_mem_size, INSTANCE_ID, dev_list, attr, joined);
+    EXPECT_EQ(ret, ACLSHMEM_SUCCESS);
+
+    if (joined) {
+        EXPECT_EQ(aclshmemx_init_status(), ACLSHMEM_STATUS_IS_INITIALIZED);
+
+        // 释放不存在的 instance_id，应返回错误且不影响当前活动实例
+        EXPECT_NE(aclshmemx_finalize(999), ACLSHMEM_SUCCESS);
+
+        // 当前活动实例仍可正常操作
+        void *ptr = aclshmem_malloc(1024);
+        EXPECT_NE(ptr, nullptr);
+        aclshmem_free(ptr);
+
+        // 正常释放当前实例
+        EXPECT_EQ(aclshmemx_finalize(INSTANCE_ID), ACLSHMEM_SUCCESS);
+    }
+
+    EXPECT_EQ(aclrtResetDevice(device_id), 0);
+    EXPECT_EQ(aclFinalize(), 0);
+}
+
+TEST(TestInitAPI, TestShmemxFinalizeActive)
+{
+    const char* fix_port_range = "20000:21023";
+    ScopedEnv env_port("SHMEM_INSTANCE_PORT_RANGE", fix_port_range);
+
+    const int process_count = test_gnpu_num;
+    uint64_t local_mem_size = 1024UL * 1024UL * 1024;
+    test_mutil_task(test_aclshmemx_finalize_active, local_mem_size, process_count);
+}
+
+TEST(TestInitAPI, TestShmemxFinalizeNonactive)
+{
+    const char* fix_port_range = "20000:21023";
+    ScopedEnv env_port("SHMEM_INSTANCE_PORT_RANGE", fix_port_range);
+
+    const int process_count = test_gnpu_num;
+    uint64_t local_mem_size = 1024UL * 1024UL * 1024;
+    test_mutil_task(test_aclshmemx_finalize_nonactive, local_mem_size, process_count);
+}
+
+TEST(TestInitAPI, TestShmemxFinalizeNonexist)
+{
+    const char* fix_port_range = "20000:21023";
+    ScopedEnv env_port("SHMEM_INSTANCE_PORT_RANGE", fix_port_range);
+
+    const int process_count = test_gnpu_num;
+    uint64_t local_mem_size = 1024UL * 1024UL * 1024;
+    test_mutil_task(test_aclshmemx_finalize_nonexist, local_mem_size, process_count);
 }

@@ -271,12 +271,20 @@ Returns:
     )");
 
     m.def("aclshmem_finalize", &aclshmem_finalize, py::call_guard<py::gil_scoped_release>(),
-          py::arg("instance_id") = 0,
           R"(
-Finalize share memory module.
+Finalize the CURRENT instance of share memory module.
+
+For single-instance mode this finalizes instance 0 (legacy behavior).
+In multi-instance mode this finalizes the currently active instance.
+    )");
+
+    m.def("aclshmemx_finalize", &aclshmemx_finalize, py::call_guard<py::gil_scoped_release>(),
+          py::arg("instance_id"),
+          R"(
+Finalize a SPECIFIC instance of share memory module (multi-instance extension).
 
 Arguments:
-    instance_id(uint64_t): Instance ID. Default is 0.
+    instance_id(uint64_t): Instance ID to finalize.
     )");
 
 

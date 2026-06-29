@@ -243,7 +243,7 @@ void test_multi_instance_finalize(aclrtStream stream, int device_id, int inst_co
     // 多实例销毁
     for (int i = 0; i < inst_count; i++) {
         uint64_t INSTANCE_ID = (1 + i);
-        int status = aclshmem_finalize(INSTANCE_ID);
+        int status = aclshmemx_finalize(INSTANCE_ID);
         EXPECT_EQ(status, 0);
     }
 

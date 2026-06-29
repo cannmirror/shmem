@@ -306,12 +306,12 @@
 1. 销毁共享内存模块，释放所有资源。
 
     ```python
-    def aclshmem_finalize(instance_id=0) -> None
+    def aclshmem_finalize() -> None
     ```
 
     |参数/返回值|方向|含义|
     |-|-|-|
-    |instance_id|[in]|实例 ID，默认 0|
+    |无参数|[in]|-|
     |返回值|-|无返回值|
 
 1. 查询共享内存模块的当前初始化状态。

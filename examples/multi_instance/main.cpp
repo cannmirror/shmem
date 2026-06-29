@@ -198,7 +198,7 @@ static int aclshmem_instance_destroy_test(int dev_id, aclshmemx_init_attr_t &att
 {
     int status = 0;
     if (std::find(dev_list.begin(), dev_list.end(), dev_id) != dev_list.end()) {
-        status = aclshmem_finalize(attr.instance_id);
+        status = aclshmemx_finalize(attr.instance_id);
     }
     return status;
 }

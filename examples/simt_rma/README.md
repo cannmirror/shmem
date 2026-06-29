@@ -2,9 +2,9 @@
 
 本样例旨在展示 SIMD 与 SIMT 混合编译模式下，SIMT 远程内存访问（RMA）接口的典型使用方法。该类接口主要包含以下三种形式：
 
-1. `__simt_callee__ inline void aclshmem_{NAME}_{op}(__gm__ TYPE *dst, __gm__ TYPE *src, uint32_t elem_size, int32_t pe)`
+1. `__simt_callee__ inline void aclshmem_{NAME}_{op}(__gm__ TYPE *dst, __gm__ TYPE *src, size_t elem_size, int32_t pe)`
 2. `__simt_callee__ inline void aclshmem_{op}{BITS}(__gm__ void *dst, __gm__ void *src, size_t nelems, int32_t pe)`
-3. `__simt_callee__ inline void aclshmem_{op}mem(__gm__ void *dst, __gm__ void *src, uint32_t elem_size, int32_t pe)`
+3. `__simt_callee__ inline void aclshmem_{op}mem(__gm__ void *dst, __gm__ void *src, size_t elem_size, int32_t pe)`
 
 上述接口名称中的占位符 `{}` 可选值如下表所示：
 
@@ -44,5 +44,5 @@
    进入示例目录并执行运行脚本：
    ```bash
    cd examples/simt_rma
-   bash scripts/run.sh
+   bash run.sh
    ```

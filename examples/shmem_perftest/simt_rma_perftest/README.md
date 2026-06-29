@@ -81,7 +81,7 @@
 | `-gnpus <int>` | 本机启动进程数 / NPU 数量。本测试固定为 2，传入其他值会报错。 | 2 |
 | `-fnpu <int>` | 首个 NPU ID，实际 device id 为 `pe_id % gnpus + fnpu`。 | 0 |
 | `-fpe <int>` | 首个 PE ID。保留为与 shmem_perftest 参数兼容，当前不参与 rank 或 device 计算。 | 0 |
-| `-t`/`--test-type <put|get|none>` | 可选校验项；若指定，必须与源码编译期 `OP_TYPE` 一致，否则二进制报错。 | - |
+| `-t`/`--test-type <put\|get\|none>` | 可选校验项；若指定，必须与源码编译期 `OP_TYPE` 一致，否则二进制报错。 | - |
 | `-d`/`--datatype <type>` | 可选校验项；类型名会映射到 bit 位宽，必须与源码编译期 `DATA_SIZE` 一致。 | - |
 | `-b`/`--block-size` | 每个 PE 使用的 Core（Block）数量。 | 32 |
 | `--block-range <min> <max>` | Core（Block）数量扫描范围，每个核数各产出统计结果。 | 32 32 |

@@ -3,7 +3,7 @@
 本样例旨在展示 SIMD 与 SIMT 混合编译模式下，SIMT 远程内存访问（RMA）接口的典型使用方法。此样例为单个标量的传输。该类接口主要包含以下两种形式：
 
 1. `__simt_callee__ inline void aclshmem_{NAME}_p(__gm__ TYPE *dst, const TYPE value, int pe)`
-2. `__simt_callee__ inline void aclshmem_{NAME}_g(__gm__ TYPE *dst, const TYPE value, int pe)`
+2. `__simt_callee__ inline TYPE aclshmem_{NAME}_g(__gm__ TYPE *src, int32_t pe)`
 
 上述接口名称中的占位符 `{NAME}` 可选值如下表所示：
 
@@ -11,9 +11,9 @@
 | --- | --- |
 | `{NAME}` | `half`, `float`, `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, `char`, `bfloat16` |
 
-这两种接口的核心功能为实现单标量或小段数据传输：
+这两种接口的核心功能为实现单标量的数据传输：
 - **`_p` 接口**：将指定的标量数值直接写入到指定计算单元（PE）的目标内存地址中。
-- **`_g` 接口**：从指定计算单元（PE）的源内存地址中读取单个标量数值。
+- **`_g` 接口**：从指定计算单元（PE）的源内存地址中读取单个标量数值并返回。
 
 ### 样例执行流程
 
@@ -41,5 +41,5 @@
    进入示例目录并执行运行脚本：
    ```bash
    cd examples/simt_rma_scalar
-   bash scripts/run.sh
+   bash run.sh
    ```

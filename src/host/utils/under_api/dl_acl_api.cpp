@@ -40,6 +40,7 @@ rtIpcOpenMemoryFunc DlAclApi::pRtIpcOpenMemory = nullptr;
 rtIpcCloseMemoryFunc DlAclApi::pRtIpcCloseMemory = nullptr;
 aclrtGetSocNameFunc DlAclApi::pAclrtGetSocName = nullptr;
 rtGetLogicDevIdByUserDevIdFunc DlAclApi::pRtGetLogicDevIdByUserDevId = nullptr;
+aclrtGetPhyDevIdByUserDevIdFunc DlAclApi::pAclrtGetPhyDevIdByUserDevId = nullptr;
 aclrtGetPhyDevIdByLogicDevIdFunc DlAclApi::pAclrtGetPhyDevIdByLogicDevId = nullptr;
 rtGetDevicePhyIdByIndexFunc DlAclApi::pRtGetDevicePhyIdByIndex = nullptr;
 aclrtReserveMemAddressFunc DlAclApi::pAclrtReserveMemAddress = nullptr;
@@ -87,6 +88,12 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
     DL_LOAD_SYM(pAclrtGetSocName, aclrtGetSocNameFunc, rtHandle, "aclrtGetSocName");
     DL_LOAD_SYM(pRtGetLogicDevIdByUserDevId, rtGetLogicDevIdByUserDevIdFunc, rtHandle, "rtGetLogicDevIdByUserDevId");
 
+    pAclrtGetPhyDevIdByUserDevId =
+        reinterpret_cast<aclrtGetPhyDevIdByUserDevIdFunc>(dlsym(rtHandle, "aclrtGetPhyDevIdByUserDevId"));
+    if (pAclrtGetPhyDevIdByUserDevId == nullptr) {
+        SHM_LOG_WARN("Optional symbol aclrtGetPhyDevIdByUserDevId is not loaded.");
+    }
+
     pAclrtGetPhyDevIdByLogicDevId =
         reinterpret_cast<aclrtGetPhyDevIdByLogicDevIdFunc>(dlsym(rtHandle, "aclrtGetPhyDevIdByLogicDevId"));
     if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
@@ -119,15 +126,19 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
 
     pRtGetDevicePhyIdByIndex = reinterpret_cast<rtGetDevicePhyIdByIndexFunc>(
         dlsym(runtimeHandle, "rtGetDevicePhyIdByIndex"));
-    if (pRtGetDevicePhyIdByIndex == nullptr && pAclrtGetPhyDevIdByLogicDevId == nullptr) {
-        SHM_LOG_ERROR("Neither aclrtGetPhyDevIdByLogicDevId nor rtGetDevicePhyIdByIndex is available.");
+    if (pRtGetDevicePhyIdByIndex == nullptr && pAclrtGetPhyDevIdByUserDevId == nullptr &&
+        pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+        SHM_LOG_ERROR("No phy id mapping API available (aclrtGetPhyDevIdByUserDevId, "
+                      "aclrtGetPhyDevIdByLogicDevId, rtGetDevicePhyIdByIndex).");
         dlclose(runtimeHandle);
         runtimeHandle = nullptr;
         dlclose(rtHandle);
         rtHandle = nullptr;
         return ACLSHMEM_DL_FUNC_FAILED;
     }
-    if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
+    if (pAclrtGetPhyDevIdByUserDevId != nullptr) {
+        SHM_LOG_INFO("Use aclrtGetPhyDevIdByUserDevId for phy id mapping.");
+    } else if (pAclrtGetPhyDevIdByLogicDevId == nullptr) {
         SHM_LOG_INFO("aclrtGetPhyDevIdByLogicDevId not found, use rtGetDevicePhyIdByIndex for phy id mapping.");
     }
 
@@ -193,6 +204,7 @@ void DlAclApi::CleanupLibrary()
     pRtIpcSetMemoryName = nullptr;
     pAclrtGetSocName = nullptr;
     pRtGetLogicDevIdByUserDevId = nullptr;
+    pAclrtGetPhyDevIdByUserDevId = nullptr;
     pAclrtGetPhyDevIdByLogicDevId = nullptr;
     pRtGetDevicePhyIdByIndex = nullptr;
     pAclrtReserveMemAddress = nullptr;

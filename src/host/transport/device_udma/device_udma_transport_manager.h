@@ -72,6 +72,7 @@ private:
 private:
     uint32_t rankId_{0};
     uint32_t rankCount_{1};
+    uint32_t userId_{0};
     uint32_t deviceId_{0};
     uint32_t phyId_{0};
     uint32_t eidCount_{0};

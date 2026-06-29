@@ -66,11 +66,10 @@ Result RdmaTransportManager::OpenDevice(const TransportOptions &options)
                              ACLSHMEM_DL_FUNC_FAILED);
 
     int32_t phyId = -1;
-    // CANN 8.2: rtGetDevicePhyIdByIndex / aclrtGetPhyDevIdByLogicDevId take userDevId when
-    // ASCEND_RT_VISIBLE_DEVICES remaps devices (logicId=4 but userId=1 -> phyId=4).
-    ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(userId, &phyId);
+    // HCCP/topo use global phyId; Runtime/TSD still use userId.
+    ret = DlAclApi::AclrtGetPhyDevIdByUserDevId(userId, &phyId);
     SHM_ASSERT_LOG_AND_RETURN(ret == 0 && phyId >= 0,
-                             "GetPhyDevIdByUserDevId() return=" << ret << ", userId=" << userId
+                             "AclrtGetPhyDevIdByUserDevId() return=" << ret << ", userId=" << userId
                                  << ", logicDeviceId=" << logicId << ", output phyId=" << phyId,
                              ACLSHMEM_DL_FUNC_FAILED);
 

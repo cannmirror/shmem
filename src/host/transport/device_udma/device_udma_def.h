@@ -35,24 +35,24 @@ struct ACLSHMEMUDMAWQCtx {
     uint64_t bufAddr;          /* start address of ring buffer qbuf */
     uint32_t wqeShiftSize;     /* basic block size of each WQE */
     uint32_t depth;            /* depth of ring buffer qbufSize */
-    uint64_t headAddr;         /* work queue head (Producer Index) address  pi */
-    uint64_t tailAddr;         /* work queue tail (Consumer Index) address  ci  */
+    uint32_t head;             /* work queue head (Producer Index) */
+    uint32_t tail;             /* work queue tail (Consumer Index) */
     ACLSHMEMUDMADBMode dbMode; /* dbtype */
     uint64_t dbAddr;           /* doorbell address  */
     uint32_t sl;               /* service level */
-    uint64_t wqeCntAddr;       /* wqe count address*/
+    uint32_t wqeCnt;           /* wqe count */
     uint64_t amoAddr;          /* amo address to store fetch data*/
 };
 
 struct ACLSHMEMUDMACqCtx {
-    uint32_t cqn;               /* completion queue number */
-    uint64_t bufAddr;           /* start address of ring buffer */
-    uint32_t cqeShiftSize;      /* basic block size of each CQE */
-    uint32_t depth;             /* depth of ring buffer */
-    uint64_t headAddr;          /* work queue head (Producer Index) address */
-    uint64_t tailAddr;          /* work queue tail (Consumer Index) address */
-    ACLSHMEMUDMADBMode dbMode;  /* dbtype */
-    uint64_t dbAddr;            /* doorbell address */
+    uint32_t cqn;              /* completion queue number */
+    uint64_t bufAddr;          /* start address of ring buffer */
+    uint32_t cqeShiftSize;     /* basic block size of each CQE */
+    uint32_t depth;            /* depth of ring buffer */
+    uint32_t head;             /* completion queue head (Producer Index) */
+    uint32_t tail;             /* completion queue tail (Consumer Index) */
+    ACLSHMEMUDMADBMode dbMode; /* dbtype */
+    uint64_t dbAddr;           /* doorbell address */
 };
 
 struct ACLSHMEMAIVUDMAInfo {
@@ -64,7 +64,7 @@ struct ACLSHMEMAIVUDMAInfo {
     uint64_t memPtr; /* pointer to memory region array of size [MAX_PE_NUM] */
 };
 
-}  // namespace device
-}  // namespace transport
-}  // namespace shm
-#endif  // MF_HYBRID_DEVICE_UDMA_DEF_H
+} // namespace device
+} // namespace transport
+} // namespace shm
+#endif // MF_HYBRID_DEVICE_UDMA_DEF_H

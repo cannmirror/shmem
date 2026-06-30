@@ -38,12 +38,7 @@ struct PerEidJettyState {
     QpCreateInfo qpCreateInfo_;
     std::vector<void*> remoteQpHandleList;
     std::vector<uint32_t> tpnList;
-    void* cqPiAddr{nullptr};
-    void* cqCiAddr{nullptr};
-    void* sqPiAddr{nullptr};
-    void* sqCiAddr{nullptr};
-    void *wqeCntAddr{nullptr};
-    void *amoAddr{nullptr};
+    void* amoAddr{nullptr};
     ACLSHMEMUDMAWQCtx localWq{};
     ACLSHMEMUDMACqCtx localCq{};
 };

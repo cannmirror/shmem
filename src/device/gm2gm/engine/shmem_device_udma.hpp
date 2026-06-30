@@ -83,8 +83,7 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uin
     auto cqBaseAddr = cqCtxEntry->bufAddr;
     auto bbShift = cqCtxEntry->baseBkShift;
     auto cqeSize = 1 << bbShift;
-    auto curHardwareTailAddr = cqCtxEntry->tailAddr;
-    uint32_t curTail = ld_dev((__gm__ uint32_t*)(curHardwareTailAddr), 0);
+    uint32_t curTail = cqCtxEntry->tail;
     while (curTail != idx) {
         __gm__ ACLSHMEMJfcCqeCtx* cqeAddr =
             (__gm__ ACLSHMEMJfcCqeCtx*)(cqBaseAddr + cqeSize * (curTail & (shm::UDMA_CQ_DEPTH_DEFAULT - 1)));
@@ -110,7 +109,7 @@ ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uin
     }
 
     // Update CQ tail
-    st_dev(curTail, (__gm__ uint32_t*)(cqCtxEntry->tailAddr), 0);
+    cqCtxEntry->tail = curTail;
     __gm__ ACLSHMEMUDMAWQCtx* wqCtxEntry =
         (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (pe * qpNum + qpIdx) * sizeof(ACLSHMEMUDMAWQCtx));
     aclshmemi_udma_poll_cq_update_info(curTail, qpIdx, cqCtxEntry, wqCtxEntry);
@@ -126,8 +125,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(
     __gm__ uint32_t* dbAddr = (__gm__ uint32_t*)cqCtxEntry->dbAddr;
     st_dev((uint32_t)(curTail & 0xFFFFFF), dbAddr, 0);
     // Update WQ tail
-    auto curWQTailAddr = wqCtxEntry->tailAddr;
-    st_dev(curTail, (__gm__ uint32_t*)curWQTailAddr, 0);
+    wqCtxEntry->tail = curTail;
 }
 
 ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr, uint32_t atomicLen)
@@ -313,10 +311,9 @@ ACLSHMEM_DEVICE __gm__ uint8_t* aclshmemi_udma_get_sge_ctx(__gm__ uint8_t* wqe_a
 ACLSHMEM_DEVICE void poll_cq_when_sq_overflow(
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry, uint32_t wqeCnt, uint32_t pe, uint32_t qpIdx)
 {
-    auto curHardwareTailAddr = qpCtxEntry->tailAddr;
     // Poll CQ if send queue is full
     constexpr uint32_t POLL_CQ_THRESHOLD = 10;
-    uint32_t curTail = ld_dev((__gm__ uint32_t*)(curHardwareTailAddr), 0);
+    uint32_t curTail = qpCtxEntry->tail;
     if ((wqeCnt + POLL_CQ_THRESHOLD) % shm::UDMA_SQ_BASKBLK_CNT == (curTail) % shm::UDMA_SQ_BASKBLK_CNT) {
         uint32_t idx =
             (curTail + ACLSHMEM_NUM_CQE_PER_POLL_CQ) > wqeCnt ? wqeCnt : curTail + ACLSHMEM_NUM_CQE_PER_POLL_CQ;
@@ -410,11 +407,9 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     ACLSHMEM_DEBUG_FUNC(assert_not_self_send, pe);
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
     auto wqeSize = 1 << qpCtxEntry->baseBkShift; // basebk_shift
-    auto curHardwareHeadAddr = qpCtxEntry->headAddr;
-    uint32_t curHead = ld_dev((__gm__ uint32_t*)(curHardwareHeadAddr), 0);
+    uint32_t curHead = qpCtxEntry->head;
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
-    auto wqeCntAddr = qpCtxEntry->wqeCntAddr;
-    uint32_t wqeCnt = ld_dev((__gm__ uint32_t*)(wqeCntAddr), 0);
+    uint32_t wqeCnt = qpCtxEntry->wqeCnt;
     // Poll CQ if send queue is full
     poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, pe, qpIdx);
     // Get memory info
@@ -433,7 +428,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     curHead += wqeBbCnt;
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
-    st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
+    qpCtxEntry->wqeCnt = wqeCnt;
     ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeCtx, (uint32_t)sizeof(T));
 }
 
@@ -443,8 +438,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm
     // Note: db address is 64-bit, but we only update 32-bit value
     __gm__ uint32_t* doorBellAddr = (__gm__ uint32_t*)qpCtxEntry->dbAddr;
     st_dev(curHead, doorBellAddr, 0);
-    auto curHardwareHeadAddr = qpCtxEntry->headAddr;
-    st_dev(curHead, (__gm__ uint32_t*)curHardwareHeadAddr, 0);
+    qpCtxEntry->head = curHead;
     return;
 }
 
@@ -486,11 +480,9 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
     auto wqeSize = 1 << qpCtxEntry->baseBkShift;
-    auto curHardwareHeadAddr = qpCtxEntry->headAddr;
-    uint32_t curHead = ld_dev((__gm__ uint32_t*)(curHardwareHeadAddr), 0);
+    uint32_t curHead = qpCtxEntry->head;
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
-    auto wqeCntAddr = qpCtxEntry->wqeCntAddr;
-    uint32_t wqeCnt = ld_dev((__gm__ uint32_t*)(wqeCntAddr), 0);
+    uint32_t wqeCnt = qpCtxEntry->wqeCnt;
     poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, pe, qpIdx);
 
     __gm__ ACLSHMEMUBmemInfo* remoteMemInfo =
@@ -525,7 +517,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     curHead += wqeBbCnt;
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
-    st_dev(wqeCnt, (__gm__ uint32_t*)wqeCntAddr, 0);
+    qpCtxEntry->wqeCnt = wqeCnt;
 }
 
 template <typename T>
@@ -584,8 +576,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_quiet(int pe)
     // Only support one qp, multi-qp will be support later.
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry =
         (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (pe * qpNum + 0) * sizeof(ACLSHMEMUDMAWQCtx));
-    auto wqeCntAddr = qpCtxEntry->wqeCntAddr;
-    uint32_t wqeCnt = ld_dev((__gm__ uint32_t*)(wqeCntAddr), 0);
+    uint32_t wqeCnt = qpCtxEntry->wqeCnt;
     aclshmemi_udma_poll_cq(pe, 0, wqeCnt);
 }
 

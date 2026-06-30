@@ -112,26 +112,6 @@ Result DeviceJettyManager::Shutdown() noexcept
             state.chanHandle = nullptr;
         }
 
-        if (state.cqPiAddr != nullptr) {
-            aclrtFree(state.cqPiAddr);
-            state.cqPiAddr = nullptr;
-        }
-        if (state.cqCiAddr != nullptr) {
-            aclrtFree(state.cqCiAddr);
-            state.cqCiAddr = nullptr;
-        }
-        if (state.sqPiAddr != nullptr) {
-            aclrtFree(state.sqPiAddr);
-            state.sqPiAddr = nullptr;
-        }
-        if (state.sqCiAddr != nullptr) {
-            aclrtFree(state.sqCiAddr);
-            state.sqCiAddr = nullptr;
-        }
-        if (state.wqeCntAddr != nullptr) {
-            aclrtFree(state.wqeCntAddr);
-            state.wqeCntAddr = nullptr;
-        }
         if (state.amoAddr != nullptr) {
             aclrtFree(state.amoAddr);
             state.amoAddr = nullptr;
@@ -242,12 +222,8 @@ Result DeviceJettyManager::JFCCreate(PerEidJettyState& state) noexcept
     state.localCq.bufAddr = state.cqInfo.out.bufAddr;
     state.localCq.cqeShiftSize = log2(state.cqInfo.out.cqeSize); // cqeSize = 64 = 2^6, cqeShiftSize此处取6
     state.localCq.depth = state.cqInfo.in.depth;
-    aclrtMalloc(&state.cqPiAddr, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemset(state.cqPiAddr, sizeof(uint32_t), 0, sizeof(uint32_t));
-    state.localCq.headAddr = reinterpret_cast<uintptr_t>(state.cqPiAddr);
-    aclrtMalloc(&state.cqCiAddr, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemset(state.cqCiAddr, sizeof(uint32_t), 0, sizeof(uint32_t));
-    state.localCq.tailAddr = reinterpret_cast<uintptr_t>(state.cqCiAddr);
+    state.localCq.head = 0;
+    state.localCq.tail = 0;
     state.localCq.dbMode = ACLSHMEMUDMADBMode::SW_DB;
     state.localCq.dbAddr = state.cqInfo.out.swdbAddr;
 
@@ -292,18 +268,12 @@ Result DeviceJettyManager::JettyCreate(PerEidJettyState& state) noexcept
     state.localWq.bufAddr = state.qpCreateInfo_.ub.sqBuffVa;
     state.localWq.wqeShiftSize = log2(state.qpCreateInfo_.ub.wqebbSize); // wqeSize = 64 = 2^6, wqeShiftSize此处取6
     state.localWq.depth = shm::UDMA_SQ_BASKBLK_CNT;
-    aclrtMalloc(&state.sqPiAddr, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemset(state.sqPiAddr, sizeof(uint32_t), 0, sizeof(uint32_t));
-    state.localWq.headAddr = reinterpret_cast<uintptr_t>(state.sqPiAddr);
-    aclrtMalloc(&state.sqCiAddr, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemset(state.sqCiAddr, sizeof(uint32_t), 0, sizeof(uint32_t));
-    state.localWq.tailAddr = reinterpret_cast<uintptr_t>(state.sqCiAddr);
+    state.localWq.head = 0;
+    state.localWq.tail = 0;
     state.localWq.dbMode = ACLSHMEMUDMADBMode::SW_DB;
     state.localWq.dbAddr = state.qpCreateInfo_.ub.dbAddr;
     state.localWq.sl = 0;
-    aclrtMalloc(&state.wqeCntAddr, sizeof(uint32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMemset(state.wqeCntAddr, sizeof(uint32_t), 0, sizeof(uint32_t));
-    state.localWq.wqeCntAddr = reinterpret_cast<uintptr_t>(state.wqeCntAddr);
+    state.localWq.wqeCnt = 0;
     aclrtMalloc(&state.amoAddr, sizeof(uint64_t), ACL_MEM_MALLOC_HUGE_FIRST);
     aclrtMemset(state.amoAddr, sizeof(uint64_t), 0, sizeof(uint64_t));
     state.localWq.amoAddr = reinterpret_cast<uintptr_t>(state.amoAddr);
@@ -466,12 +436,12 @@ void DeviceJettyManager::FillUdmaWq(ACLSHMEMUDMAWQCtx& srcWq, ACLSHMEMUDMAWQCtx&
     dstWq.bufAddr = srcWq.bufAddr;
     dstWq.wqeShiftSize = srcWq.wqeShiftSize;
     dstWq.depth = srcWq.depth;
-    dstWq.headAddr = srcWq.headAddr;
-    dstWq.tailAddr = srcWq.tailAddr;
+    dstWq.head = srcWq.head;
+    dstWq.tail = srcWq.tail;
     dstWq.dbMode = srcWq.dbMode;
     dstWq.dbAddr = srcWq.dbAddr;
     dstWq.sl = srcWq.sl;
-    dstWq.wqeCntAddr = srcWq.wqeCntAddr;
+    dstWq.wqeCnt = srcWq.wqeCnt;
     dstWq.amoAddr = srcWq.amoAddr;
 }
 
@@ -481,8 +451,8 @@ void DeviceJettyManager::FillUdmaCq(ACLSHMEMUDMACqCtx& srcCq, ACLSHMEMUDMACqCtx&
     dstCq.bufAddr = srcCq.bufAddr;
     dstCq.cqeShiftSize = srcCq.cqeShiftSize;
     dstCq.depth = srcCq.depth;
-    dstCq.headAddr = srcCq.headAddr;
-    dstCq.tailAddr = srcCq.tailAddr;
+    dstCq.head = srcCq.head;
+    dstCq.tail = srcCq.tail;
     dstCq.dbMode = srcCq.dbMode;
     dstCq.dbAddr = srcCq.dbAddr;
 }
@@ -507,20 +477,20 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.bufAddr: " << tempWQCtx.bufAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeShiftSize: " << tempWQCtx.wqeShiftSize);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.depth: " << tempWQCtx.depth);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.headAddr: " << tempWQCtx.headAddr);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.tailAddr: " << tempWQCtx.tailAddr);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.head: " << tempWQCtx.head);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.tail: " << tempWQCtx.tail);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.dbMode: " << static_cast<int>(tempWQCtx.dbMode));
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.dbAddr: " << tempWQCtx.dbAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.sl: " << tempWQCtx.sl);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeCntAddr: " << tempWQCtx.wqeCntAddr);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeCnt: " << tempWQCtx.wqeCnt);
 
     auto tempCQCtx = ((ACLSHMEMUDMACqCtx*)hostInfo.scqPtr)[rankId_];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.cqn: " << tempCQCtx.cqn);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.bufAddr: " << tempCQCtx.bufAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.cqeShiftSize: " << tempCQCtx.cqeShiftSize);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.depth: " << tempCQCtx.depth);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.headAddr: " << tempCQCtx.headAddr);
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.tailAddr: " << tempCQCtx.tailAddr);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.head: " << tempCQCtx.head);
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.tail: " << tempCQCtx.tail);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.dbMode: " << static_cast<int>(tempCQCtx.dbMode));
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.dbAddr: " << tempCQCtx.dbAddr);
 

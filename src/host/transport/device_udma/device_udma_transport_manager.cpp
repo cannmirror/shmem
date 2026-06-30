@@ -397,8 +397,8 @@ Result UdmaTransportManager::ReadChannelContexts(const std::vector<uint64_t>& ch
 
 Result UdmaTransportManager::PrepareUdmaInfoBuffers(std::vector<uint8_t>& eidTableHost)
 {
-    // Reserve the per-peer scratch buffers (wqe counter / AMO) the same way the
-    // legacy DeviceJettyManager did: one malloc per peer, referenced from WQCtx.
+    // Reserve the per-peer AMO scratch buffers the same way the legacy
+    // DeviceJettyManager did: one malloc per peer, referenced from WQCtx.
     auto ret = ReserveScratchBuffers();
     if (ret != ACLSHMEM_SUCCESS) {
         return ret;
@@ -498,17 +498,12 @@ Result UdmaTransportManager::CopyUdmaInfoToDevice(
 
 Result UdmaTransportManager::ReserveScratchBuffers()
 {
-    wqeCntDevList_.assign(rankCount_, nullptr);
     amoDevList_.assign(rankCount_, nullptr);
     for (uint32_t peer = 0; peer < rankCount_; ++peer) {
         if (peer == rankId_) {
             continue;
         }
-        auto ret = AllocateAndClearDeviceBuffer(wqeCntDevList_[peer], sizeof(uint32_t), "udma wqe counter");
-        if (ret != ACLSHMEM_SUCCESS) {
-            return ret;
-        }
-        ret = AllocateAndClearDeviceBuffer(amoDevList_[peer], sizeof(uint64_t), "udma amo scratch");
+        auto ret = AllocateAndClearDeviceBuffer(amoDevList_[peer], sizeof(uint64_t), "udma amo scratch");
         if (ret != ACLSHMEM_SUCCESS) {
             return ret;
         }
@@ -524,12 +519,12 @@ void UdmaTransportManager::FillWqCtx(const SqContext& sqContext, uint32_t peer, 
     // HCOMM exposes the raw WQE byte size; the data plane consumes it directly.
     dstWq.wqeSize = ubJfs.wqeSize;
     dstWq.depth = shm::UDMA_SQ_BASKBLK_CNT;
-    dstWq.headAddr = ubJfs.headAddr;
-    dstWq.tailAddr = ubJfs.tailAddr;
+    dstWq.head = 0;
+    dstWq.tail = 0;
     dstWq.dbMode = ACLSHMEMUDMADBMode::SW_DB;
     dstWq.dbAddr = ubJfs.dbVa;
     dstWq.sl = 0;
-    dstWq.wqeCntAddr = reinterpret_cast<uint64_t>(wqeCntDevList_[peer]);
+    dstWq.wqeCnt = 0;
     dstWq.amoAddr = reinterpret_cast<uint64_t>(amoDevList_[peer]);
 }
 
@@ -540,8 +535,8 @@ void UdmaTransportManager::FillCqCtx(const CqContext& cqContext, ACLSHMEMUDMACqC
     dstCq.bufAddr = ubJfc.scqVa;
     dstCq.cqeSize = ubJfc.cqeSize;
     dstCq.depth = shm::UDMA_CQ_DEPTH_DEFAULT;
-    dstCq.headAddr = ubJfc.headAddr;
-    dstCq.tailAddr = ubJfc.tailAddr;
+    dstCq.head = 0;
+    dstCq.tail = 0;
     dstCq.dbMode = ACLSHMEMUDMADBMode::SW_DB;
     dstCq.dbAddr = ubJfc.dbVa;
 }
@@ -580,12 +575,12 @@ void UdmaTransportManager::PrintHostUdmaInfo(const ACLSHMEMAIVUDMAInfo& hostInfo
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.bufAddr: " << wq.bufAddr);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.wqeSize: " << wq.wqeSize);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.depth: " << wq.depth);
-        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.headAddr: " << wq.headAddr);
-        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.tailAddr: " << wq.tailAddr);
+        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.head: " << wq.head);
+        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.tail: " << wq.tail);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.dbMode: " << static_cast<int>(wq.dbMode));
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.dbAddr: " << wq.dbAddr);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.sl: " << wq.sl);
-        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.wqeCntAddr: " << wq.wqeCntAddr);
+        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.wqeCnt: " << wq.wqeCnt);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] WQCtx.amoAddr: " << wq.amoAddr);
 
         const auto& cq = cqArray[pe];
@@ -593,8 +588,8 @@ void UdmaTransportManager::PrintHostUdmaInfo(const ACLSHMEMAIVUDMAInfo& hostInfo
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.bufAddr: " << cq.bufAddr);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.cqeSize: " << cq.cqeSize);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.depth: " << cq.depth);
-        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.headAddr: " << cq.headAddr);
-        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.tailAddr: " << cq.tailAddr);
+        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.head: " << cq.head);
+        SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.tail: " << cq.tail);
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.dbMode: " << static_cast<int>(cq.dbMode));
         SHM_LOG_DEBUG("rank[" << rankId_ << "] peer[" << pe << "] CQCtx.dbAddr: " << cq.dbAddr);
 
@@ -933,13 +928,6 @@ void UdmaTransportManager::FreeDeviceInfo()
         (void)DlAclApi::AclrtFree(eidDev_);
         eidDev_ = nullptr;
     }
-    for (auto& wqeCntDev : wqeCntDevList_) {
-        if (wqeCntDev != nullptr) {
-            (void)DlAclApi::AclrtFree(wqeCntDev);
-            wqeCntDev = nullptr;
-        }
-    }
-    wqeCntDevList_.clear();
     for (auto& amoDev : amoDevList_) {
         if (amoDev != nullptr) {
             (void)DlAclApi::AclrtFree(amoDev);

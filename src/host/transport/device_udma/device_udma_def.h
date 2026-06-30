@@ -40,12 +40,12 @@ struct ACLSHMEMUDMAWQCtx {
     uint64_t bufAddr;     // start address of ring buffer
     uint32_t wqeSize;     // size in bytes of each WQE
     uint32_t depth;       // depth of ring buffer
-    uint64_t headAddr;    // work queue head (Producer Index) address
-    uint64_t tailAddr;    // work queue tail (Consumer Index) address
+    uint32_t head;        // work queue head (Producer Index)
+    uint32_t tail;        // work queue tail (Consumer Index)
     ACLSHMEMUDMADBMode dbMode;
     uint64_t dbAddr;      // doorbell address
     uint32_t sl;          // service level
-    uint64_t wqeCntAddr;  // wqe count address
+    uint32_t wqeCnt;      // wqe count
     uint64_t amoAddr;     // amo address to store fetch data
 };
 
@@ -54,8 +54,8 @@ struct ACLSHMEMUDMACqCtx {
     uint64_t bufAddr;     // start address of ring buffer
     uint32_t cqeSize;     // size in bytes of each CQE
     uint32_t depth;       // depth of ring buffer
-    uint64_t headAddr;    // work queue head (Producer Index) address
-    uint64_t tailAddr;    // work queue tail (Consumer Index) address
+    uint32_t head;        // completion queue head (Producer Index)
+    uint32_t tail;        // completion queue tail (Consumer Index)
     ACLSHMEMUDMADBMode dbMode;
     uint64_t dbAddr;      // doorbell address
 };

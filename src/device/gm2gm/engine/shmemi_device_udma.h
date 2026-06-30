@@ -49,7 +49,7 @@ struct ACLSHMEMUBmemInfo {
     uint32_t tid;              // 对应着SQE的rmt_jetty_or_seg_id，来源是udma_seg->tid;
     uint32_t rmtTokenValue;    // 对应着SQE的rmt_token_value，来源是udma_seg->token_value.token;
     uint32_t len;
-    uint64_t addr;             // 来源urma_sge的addr，对应SQE的rmt_addr_l_or_token_id，rmt_addr_h_or_token_value
+    uint64_t addr; // 来源urma_sge的addr，对应SQE的rmt_addr_l_or_token_id，rmt_addr_h_or_token_value
     uint64_t eidAddr;
 };
 
@@ -60,13 +60,13 @@ struct ACLSHMEMUDMAWQCtx {
     uint64_t bufAddr;     // start address of ring buffer
     uint32_t wqeSize;     // size in bytes of each WQE
     uint32_t depth;       // depth of ring buffer
-    uint64_t headAddr;    // work queue head (Producer Index) address
-    uint64_t tailAddr;    // work queue tail (Consumer Index) address
+    uint32_t head;        // work queue head (Producer Index)
+    uint32_t tail;        // work queue tail (Consumer Index)
     ACLSHMEMUDMADBMode dbMode;
-    uint64_t dbAddr;      // doorbell address
-    uint32_t sl;          // service level
-    uint64_t wqeCntAddr;  // wqe count address
-    uint64_t amoAddr;     // amo address to store fetch data
+    uint64_t dbAddr;  // doorbell address
+    uint32_t sl;      // service level
+    uint32_t wqeCnt;  // wqe count
+    uint64_t amoAddr; // amo address to store fetch data
 };
 
 struct ACLSHMEMUDMACqCtx {
@@ -74,10 +74,10 @@ struct ACLSHMEMUDMACqCtx {
     uint64_t bufAddr;     // start address of ring buffer
     uint32_t cqeSize;     // size in bytes of each CQE
     uint32_t depth;       // depth of ring buffer
-    uint64_t headAddr;    // work queue head (Producer Index) address
-    uint64_t tailAddr;    // work queue tail (Consumer Index) address
+    uint32_t head;        // completion queue head (Producer Index)
+    uint32_t tail;        // completion queue tail (Consumer Index)
     ACLSHMEMUDMADBMode dbMode;
-    uint64_t dbAddr;      // doorbell address
+    uint64_t dbAddr; // doorbell address
 };
 
 struct ACLSHMEMSqeCtx { // 对应着 ACLSHMEMwqeCtx

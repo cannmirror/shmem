@@ -92,12 +92,11 @@ private:
     std::vector<uint32_t> channelPeers_;
     // The control plane fills a contiguous ACLSHMEMAIVUDMAInfo blob using the legacy
     // (jetty-manager) layout so the data plane consumes it unchanged. The per-peer
-    // wqeCnt / amo / remote-EID scratch buffers are allocated separately, mirroring
+    // amo / remote-EID scratch buffers are allocated separately, mirroring
     // the original DeviceJettyManager allocation scheme.
     void* udmaInfoDev_{nullptr};            // device pointer to the contiguous ACLSHMEMAIVUDMAInfo blob
     uint64_t udmaInfoSize_{0};              // byte size of the contiguous blob
     void* eidDev_{nullptr};                 // device pointer to uint8_t[rankCount_][16] remote EID raw, indexed by pe
-    std::vector<void*> wqeCntDevList_;      // per-peer uint32_t wqe counter device buffers, indexed by pe
     std::vector<void*> amoDevList_;         // per-peer uint64_t AMO scratch device buffers, indexed by pe
 };
 } // namespace device

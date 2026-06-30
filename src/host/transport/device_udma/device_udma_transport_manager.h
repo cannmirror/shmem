@@ -58,7 +58,7 @@ public:
     }
 
 private:
-    static bool OpenTsd(uint32_t deviceId, uint32_t rankCount);
+    static bool OpenTsd(uint32_t userId, uint32_t rankCount);
     static bool RaInit(uint32_t deviceId);
     bool RaGetDevEidInfoNum(uint32_t deviceId, unsigned int& num);
     bool RaGetDevEidInfoList(

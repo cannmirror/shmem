@@ -339,7 +339,7 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
         return false;
     }
 
-    if (!OpenTsd(deviceId, rankCount)) {
+    if (!OpenTsd(userId_, rankCount)) {
         SHM_LOG_ERROR("Open tsd failed.");
         return false;
     }
@@ -420,7 +420,7 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
     return true;
 }
 
-bool UdmaTransportManager::OpenTsd(uint32_t deviceId, uint32_t rankCount)
+bool UdmaTransportManager::OpenTsd(uint32_t userId, uint32_t rankCount)
 {
     if (tsdOpened_) {
         SHM_LOG_INFO("Tsd already opened.");
@@ -438,14 +438,14 @@ bool UdmaTransportManager::OpenTsd(uint32_t deviceId, uint32_t rankCount)
     args.pathLen = 0UL;
     int subPid = 0;
     args.subPid = &subPid;
-    auto ret = shm::DlHccpV2Api::TsdProcessOpen(deviceId, &args);
+    auto ret = shm::DlHccpV2Api::TsdProcessOpen(userId, &args);
     if (ret != 0) {
         SHM_LOG_ERROR(
-            "TsdProcessOpen failed, deviceId = " << deviceId << ", rankCount = " << rankCount << ", ret = " << ret);
+            "TsdProcessOpen failed, userId = " << userId << ", rankCount = " << rankCount << ", ret = " << ret);
         return false;
     }
     subPid_ = subPid;
-    SHM_LOG_DEBUG("Open tsd for device id: " << deviceId << ", rank count: " << rankCount << " success.");
+    SHM_LOG_DEBUG("Open tsd for user id: " << userId << ", rank count: " << rankCount << " success.");
     tsdOpened_ = true;
     return true;
 }
@@ -690,10 +690,10 @@ void UdmaTransportManager::CleanupResources()
     }
 
     if (tsdOpened_ && subPid_ > 0) {
-        auto ret = shm::DlHccpV2Api::TsdProcessClose(deviceId_, subPid_);
+        auto ret = shm::DlHccpV2Api::TsdProcessClose(userId_, subPid_);
         if (ret != 0) {
             SHM_LOG_WARN(
-                "TsdProcessClose failed, device id: " << deviceId_ << ", subPid: " << subPid_ << ", ret = " << ret);
+                "TsdProcessClose failed, userId: " << userId_ << ", subPid: " << subPid_ << ", ret = " << ret);
         }
         SHM_LOG_INFO("TsdProcessClose success.");
     }

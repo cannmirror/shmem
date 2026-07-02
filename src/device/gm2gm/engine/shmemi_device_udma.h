@@ -32,156 +32,156 @@ enum class aclshmemi_udma_opcode_t : uint32_t {
     UDMA_OPCODE_NOP = 0x11
 };
 
-struct ACLSHMEMAIVUDMAInfo {
-    uint32_t qpNum;  // number of QP per connection
-    uint64_t sqPtr;  // pointer to send queue address array of size [PE_NUM][qpNum]
-    uint64_t rqPtr;  // pointer to receive queue address array of size [PE_NUM][qpNum]
-    uint64_t scqPtr; // pointer to send completion queue address array of size [PE_NUM][qpNum]
-    uint64_t rcqPtr; // pointer to receive completion queue address array of size [PE_NUM][qpNum]
-    uint64_t memPtr; // pointer to memory region array of size [MAX_PE_NUM]
+struct aclshmemi_aiv_udma_info_t {
+    uint32_t qp_num;  // number of QP per connection
+    uint64_t sq_ptr;  // pointer to send queue address array of size [PE_NUM][qp_num]
+    uint64_t rq_ptr;  // pointer to receive queue address array of size [PE_NUM][qp_num]
+    uint64_t scq_ptr; // pointer to send completion queue address array of size [PE_NUM][qp_num]
+    uint64_t rcq_ptr; // pointer to receive completion queue address array of size [PE_NUM][qp_num]
+    uint64_t mem_ptr; // pointer to memory region array of size [MAX_PE_NUM]
 };
 
-struct ACLSHMEMUBmemInfo {
-    bool tokenValueValid;      // token_en 表示是否使能token
-    uint32_t rmtJettyType : 2; // 表示远端jetty的类型
-    uint8_t targetHint;        // jettygrp场景使用
+struct aclshmemi_ubmem_info_t {
+    bool token_value_valid;      // token_en 表示是否使能token
+    uint32_t rmt_jetty_type : 2; // 表示远端jetty的类型
+    uint8_t target_hint;        // jettygrp场景使用
     uint32_t tpn;              // 对应着tp_id 区分传输层是简易传输层还是完整传输层
     uint32_t tid;              // 对应着SQE的rmt_jetty_or_seg_id，来源是udma_seg->tid;
-    uint32_t rmtTokenValue;    // 对应着SQE的rmt_token_value，来源是udma_seg->token_value.token;
+    uint32_t rmt_token_value;    // 对应着SQE的rmt_token_value，来源是udma_seg->token_value.token;
     uint32_t len;
     uint64_t addr; // 来源urma_sge的addr，对应SQE的rmt_addr_l_or_token_id，rmt_addr_h_or_token_value
-    uint64_t eidAddr;
+    uint64_t eid_addr;
 };
 
-enum class ACLSHMEMUDMADBMode : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
+enum class aclshmemi_udma_db_mode_t : int32_t { INVALID_DB = -1, HW_DB = 0, SW_DB };
 
-struct ACLSHMEMUDMAWQCtx {
+struct aclshmemi_udma_wq_ctx_t {
     uint32_t wqn;         // work queue number
-    uint64_t bufAddr;     // start address of ring buffer
-    uint32_t wqeSize;     // size in bytes of each WQE
+    uint64_t buf_addr;     // start address of ring buffer
+    uint32_t wqe_size; // size in bytes of each WQE
     uint32_t depth;       // depth of ring buffer
-    uint32_t head;        // work queue head (Producer Index)
-    uint32_t tail;        // work queue tail (Consumer Index)
-    ACLSHMEMUDMADBMode dbMode;
-    uint64_t dbAddr;  // doorbell address
-    uint32_t sl;      // service level
-    uint32_t wqeCnt;  // wqe count
-    uint64_t amoAddr; // amo address to store fetch data
+    uint32_t head;      // work queue head (Producer Index)
+    uint32_t tail;      // work queue tail (Consumer Index)
+    aclshmemi_udma_db_mode_t db_mode;
+    uint64_t db_addr;  // doorbell address
+    uint32_t sl;       // service level
+    uint32_t wqe_cnt;  // wqe count
+    uint64_t amo_addr; // amo address to store fetch data
 };
 
-struct ACLSHMEMUDMACqCtx {
+struct aclshmemi_udma_cq_ctx_t {
     uint32_t cqn;         // completion queue number
-    uint64_t bufAddr;     // start address of ring buffer
-    uint32_t cqeSize;     // size in bytes of each CQE
+    uint64_t buf_addr;     // start address of ring buffer
+    uint32_t cqe_size; // size in bytes of each CQE
     uint32_t depth;       // depth of ring buffer
-    uint32_t head;        // completion queue head (Producer Index)
-    uint32_t tail;        // completion queue tail (Consumer Index)
-    ACLSHMEMUDMADBMode dbMode;
-    uint64_t dbAddr; // doorbell address
+    uint32_t head;      // completion queue head (Producer Index)
+    uint32_t tail;      // completion queue tail (Consumer Index)
+    aclshmemi_udma_db_mode_t db_mode;
+    uint64_t db_addr; // doorbell address
 };
 
-struct ACLSHMEMSqeCtx { // 对应着 ACLSHMEMwqeCtx
+struct aclshmemi_sqe_ctx_t { // 对应着 ACLSHMEMwqeCtx
     /* byte 4 */
-    uint32_t sqeBbIdx : 16;
+    uint32_t sqe_bb_idx : 16;
     uint32_t flag : 8;
     uint32_t rsv0 : 3;
     uint32_t nf : 1;
-    uint32_t tokenEn : 1;
-    uint32_t rmtJettyType : 2;
+    uint32_t token_en : 1;
+    uint32_t rmt_jetty_type : 2;
     uint32_t owner : 1;
     /* byte 8 */
-    uint32_t targetHint : 8;
+    uint32_t target_hint : 8;
     uint32_t opcode : 8;
     uint32_t rsv1 : 6;
-    uint32_t inlineMsgLen : 10;
+    uint32_t inline_msg_len : 10;
     /* byte 12 */
-    uint32_t tpId : 24;
-    uint32_t sgeNum : 8;
+    uint32_t tp_id : 24;
+    uint32_t sge_num : 8;
     /* byte 16 */
-    uint32_t rmtJettyOrSegId : 20;
+    uint32_t rmt_jetty_or_seg_id : 20;
     uint32_t rsv2 : 12;
     /* byte 20 - 32 */
     // For better perf, use 2 uint64_t to represent int8[16]
-    uint64_t rmtEidL;
-    uint64_t rmtEidH;
+    uint64_t rmt_eid_l;
+    uint64_t rmt_eid_h;
     /* byte 36 */
-    uint32_t rmtTokenValue;
+    uint32_t rmt_token_value;
     /* byte 40 */
-    uint32_t udfType : 8;
-    uint32_t reduceDataType : 4;
-    uint32_t reduceOpcode : 4;
+    uint32_t udf_type : 8;
+    uint32_t reduce_data_type : 4;
+    uint32_t reduce_opcode : 4;
     uint32_t rsv3 : 16;
     /* byte 44 - 48*/
-    uint32_t rmtAddrLOrTokenId;
-    uint32_t rmtAddrHOrTokenValue;
+    uint32_t rmt_addr_l_or_token_id;
+    uint32_t rmt_addr_h_or_token_value;
 };
 
-struct ACLSHMEMSgeCtx { // 对应着ACLSHMEMsegCtx
+struct aclshmemi_sge_ctx_t { // 对应着ACLSHMEMsegCtx
     uint32_t len;
     uint32_t token_id;
     uint64_t va;
 };
 
-struct ACLSHMEMNotifyCtx {
+struct aclshmemi_notify_ctx_t {
     /* byte 48 - 52 */
-    uint32_t notifyTokenId : 20;
+    uint32_t notify_token_id : 20;
     uint32_t rsv : 12;
     /* byte 52 - 56 */
-    uint32_t notifyTokenValue;
+    uint32_t notify_token_value;
     /* byte 56 - 60 */
-    uint32_t notifyAddrL;
+    uint32_t notify_addr_l;
     /* byte 60 - 64 */
-    uint32_t notifyAddrH;
+    uint32_t notify_addr_h;
     /* byte 64 - 68 */
-    uint32_t notifyDataL;
+    uint32_t notify_data_l;
     /* byte 68 - 72 */
-    uint32_t notifyDataH;
+    uint32_t notify_data_h;
     /* byte 72 - 80 */
     uint32_t rsv2[2];
 };
 
-struct ACLSHMEMJfcCqeCtx { // 对应ACLSHMEMcqeCtx
+struct aclshmemi_jfc_cqe_ctx_t { // 对应ACLSHMEMcqeCtx
     /* DW0 */
-    uint32_t sR : 1;
-    uint32_t isJetty : 1;
+    uint32_t s_r : 1;
+    uint32_t is_jetty : 1;
     uint32_t owner : 1;
-    uint32_t inlineEn : 1;
+    uint32_t inline_en : 1;
     uint32_t opcode : 3;
     uint32_t fd : 1;
     uint32_t rsv : 8;
     uint32_t substatus : 8;
     uint32_t status : 8;
     /* DW1 */
-    uint32_t entryIdx : 16;
-    uint32_t localNumL : 16;
+    uint32_t entry_idx : 16;
+    uint32_t local_num_l : 16;
     /* DW2 */
-    uint32_t localNumH : 4;
-    uint32_t rmtIdx : 20;
+    uint32_t local_num_h : 4;
+    uint32_t rmt_idx : 20;
     uint32_t rsv1 : 8;
     /* DW3 */
     uint32_t tpn : 24;
     uint32_t rsv2 : 8;
     /* DW4 */
-    uint32_t byteCnt;
+    uint32_t byte_cnt;
     /* DW5 ~ DW6 */
-    uint32_t userDataL;
-    uint32_t userDataH;
+    uint32_t user_data_l;
+    uint32_t user_data_h;
     /* DW7 ~ DW10 */
-    uint32_t rmtEid[4];
+    uint32_t rmt_eid[4];
     /* DW11 ~ DW12 */
-    uint32_t dataL;
-    uint32_t dataH;
+    uint32_t data_l;
+    uint32_t data_h;
     /* DW13 ~ DW15 */
-    uint32_t inlineData[3];
+    uint32_t inline_data[3];
 };
 
-struct ACLSHMEMUDMADeviceMeta {
-    uint32_t entityId;
-    uint32_t rankId;
-    uint32_t rankSize;
-    uint32_t extraContextSize;
-    uint64_t symmetricSize;
-    uint64_t qpInfoAddress; // 对应着ACLSHMEMAIVUDMAInfo
+struct aclshmemi_udma_device_meta_t {
+    uint32_t entity_id;
+    uint32_t rank_id;
+    uint32_t rank_size;
+    uint32_t extra_context_size;
+    uint64_t symmetric_size;
+    uint64_t qp_info_address; // 对应着aclshmem_aiv_udma_info_t
     uint64_t reserved[12];  // total 128B, equal HYBM_DEVICE_PRE_META_SIZE
 };
 
@@ -231,68 +231,68 @@ struct aclshmemi_udma_params_impl_t<T, signal_op_tag_t> {
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 using aclshmemi_udma_params_t = aclshmemi_udma_params_impl_t<T, typename aclshmemi_op_category_t<OP_CODE>::type>;
 
-ACLSHMEM_DEVICE __gm__ ACLSHMEMAIVUDMAInfo* aclshmemi_udma_qp_info_fetch();
+ACLSHMEM_DEVICE __gm__ aclshmemi_aiv_udma_info_t* aclshmemi_udma_qp_info_fetch();
 
 /**
  * @brief UDMA Poll Completion Queue (CQ) function. Return status: 0 means success, non-zero means error.
  *
  * @param pe                     [in] destination PE ID
- * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param qp_idx                  [in] QP index in multi-QP scenario (default 0 for single QP)
  * @param idx                    [in] expect completion queue consumer index after polling
  */
-ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qpIdx, uint32_t idx);
+ACLSHMEM_DEVICE uint32_t aclshmemi_udma_poll_cq(uint32_t pe, uint32_t qp_idx, uint32_t idx);
 
 ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(
-    uint32_t curTail, uint32_t qpIdx, __gm__ ACLSHMEMUDMACqCtx* cqCtxEntry, __gm__ ACLSHMEMUDMAWQCtx* wqCtxEntry);
+    uint32_t cur_tail, uint32_t qp_idx, __gm__ aclshmemi_udma_cq_ctx_t* cq_ctx_entry, __gm__ aclshmemi_udma_wq_ctx_t* wq_ctx_entry);
 
 /**
  * @brief AIV direct UDMA helper function for post send, prepare WQE and ring doorbell.
  *
- * @param remoteAddr             [in] address in remote HBM
- * @param localAddr              [in] address in lcoal HBM
+ * @param remote_addr             [in] address in remote HBM
+ * @param local_addr              [in] address in lcoal HBM
  * @param pe                     [in] destination PE ID
- * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param qp_idx                  [in] QP index in multi-QP scenario (default 0 for single QP)
  * @param opcode                 [in] udma opcode in aclshmemi_udma_opcode_t enum class
- * @param messageLen             [in] message length in Bytes
+ * @param message_len             [in] message length in Bytes
  * @param params                 [in] extra parameters
  */
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
-    __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    __gm__ uint8_t* remote_addr, __gm__ uint8_t* local_addr, uint32_t pe, uint32_t qp_idx, uint64_t message_len,
     const aclshmemi_udma_params_t<T, OP_CODE>& params = {});
 
-ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm__ ACLSHMEMUDMAWQCtx*& qpCtxEntry);
+ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t cur_head, __gm__ aclshmemi_udma_wq_ctx_t*& qp_ctx_entry);
 
 /**
  * @brief Asynchronous UDMA Write function.
  *
- * @param destDmaAddr            [in] destination address in remote HBM
- * @param srcDmaAddr             [in] source address in local HBM
+ * @param dest_dma_addr            [in] destination address in remote HBM
+ * @param src_dma_addr             [in] source address in local HBM
  * @param pe                     [in] destination PE ID
- * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
- * @param messageLen             [in] message length in Bytes
+ * @param qp_idx                  [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param message_len             [in] message length in Bytes
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen);
+    __gm__ T* dest_dma_addr, __gm__ T* src_dma_addr, uint32_t pe, uint32_t qp_idx, uint64_t message_len);
 
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_write_notify(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    __gm__ T* dest_dma_addr, __gm__ T* src_dma_addr, uint32_t pe, uint32_t qp_idx, uint64_t message_len,
     const aclshmemi_udma_params_t<T, OP_CODE>& params = {});
 
 /**
  * @brief Asynchronous UDMA READ function.
  *
- * @param destDmaAddr            [in] destination address in local HBM
- * @param srcDmaAddr             [in] source address in remote HBM
- * @param srcPe                  [in] source PE ID
- * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
- * @param messageLen             [in] message length in Bytes
+ * @param dest_dma_addr            [in] destination address in local HBM
+ * @param src_dma_addr             [in] source address in remote HBM
+ * @param src_pe                  [in] source PE ID
+ * @param qp_idx                  [in] QP index in multi-QP scenario (default 0 for single QP)
+ * @param message_len             [in] message length in Bytes
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_read(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen);
+    __gm__ T* dest_dma_addr, __gm__ T* src_dma_addr, uint32_t src_pe, uint32_t qp_idx, uint64_t message_len);
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_get_nbi(__gm__ T* dst, __gm__ T* src, uint32_t elem_size, int pe);

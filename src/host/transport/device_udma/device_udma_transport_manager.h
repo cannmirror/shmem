@@ -52,52 +52,52 @@ public:
     }
 
 private:
-    bool CreateEndpoint(uint32_t eidIndex, const std::array<uint8_t, 16>& targetEidRaw);
-    bool PrepareOpenDevice(uint32_t deviceId, uint32_t rankCount);
-    Result BuildUdmaInfo(const std::vector<uint64_t>& channelPtrs, const std::vector<uint32_t>& channelPeers);
-    Result ReadChannelContexts(const std::vector<uint64_t>& channelPtrs, const std::vector<uint32_t>& channelPeers,
-        std::vector<SqContext>& sqContextsByPeer, std::vector<CqContext>& cqContextsByPeer,
-        std::vector<RegedBufferEntity>& remoteBuffersByPeer, std::vector<bool>& peerValid) const;
-    Result PrepareUdmaInfoBuffers(std::vector<uint8_t>& eidTableHost);
-    void InitHostUdmaInfo(uint32_t qpNum, std::vector<uint8_t>& udmaInfoBuffer, ACLSHMEMAIVUDMAInfo*& copyInfo);
-    void FillHostUdmaInfo(const std::vector<SqContext>& sqContextsByPeer,
-        const std::vector<CqContext>& cqContextsByPeer, const std::vector<RegedBufferEntity>& remoteBuffersByPeer,
-        const std::vector<bool>& peerValid, std::vector<uint8_t>& eidTableHost, ACLSHMEMAIVUDMAInfo& copyInfo);
-    Result CopyEidTableToDevice(const std::vector<uint8_t>& eidTableHost);
+    bool CreateEndpoint(uint32_t eid_index, const std::array<uint8_t, 16>& target_eid_raw);
+    bool PrepareOpenDevice(uint32_t device_id, uint32_t rank_count);
+    Result BuildUdmaInfo(const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers);
+    Result ReadChannelContexts(const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers,
+        std::vector<SqContext>& sq_contexts_by_peer, std::vector<CqContext>& cq_contexts_by_peer,
+        std::vector<RegedBufferEntity>& remote_buffers_by_peer, std::vector<bool>& peer_valid) const;
+    Result PrepareUdmaInfoBuffers(std::vector<uint8_t>& eid_table_host);
+    void InitHostUdmaInfo(uint32_t qp_num, std::vector<uint8_t>& udma_info_buffer, aclshmemi_aiv_udma_info_t*& copy_info);
+    void FillHostUdmaInfo(const std::vector<SqContext>& sq_contexts_by_peer,
+        const std::vector<CqContext>& cq_contexts_by_peer, const std::vector<RegedBufferEntity>& remote_buffers_by_peer,
+        const std::vector<bool>& peer_valid, std::vector<uint8_t>& eid_table_host, aclshmemi_aiv_udma_info_t& copy_info);
+    Result CopyEidTableToDevice(const std::vector<uint8_t>& eid_table_host);
     Result CopyUdmaInfoToDevice(
-        uint32_t qpNum, std::vector<uint8_t>& udmaInfoBuffer, ACLSHMEMAIVUDMAInfo& copyInfo);
+        uint32_t qp_num, std::vector<uint8_t>& udma_info_buffer, aclshmemi_aiv_udma_info_t& copy_info);
     Result ReserveScratchBuffers();
-    void FillWqCtx(const SqContext& sqContext, uint32_t peer, ACLSHMEMUDMAWQCtx& dstWq) const;
-    void FillCqCtx(const CqContext& cqContext, ACLSHMEMUDMACqCtx& dstCq) const;
+    void FillWqCtx(const SqContext& sq_context, uint32_t peer, aclshmemi_udma_wq_ctx_t& dst_wq) const;
+    void FillCqCtx(const CqContext& cq_context, aclshmemi_udma_cq_ctx_t& dst_cq) const;
     void FillMemInfo(
-        const SqContext& sqContext, const RegedBufferEntity& remoteBuffer, ACLSHMEMUBmemInfo& dstMem) const;
-    void PrintHostUdmaInfo(const ACLSHMEMAIVUDMAInfo& hostInfo) const;
-    std::vector<HcommMemHandle> CollectChannelMemHandles(uint32_t eidIndex) const;
+        const SqContext& sq_context, const RegedBufferEntity& remote_buffer, aclshmemi_ubmem_info_t& dst_mem) const;
+    void PrintHostUdmaInfo(const aclshmemi_aiv_udma_info_t& host_info) const;
+    std::vector<HcommMemHandle> CollectChannelMemHandles(uint32_t eid_index) const;
     void FreeDeviceInfo();
     void DestroyChannels();
     Result CheckPrepareOptions(const HybmTransPrepareOptions& options);
     void CleanupResources();
 
 private:
-    uint32_t rankId_{0};
-    uint32_t rankCount_{1};
-    uint32_t phyId_{0};
+    uint32_t rank_id_{0};
+    uint32_t rank_count_{1};
+    uint32_t phy_id_{0};
     hybm_role_type role_{HYBM_ROLE_PEER};
-    std::map<uint32_t, uint32_t> peerEidIndexMap_;                        // peerRankId -> local eidIndex
-    std::map<uint32_t, uint32_t> peerRemoteEidIndexMap_;                  // peerRankId -> remote eidIndex
-    std::map<uint32_t, EndpointDesc> endpointDescMap_;                    // eidIndex -> local hcomm endpoint desc
-    std::map<uint32_t, EndpointHandle> endpointHandleMap_;                // eidIndex -> hcomm endpoint handle
-    std::map<uint64_t, std::map<uint32_t, HcommMemHandle>> memRecordMap_; // addr -> eidIndex -> hcomm mem handle
-    std::vector<ChannelHandle> channelHandles_;
-    std::vector<uint32_t> channelPeers_;
-    // The control plane fills a contiguous ACLSHMEMAIVUDMAInfo blob using the legacy
+    std::map<uint32_t, uint32_t> peer_eid_index_map_;                        // peerRankId -> local eid_index
+    std::map<uint32_t, uint32_t> peer_remote_eid_index_map_;                  // peerRankId -> remote eid_index
+    std::map<uint32_t, EndpointDesc> endpoint_desc_map_;                    // eid_index -> local hcomm endpoint desc
+    std::map<uint32_t, EndpointHandle> endpoint_handle_map_;                // eid_index -> hcomm endpoint handle
+    std::map<uint64_t, std::map<uint32_t, HcommMemHandle>> mem_record_map_; // addr -> eid_index -> hcomm mem handle
+    std::vector<ChannelHandle> channel_handles_;
+    std::vector<uint32_t> channel_peers_;
+    // The control plane fills a contiguous aclshmemi_aiv_udma_info_t blob using the legacy
     // (jetty-manager) layout so the data plane consumes it unchanged. The per-peer
     // amo / remote-EID scratch buffers are allocated separately, mirroring
     // the original DeviceJettyManager allocation scheme.
-    void* udmaInfoDev_{nullptr};            // device pointer to the contiguous ACLSHMEMAIVUDMAInfo blob
-    uint64_t udmaInfoSize_{0};              // byte size of the contiguous blob
-    void* eidDev_{nullptr};                 // device pointer to uint8_t[rankCount_][16] remote EID raw, indexed by pe
-    std::vector<void*> amoDevList_;         // per-peer uint64_t AMO scratch device buffers, indexed by pe
+    void* udma_info_dev_{nullptr};            // device pointer to the contiguous aclshmemi_aiv_udma_info_t blob
+    uint64_t udma_info_size_{0};              // byte size of the contiguous blob
+    void* eid_dev_{nullptr};                 // device pointer to uint8_t[rank_count_][16] remote EID raw, indexed by pe
+    std::vector<void*> amo_dev_list_;         // per-peer uint64_t AMO scratch device buffers, indexed by pe
 };
 } // namespace device
 } // namespace transport

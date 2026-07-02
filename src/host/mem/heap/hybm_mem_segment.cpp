@@ -20,6 +20,7 @@ namespace shm {
 bool MemSegment::deviceInfoReady{false};
 int MemSegment::deviceId_{-1};
 int MemSegment::logicDeviceId_{-1};
+int MemSegment::devicePhyId_{-1};
 uint32_t MemSegment::pid_{0};
 uint32_t MemSegment::sdid_{0};
 uint32_t MemSegment::serverId_{0};
@@ -86,6 +87,14 @@ Result MemSegment::InitDeviceInfo()
     ret = DlAclApi::RtGetLogicDevIdByUserDevId(deviceId_, &logicDeviceId_);
     if (ret != 0 || logicDeviceId_ < 0) {
         SHM_LOG_ERROR("Failed to get logic deviceId: " << deviceId_ << ", ret=" << ret);
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    // CANN: aclrtGetPhyDevIdByLogicDevId actually expects userDevId under grouped visible (see transport path).
+    ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(deviceId_, &devicePhyId_);
+    if (ret != 0 || devicePhyId_ < 0) {
+        SHM_LOG_ERROR("Failed to get phy deviceId: user=" << deviceId_ << ", logic=" << logicDeviceId_
+                                                    << ", ret=" << ret);
         return ACLSHMEM_INNER_ERROR;
     }
 
@@ -169,5 +178,46 @@ bool MemSegment::IsSdmaAccessible(uint32_t superPodId, uint32_t serverId, uint32
     }
 
     return superPodId == superPodId_;
+}
+
+Result MemSegment::EnableRemotePeerAccess(int32_t remotePhyId, int32_t remoteUserId) noexcept
+{
+    if (remotePhyId < 0) {
+        SHM_LOG_ERROR("invalid remote phy id: " << remotePhyId);
+        return ACLSHMEM_INVALID_PARAM;
+    }
+    if (remotePhyId == devicePhyId_) {
+        return ACLSHMEM_SUCCESS;
+    }
+
+    Result ret = DlAclApi::RtEnableP2P(static_cast<uint32_t>(deviceId_), static_cast<uint32_t>(remotePhyId), 0);
+    if (ret == ACLSHMEM_UNDER_API_UNLOAD) {
+        if (remoteUserId < 0) {
+            SHM_LOG_ERROR("invalid remote user id: " << remoteUserId);
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        ret = DlAclApi::AclrtDeviceEnablePeerAccess(remoteUserId, 0);
+        if (ret != 0) {
+            SHM_LOG_ERROR("enable device access failed:" << ret << " local_user:" << deviceId_
+                                                        << " local_phy:" << devicePhyId_
+                                                        << " remote_user:" << remoteUserId
+                                                        << " remote_phy:" << remotePhyId);
+            return ACLSHMEM_DL_FUNC_FAILED;
+        }
+        SHM_LOG_DEBUG("enable device access success (aclrt fallback) local_user:" << deviceId_
+                                                                                  << " remote_user:"
+                                                                                  << remoteUserId);
+        return ACLSHMEM_SUCCESS;
+    }
+    if (ret != 0) {
+        SHM_LOG_ERROR("enable device access failed:" << ret << " local_user:" << deviceId_
+                                                    << " local_phy:" << devicePhyId_
+                                                    << " remote_phy:" << remotePhyId);
+        return ACLSHMEM_DL_FUNC_FAILED;
+    }
+    SHM_LOG_DEBUG("enable device access success local_user:" << deviceId_
+                                                             << " local_phy:" << devicePhyId_
+                                                             << " remote_phy:" << remotePhyId);
+    return ACLSHMEM_SUCCESS;
 }
 }

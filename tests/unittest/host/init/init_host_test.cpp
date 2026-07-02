@@ -333,7 +333,8 @@ void test_aclshmem_init_cant_access(int rank_id, int n_ranks, uint64_t local_mem
     aclshmemx_init_attr_t attributes;
     test_set_attr(rank_id, n_ranks, local_mem_size, test_global_ipport, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
-    EXPECT_EQ(status, ACLSHMEM_DL_FUNC_FAILED);
+    EXPECT_EQ(status, ACLSHMEM_SUCCESS);
+    EXPECT_NE(g_state.heap_base, nullptr);
     status = aclshmem_finalize();
     EXPECT_EQ(status, ACLSHMEM_SUCCESS);
     EXPECT_EQ(aclrtResetDevice(0), 0);

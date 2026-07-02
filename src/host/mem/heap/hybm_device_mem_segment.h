@@ -35,6 +35,7 @@ struct HbmExportInfo {
     uint32_t sdid{0};
     int32_t logicDeviceId{-1};
     int32_t deviceId{-1};
+    int32_t devicePhyId{-1};
     uint32_t serverId{0};
     uint32_t superPodId{0};
     int pid{0};

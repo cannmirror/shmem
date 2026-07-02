@@ -40,6 +40,7 @@ using aclrtGetSocNameFunc = const char *(*)();
 using rtGetLogicDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using aclrtGetPhyDevIdByLogicDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using rtGetDevicePhyIdByIndexFunc = int32_t (*)(uint32_t, uint32_t *);
+using rtEnableP2PFunc = int32_t (*)(uint32_t, uint32_t, uint32_t);
 using aclrtReserveMemAddressFunc = int (*)(void **, size_t, size_t, void *, uint64_t);
 using aclrtReleaseMemAddressFunc = int (*)(void *);
 
@@ -228,6 +229,14 @@ public:
 
     static Result AclrtReleaseMemAddress(void *virPtr);
 
+    static inline Result RtEnableP2P(uint32_t localUserId, uint32_t remotePhyId, uint32_t flags)
+    {
+        if (pRtEnableP2P == nullptr) {
+            return ACLSHMEM_UNDER_API_UNLOAD;
+        }
+        return pRtEnableP2P(localUserId, remotePhyId, flags);
+    }
+
 private:
     static std::mutex gMutex;
     static bool gLoaded;
@@ -258,6 +267,7 @@ private:
     static rtGetLogicDevIdByUserDevIdFunc pRtGetLogicDevIdByUserDevId;
     static aclrtGetPhyDevIdByLogicDevIdFunc pAclrtGetPhyDevIdByLogicDevId;
     static rtGetDevicePhyIdByIndexFunc pRtGetDevicePhyIdByIndex;
+    static rtEnableP2PFunc pRtEnableP2P;
     static aclrtReserveMemAddressFunc pAclrtReserveMemAddress;
     static aclrtReleaseMemAddressFunc pAclrtReleaseMemAddress;
 };

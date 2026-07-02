@@ -4,6 +4,10 @@ HCCS/SIO 链路测试工具，用于验证 NPU 之间 SIO / HCCS 链路的正确
 
 > **注意**：当前 CANN 版本暂未支持，预计 CANN 9.1.0 版本支持该功能。
 
+> **依赖**：
+> - Ascend HDK 版本 >= 26.0.0
+> - LingQu Computing Network 版本 >= 1.5.3。下载地址：[LingQu Computing Network](https://support.huawei.com/enterprise/zh/ascend-computing/lingqu-computing-network-pid-258003841/software)
+
 ## 链路说明
 
 对于 A3 芯片，一个 NPU 包含两个 Die，两 Die 之间通过 SIO 链路互连。本方案在 SIO 链路基础上新增 HCCS 链路，实现 SIO/HCCS 双路并行传输，从而提高 Die 间数据传输速度。

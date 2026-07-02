@@ -138,7 +138,10 @@ git clone https://gitcode.com/cann/shmem.git
 cd shmem
 
 # 编译核心库（默认不包含xDMA能力，也不包含示例和测试）
+# Ascend910B/C 平台
 bash scripts/build.sh
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950
 
 # 配置环境变量
 source install/set_env.sh
@@ -146,7 +149,9 @@ source install/set_env.sh
 备注：build.sh 的参数可以参考 [compilation_build_guide.md](./compilation_build_guide.md)
 
 #### 5.1.2 方式二：二进制包安装
-获取方式：`bash scripts/build.sh -package`
+获取方式：
+- Ascend910B/C 平台：`bash scripts/build.sh -package`
+- Ascend950 平台：`bash scripts/build.sh -soc_type Ascend950 -package`
 
 软件包格式：`SHMEM_{version}_linux-{arch}.run`
 
@@ -179,8 +184,13 @@ int32_t ret = aclshmemx_set_conf_store_tls(false, NULL, 0);
 
 1.在shmem/目录编译:
 
+- Ascend910B/C 平台:
 ```sh
 bash scripts/build.sh -examples
+```
+- Ascend950 平台:
+```sh
+bash scripts/build.sh -soc_type Ascend950 -examples
 ```
 
 2.在shmem/examples/allgather目录执行demo:
@@ -202,17 +212,27 @@ bash scripts/run.sh -ranks 8 -ipport tcp://127.0.0.1:8666 -test_filter Init
 ### 5.3 debug 模式使用
 在源码 shmem/ 目录编译:
 
+- Ascend910B/C 平台:
    ```sh
    bash scripts/build.sh -examples -debug
+   ```
+- Ascend950 平台:
+   ```sh
+   bash scripts/build.sh -soc_type Ascend950 -examples -debug
    ```
 
 注意：此处 `-examples` 参数非必选项，仅提供[使用参考](./debug/Troubleshooting_FAQs.md#shmem-常见问题)。
 
 ## 6 Python 侧 test 用例     [Python 接口 API 列表](api/pythonAPI.md)
-1. 在 scripts 目录下编译的时候，带上 build python 的选项
+1. 在 shmem 根目录下编译时，带上 build python 的选项
 
+- Ascend910B/C 平台:
 ```sh
-bash build.sh -python_extension
+bash scripts/build.sh -python_extension
+```
+- Ascend950 平台:
+```sh
+bash scripts/build.sh -soc_type Ascend950 -python_extension
 ```
 
 2. 在 install 目录下，source 环境变量
@@ -317,7 +337,10 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, attributes);
 
 ```bash
 # 编译并运行单元测试
+# Ascend910B/C 平台
 bash scripts/build.sh -uttests
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -uttests
 bash scripts/run.sh
 ```
 run.sh 脚本提供 `-ranks`、`-test_filter` 等参数自定义执行用例的卡数、`gtest_filter` 等，例如：
@@ -330,7 +353,10 @@ bash scripts/run.sh -ranks 8 -test_filter Init
 ### 9.2 样例编译与执行
 
 ```bash
+# Ascend910B/C 平台
 bash scripts/build.sh -examples
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples
 bash scripts/run_examples.sh
 ```
 
@@ -340,7 +366,10 @@ bash scripts/run_examples.sh
 ### 9.4 运行 Python 测试用例
 ```bash
 # 编译 Python 扩展
+# Ascend910B/C 平台
 bash scripts/build.sh -python_extension
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -python_extension
 # 安装构建脚本生成的 wheel 包
 pip3 install dist/shmem-xxx.whl --force-reinstall
 ```

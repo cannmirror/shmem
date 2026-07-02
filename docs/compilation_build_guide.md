@@ -14,7 +14,10 @@ git clone https://gitcode.com/cann/shmem.git
 
 ```shell
 cd shmem
+# Ascend910B/C 平台
 bash scripts/build.sh
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950
 ```
 
 更多命令介绍可查看shmem仓主目录下的`README.md`和`scripts/build.sh`文件。

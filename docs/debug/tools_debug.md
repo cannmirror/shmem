@@ -65,8 +65,13 @@ pip3 install --upgrade mstx-xxxxx.whl --target ${ASCEND_HOME_PATH}/tools/mstx/
 ### 三、shmem 使能mssanitizer工具能力
 
 在shmem/目录编译:
+- Ascend910B/C 平台:
 ```sh
 bash scripts/build.sh -mssanitizer
+```
+- Ascend950 平台:
+```sh
+bash scripts/build.sh -soc_type Ascend950 -mssanitizer
 ```
 
 不同芯片型号的编译选项有所差异：
@@ -92,8 +97,13 @@ mssanitizer <options> -- <user_program> <user_options>
 shmem的[AllGather](https://gitcode.com/cann/shmem/tree/master/examples/allgather)样例运行脚本提供了tool选项选择拉起工具。
 
 编译样例且使能工具能力
+- Ascend910B/C 平台:
 ```sh
 bash scripts/build.sh -examples -mssanitizer
+```
+- Ascend950 平台:
+```sh
+bash scripts/build.sh -soc_type Ascend950 -examples -mssanitizer
 ```
 用mssanitizer工具拉起allgather样例进行内存检测
 ```sh

@@ -12,8 +12,13 @@ SHMEM当前提供了三种flag用于初始化：
 
 ### 样例运行
 在根目录调用`scripts/build.sh`控制后端。
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950
 ```
 
 ```bash
@@ -95,8 +100,13 @@ export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
 ```
 
 在根目录调用`scripts/build.sh`
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950
 ```
 
 ```bash
@@ -147,8 +157,13 @@ export LD_LIBRARY_PATH=/usr/local/mpich/lib:$LD_LIBRARY_PATH
 ```
 
 在根目录调用`scripts/build.sh`控制后端。
+- Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh
+```
+- Ascend950 平台:
+```bash
+bash scripts/build.sh -soc_type Ascend950
 ```
 
 ```bash

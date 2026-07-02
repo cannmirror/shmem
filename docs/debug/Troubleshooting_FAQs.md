@@ -36,7 +36,9 @@ if (symmTest != nullptr) {
 
 #### A: 可使用debug模式排查共享内存分配对称性问题
 
-`debug`模式开启方法：在代码仓根目录下执行：`bash scripts/build.sh -examples -debug`
+`debug`模式开启方法：在代码仓根目录下执行：
+- Ascend910B/C 平台：`bash scripts/build.sh -examples -debug`
+- Ascend950 平台：`bash scripts/build.sh -soc_type Ascend950 -examples -debug`
 
 此时执行代码获得如下报错，确认错误为使用`aclshmem_malloc`接口分配了非对称的共享内存
 

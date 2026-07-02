@@ -63,8 +63,13 @@ Profiling工具核心特性：
 
 1. 按照如上步骤修改完后，进行编译算子样例。
 
+   - Ascend910B/C 平台:
    ```sh
    bash scripts/build.sh -examples
+   ```
+   - Ascend950 平台:
+   ```sh
+   bash scripts/build.sh -soc_type Ascend950 -examples
    ```
 2. 在examples/allgather目录执行demo:
 

@@ -32,8 +32,13 @@ AscendC算子调测API是AscendC提供的调试能力，可进行kernel内部的
 
 1. 打开工具的编译开关`-enable_ascendc_dump`， 使能AscendC算子调测API编译算子样例。
 
+   - Ascend910B/C 平台:
    ```sh
    bash scripts/build.sh -enable_ascendc_dump -examples
+   ```
+   - Ascend950 平台:
+   ```sh
+   bash scripts/build.sh -soc_type Ascend950 -enable_ascendc_dump -examples
    ```
 2. 在examples/sdma目录执行demo:
 

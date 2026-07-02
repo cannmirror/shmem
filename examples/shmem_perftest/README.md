@@ -37,7 +37,10 @@ bash scripts/build.sh -soc_type Ascend950 -examples
 bash scripts/build.sh -examples -enable_simt -soc_type Ascend950
 
 # 如需运行 --memory-type dram，需启用CANN模式编译
+# Ascend910B/C 平台
 bash scripts/build.sh -examples -cann
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples -cann
 
 # 运行所有已编译示例（默认模式，仅生成CSV）
 cd examples/shmem_perftest
@@ -91,7 +94,10 @@ bash run.sh -m all -t put -d float -fpe 0 -a md
 `--memory-type dram` 仅作用于 mte_perftest，会使用 `aclshmemx_malloc(..., HOST_SIDE)` 分配Host侧DRAM内存。该功能依赖CANN模式，编译时必须使用：
 
 ```bash
+# Ascend910B/C 平台
 bash scripts/build.sh -examples -cann
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 -examples -cann
 ```
 
 DRAM测试需要运行环境支持Host侧DRAM内存访问，相关硬件和可用内存约束可参考 [rma_d2h_demo](../rma_d2h_demo/README.md) 的“约束限制”章节。mte_perftest默认配置1GB本地内存；当测试参数需要更大本地内存时，程序会按数据量自动上调，运行前需确保可用DRAM空间大于实际本地内存配置。

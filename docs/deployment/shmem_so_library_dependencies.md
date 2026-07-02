@@ -39,9 +39,9 @@
 ### 1.3.2 Mermaid依赖图（示例）
 ```mermaid
 graph TD
-    A[${CUSTOM_PROJECT}/lib/libshmem.so] --> B[${CUSTOM_PROJECT}/lib/libshmem_utils.so]
-    A --> C[${CUSTOM_PROJECT}/lib/aclshmem_bootstrap_config_store.so]
-    A --> D[${CUSTOM_PROJECT}/lib/aclshmem_bootstrap_mpi.so]
+    A["${CUSTOM_PROJECT}/lib/libshmem.so"] --> B["${CUSTOM_PROJECT}/lib/libshmem_utils.so"]
+    A --> C["${CUSTOM_PROJECT}/lib/aclshmem_bootstrap_config_store.so"]
+    A --> D["${CUSTOM_PROJECT}/lib/aclshmem_bootstrap_mpi.so"]
     A --> E[libascend_hal.so]
     A --> F[libascendcl.so]
     A --> G[libruntime.so]
@@ -50,10 +50,10 @@ graph TD
     A --> J[libtsdclient.so]
     C --> K[libssl.so]
     C --> L[libcrypto.so]
-    A --> M[/lib64/libc.so.6]
-    A --> N[/lib64/libpthread.so.0]
-    A --> O[/lib64/libdl.so.2]
-    D --> P[/usr/lib64/libmpi.so]
+    A --> M["/lib64/libc.so.6"]
+    A --> N["/lib64/libpthread.so.0"]
+    A --> O["/lib64/libdl.so.2"]
+    D --> P["/usr/lib64/libmpi.so"]
 
     classDef strong fill:#FDE2E2,stroke:#C53030,stroke-width:1px;
     classDef weak fill:#E6FFFA,stroke:#2C7A7B,stroke-width:1px;
@@ -69,7 +69,10 @@ graph TD
 Linux命令（CentOS/Ubuntu）：
 ```bash
 # 在项目根目录执行
+# Ascend910B/C 平台
 bash scripts/build.sh install
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 install
 
 # 产物检查
 ls -l install/lib/*.so
@@ -121,7 +124,10 @@ cp -f ${BUILD_DIR}/lib/*.so "${INSTALL_LIB_DIR}/"
 ### 1.5.3 调整后执行命令
 Linux命令（CentOS/Ubuntu）：
 ```bash
-bash build.sh install
+# Ascend910B/C 平台
+bash scripts/build.sh install
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 install
 ls -l install/lib/
 ```
 
@@ -189,7 +195,10 @@ LD_DEBUG=libs,files ${CUSTOM_PROJECT}/bin/app --version 2>&1 | grep -E "libshmem
 - 清理旧目录后重编译：
 ```bash
 rm -rf build output install
-bash build.sh install
+# Ascend910B/C 平台
+bash scripts/build.sh install
+# Ascend950 平台
+bash scripts/build.sh -soc_type Ascend950 install
 ```
 
 ### 1.8.2 项目路径权限不足

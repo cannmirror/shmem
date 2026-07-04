@@ -16,6 +16,13 @@ bash examples/udma_demo/run.sh 1 # put signal 测试
 ```
 默认按单机8卡启动，脚本依次拉起`PE 0`到`PE 7`，并等待所有进程退出。
 
+UDMA 高阶 RMA 接口默认使用 `PIPE_MTE3` 下发 WQE，需要一段 UB
+scratch。默认配置为 `offset = 189 * 1024`、`ub_size = 128` 字节、
+`sync_id = 0`；如果样例或业务 kernel 需要复用这段 UB，可通过
+`aclshmemx_set_udma_config(offset, ub_size, sync_id)` 调整。`ub_size`
+必须不小于 128 字节，用于容纳当前 UDMA 数据搬移操作的一块完整
+WQE staging block。
+
 3.脚本命令行参数说明
 ```bash
 ./udma_demo <n_pes> <pe_id> <ipport> <g_npus> <f_pe> <f_npu> [test_type]

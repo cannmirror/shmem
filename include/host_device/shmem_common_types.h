@@ -179,6 +179,10 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// \brief SDMA flag data length
 #define ACLSHMEM_SDMA_FLAG_LENGTH 64
 
+/// \def ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE
+/// \brief Minimum UB scratch size in bytes for UDMA PIPE_MTE3 WQE staging
+#define ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE 128U
+
 /// \def ALIGN_TO
 /// \brief Memory address/size alignment macro
 /// \param size Original size/address to be aligned
@@ -358,6 +362,7 @@ typedef struct {
 typedef aclshmem_ub_config_t aclshmem_mte_config_t;  ///< @deprecated Use aclshmem_mte_config_t instead
 typedef aclshmem_ub_config_t aclshmem_sdma_config_t;  ///< @deprecated Use aclshmem_sdma_config_t instead
 typedef aclshmem_ub_config_t aclshmem_rdma_config_t;  ///< @deprecated Use aclshmem_rdma_config_t instead
+typedef aclshmem_ub_config_t aclshmem_udma_config_t;  ///< UDMA MTE staging config; ub_size must be >= 128 bytes
 
 // state
 /**
@@ -402,6 +407,7 @@ typedef struct {
     aclshmem_mte_config_t mte_config;   ///< Configuration information of the MTE memory transfer engine
     aclshmem_sdma_config_t sdma_config; ///< Configuration information of the SDMA memory transfer engine
     aclshmem_rdma_config_t rdma_config; ///< Configuration information of RDMA
+    aclshmem_udma_config_t udma_config; ///< UDMA MTE staging config for high-level UDMA APIs
     uint64_t qp_info;                 ///< Queue Pair (QP) information, used for communication mechanisms such as RDMA
 
     uint64_t sdma_workspace_addr;  /// sdma aicpu和aiv的共享内存

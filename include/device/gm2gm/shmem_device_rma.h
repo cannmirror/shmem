@@ -15,6 +15,7 @@
 #include "kernel_operator.h"
 #include "device/gm2gm/engine/shmem_device_mte.h"
 #include "device/gm2gm/engine/shmem_device_rdma.h"
+#include "device/gm2gm/engine/shmem_device_udma.h"
 #include "device/gm2gm/shmem_device_mo.h"
 #include "host/shmem_host_def.h"
 #include "device/shmem_def.h"
@@ -766,6 +767,19 @@ ACLSHMEM_DEVICE void aclshmem_putmem_nbi(__gm__ void *dst, __gm__ void *src, uin
  */
 ACLSHMEM_DEVICE void aclshmemx_set_mte_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id);
 #define shmem_mte_set_ub_params aclshmemx_set_mte_config
+
+/**
+ * @brief Set necessary parameters for UDMA MTE staging operations.
+ *        High-level UDMA RMA APIs use this UB scratch to stage one full WQE
+ *        block on the default PIPE_MTE3 path.
+ *
+ * @param offset                [in] The start address on UB.
+ * @param ub_size               [in] The Size of Temp UB Buffer in bytes. It
+ *                              must be at least ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE
+ *                              bytes for UDMA MTE staging.
+ * @param sync_id               [in] Sync ID for the MTE3->S synchronization.
+ */
+ACLSHMEM_DEVICE void aclshmemx_set_udma_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id);
 
 #include "gm2gm/shmem_device_rma.hpp"
 #endif

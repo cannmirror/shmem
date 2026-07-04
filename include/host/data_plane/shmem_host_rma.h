@@ -583,6 +583,20 @@ ACLSHMEM_HOST_API int aclshmemx_set_rdma_config(uint64_t offset, uint32_t ub_siz
 #define shmem_rdma_set_ub_params aclshmemx_set_rdma_config
 
 /**
+ * @brief Set necessary parameters for UDMA MTE staging operations.
+ *        High-level UDMA RMA APIs use this UB scratch to stage one full WQE
+ *        block on the default PIPE_MTE3 path.
+ *
+ * @param offset                [in] The start address on UB.
+ * @param ub_size               [in] The Size of Temp UB Buffer in bytes. It
+ *                              must be at least ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE
+ *                              bytes for UDMA MTE staging.
+ * @param sync_id               [in] Sync ID for the MTE3->S synchronization.
+ * @return Returns 0 on success or an error code on failure.
+ */
+ACLSHMEM_HOST_API int aclshmemx_set_udma_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id);
+
+/**
  * @brief Ensures completion of all previously issued operations on symmetric data objects
  *        issued by the calling PE. The quiet is queued on the given stream; the caller must
  *        synchronize the stream to observe completion from the host.

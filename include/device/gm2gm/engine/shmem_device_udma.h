@@ -32,7 +32,7 @@
  * @param src                 [in] Pointer on Symmetric memory of the source data.
  * @param buf                 [in] Pointer on local UB. Used as WQE staging scratch when
  *                                 WQE_PIPE == PIPE_MTE3 (must hold one full WQE block;
- *                                 256 B is safe for all current opcodes); ignored when
+ *                                 128 B is safe for all current opcodes); ignored when
  *                                 WQE_PIPE == PIPE_S.
  * @param elem_size           [in] Number of elements in the destination and source arrays.
  * @param pe                  [in] PE number of the remote PE.
@@ -163,7 +163,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
  * @param pe                  [in] PE number of the remote PE.
  * @param buf                 [in] Pointer on local UB used as WQE staging scratch
  *                                 (must hold one full WRITE_WITH_NOTIFY WQE block;
- *                                 256 B is safe). Ignored when WQE_PIPE == PIPE_S.
+ *                                 128 B is safe). Ignored when WQE_PIPE == PIPE_S.
  * @param sync_id             [in] Hardware event ID used by the MTE3->S sync after
  *                                 DataCopyPad in the PIPE_MTE3 path. Ignored when
  *                                 WQE_PIPE == PIPE_S. Defaults to 0.

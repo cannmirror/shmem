@@ -19,6 +19,13 @@
 #include "host/shmem_host_def.h"
 #include "shmemi_device_rma.h"
 
+#ifndef ACLSHMEM_UDMA_SUPPORTED
+#define ACLSHMEM_UDMA_SUPPORTED 0
+#endif
+
+#define ACLSHMEM_UDMA_TRANSPORT_ENABLED(STATE, PE) \
+    (ACLSHMEM_UDMA_SUPPORTED && (((STATE)->topo_list[(PE)] & ACLSHMEM_TRANSPORT_UDMA) != 0))
+
 /**
  * @brief Standard RMA Types and Names
  *
@@ -77,6 +84,26 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_P_AICORE);
 
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_G_AICORE);
 
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemi_udma_get_default_nbi(
+    __gm__ aclshmem_device_host_state_t *device_state, __gm__ T *dst, __gm__ T *src, uint32_t elem_size, int32_t pe)
+{
+    uint64_t copy_ub = device_state->udma_config.aclshmem_ub;
+    uint32_t sync_id = device_state->udma_config.sync_id;
+    aclshmemx_udma_get_nbi<T>(
+        dst, src, reinterpret_cast<__ubuf__ T *>(copy_ub), elem_size, pe, sync_id);
+}
+
+template <typename T>
+ACLSHMEM_DEVICE void aclshmemi_udma_put_default_nbi(
+    __gm__ aclshmem_device_host_state_t *device_state, __gm__ T *dst, __gm__ T *src, uint32_t elem_size, int32_t pe)
+{
+    uint64_t copy_ub = device_state->udma_config.aclshmem_ub;
+    uint32_t sync_id = device_state->udma_config.sync_id;
+    aclshmemx_udma_put_nbi<T>(
+        dst, src, reinterpret_cast<__ubuf__ T *>(copy_ub), elem_size, pe, sync_id);
+}
+
 ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_t elem_size, int32_t pe)
 {
     /* Global State Get */
@@ -89,6 +116,11 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_sdma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
                                reinterpret_cast<__ubuf__ char *>(copy_ub), copy_ub_size, elem_size, pe, sync_id);
         aclshmemx_sdma_quiet(reinterpret_cast<__ubuf__ char *>(copy_ub), copy_ub_size, sync_id);
+    } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {
+        /* UDMA */
+        aclshmemi_udma_get_default_nbi<char>(device_state, reinterpret_cast<__gm__ char *>(dst),
+            reinterpret_cast<__gm__ char *>(src), elem_size, pe);
+        aclshmemx_udma_quiet(pe);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
         /* MTE */
         /* CopyUB Config Set */
@@ -105,11 +137,6 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
                             reinterpret_cast<__ubuf__ char *>(copy_ub), elem_size, pe, sync_id);
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
-    } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
-        /* UDMA */
-        aclshmemx_udma_get_nbi<char, PIPE_S>(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
-            (__ubuf__ char *)nullptr, elem_size, pe);
-        aclshmemx_udma_quiet(pe);
     }
 }
 
@@ -126,6 +153,10 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_sdma_get_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, elem_size, pe,\
                                    sync_id);                                                                         \
             aclshmemx_sdma_quiet(reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, sync_id);                 \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                             \
+            /* UDMA */                                                                                               \
+            aclshmemi_udma_get_default_nbi<TYPE>(device_state, dst, src, elem_size, pe);                             \
+            aclshmemx_udma_quiet(pe);                                                                                \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE)  {                                          \
             /* MTE */                                                                                                \
             /* CopyUB Config Set */                                                                                  \
@@ -141,10 +172,6 @@ ACLSHMEM_DEVICE void aclshmem_getmem(__gm__ void *dst, __gm__ void *src, uint32_
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                    \
             aclshmemx_roce_get_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), elem_size, pe, sync_id);    \
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                           \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                          \
-            /* UDMA */                                                                                               \
-            aclshmemx_udma_get_nbi<TYPE, PIPE_S>(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                     \
-            aclshmemx_udma_quiet(pe);                                                                                \
         }                                                                                                            \
     }
 
@@ -314,6 +341,11 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_sdma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
                                reinterpret_cast<__ubuf__ char *>(copy_ub), copy_ub_size, elem_size, pe, sync_id);
         aclshmemx_sdma_quiet(reinterpret_cast<__ubuf__ char *>(copy_ub),copy_ub_size, sync_id);
+    } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {
+        /* UDMA */
+        aclshmemi_udma_put_default_nbi<char>(device_state, reinterpret_cast<__gm__ char *>(dst),
+            reinterpret_cast<__gm__ char *>(src), elem_size, pe);
+        aclshmemx_udma_quiet(pe);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
         /* MTE */
         /* CopyUB Config Set */
@@ -330,11 +362,6 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
         aclshmemx_roce_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
                                reinterpret_cast<__ubuf__ char *>(copy_ub), elem_size, pe, sync_id);
         aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ char *>(copy_ub), sync_id);
-    } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {
-        /* UDMA */
-        aclshmemx_udma_put_nbi<char, PIPE_S>(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
-            (__ubuf__ char *)nullptr, elem_size, pe);
-        aclshmemx_udma_quiet(pe);
     }
 }
 
@@ -351,6 +378,10 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
             aclshmemx_sdma_put_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, elem_size, pe,   \
                                    sync_id);                                                                            \
             aclshmemx_sdma_quiet(reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, sync_id);                    \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                                \
+            /* UDMA */                                                                                                  \
+            aclshmemi_udma_put_default_nbi<TYPE>(device_state, dst, src, elem_size, pe);                                \
+            aclshmemx_udma_quiet(pe);                                                                                   \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                              \
             /* MTE */                                                                                                   \
             /* CopyUB Config Set */                                                                                     \
@@ -366,10 +397,6 @@ ACLSHMEM_DEVICE void aclshmem_putmem(__gm__ void *dst, __gm__ void *src, uint32_
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                       \
             aclshmemx_roce_put_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), elem_size, pe, sync_id);       \
             aclshmemx_roce_quiet(pe, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), sync_id);                              \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                             \
-            /* UDMA */                                                                                                  \
-            aclshmemx_udma_put_nbi<TYPE, PIPE_S>(dst, src, (__ubuf__ TYPE *)nullptr, elem_size, pe);                    \
-            aclshmemx_udma_quiet(pe);                                                                                   \
         }                                                                                                               \
     }
 
@@ -538,6 +565,10 @@ ACLSHMEM_DEVICE void aclshmem_getmem_nbi(__gm__ void *dst, __gm__ void *src, uin
         uint32_t sync_id = device_state->sdma_config.sync_id;
         aclshmemx_sdma_get_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src),
                                reinterpret_cast<__ubuf__ char *>(copy_ub), copy_ub_size, elem_size, pe, sync_id);
+    } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {
+        /* UDMA */
+        aclshmemi_udma_get_default_nbi<char>(device_state, reinterpret_cast<__gm__ char *>(dst),
+            reinterpret_cast<__gm__ char *>(src), elem_size, pe);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
         /* MTE  */
         /* CopyUB Config Set */
@@ -568,6 +599,9 @@ ACLSHMEM_DEVICE void aclshmem_getmem_nbi(__gm__ void *dst, __gm__ void *src, uin
             uint32_t sync_id = device_state->sdma_config.sync_id;                                                     \
             aclshmemx_sdma_get_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, elem_size, pe,       \
                                    sync_id);                                                                          \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                                    \
+            /* UDMA */                                                                                                      \
+            aclshmemi_udma_get_default_nbi<TYPE>(device_state, dst, src, elem_size, pe);                                    \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                                  \
             /* MTE  */                                                                                                      \
             /* CopyUB Config Set */                                                                                         \
@@ -581,9 +615,6 @@ ACLSHMEM_DEVICE void aclshmem_getmem_nbi(__gm__ void *dst, __gm__ void *src, uin
             uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                                       \
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                           \
             aclshmemx_roce_get_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), elem_size, pe, sync_id);            \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                                 \
-            /* UDMA */                                                                                                      \
-            aclshmemi_udma_get_nbi(dst, src, elem_size, pe);                                                                \
         }                                                                                                                   \
     }
 
@@ -637,6 +668,10 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_DETAILED_NBI);
             ub_tensor.address_.dataLen = device_state->sdma_config.ub_size;                                              \
             uint32_t sync_id = device_state->sdma_config.sync_id;                                                        \
             aclshmemx_sdma_get_nbi(dst, src, ub_tensor, elem_size, pe, sync_id);                                         \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                                 \
+            /* UDMA */                                                                                                   \
+            aclshmemi_udma_get_default_nbi<TYPE>(device_state, (__gm__ TYPE*)dst.GetPhyAddr(),                         \
+                (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);                                                        \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                               \
             /* MTE  */                                                                                                   \
             /* CopyUB Config Set */                                                                                      \
@@ -658,9 +693,6 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_DETAILED_NBI);
             ub_tensor.address_.dataLen = device_state->rdma_config.ub_size;                                              \
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                        \
             aclshmemx_roce_get_nbi(dst, src, ub_tensor, elem_size, pe, sync_id);                                         \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                              \
-            /* UDMA */                                                                                                   \
-            aclshmemi_udma_get_nbi((__gm__ TYPE*)dst.GetPhyAddr(), (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);       \
         }                                                                                                                \
     }
 
@@ -701,6 +733,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_TENSOR_DETAILED_NBI);
             uint32_t sync_id = device_state->sdma_config.sync_id;                                                           \
             aclshmemx_sdma_put_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), copy_ub_size, elem_size, pe,       \
                                    sync_id);                                                                                \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                                    \
+            /* UDMA */                                                                                                      \
+            aclshmemi_udma_put_default_nbi<TYPE>(device_state, dst, src, elem_size, pe);                                    \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                                  \
             /* MTE  */                                                                                                      \
             /* CopyUB Config Set */                                                                                         \
@@ -714,9 +749,6 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_GET_TYPENAME_MEM_TENSOR_DETAILED_NBI);
             uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;                                                       \
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                           \
             aclshmemx_roce_put_nbi(dst, src, reinterpret_cast<__ubuf__ TYPE *>(copy_ub), elem_size, pe, sync_id);           \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                                 \
-            /* UDMA */                                                                                                      \
-            aclshmemi_udma_put_nbi(dst, src, elem_size, pe);                                                                \
         }                                                                                                                   \
     }
 
@@ -769,6 +801,10 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_PUT_TYPENAME_MEM_DETAILED_NBI);
             ub_tensor.address_.dataLen = device_state->sdma_config.ub_size;                                              \
             uint32_t sync_id = device_state->sdma_config.sync_id;                                                        \
             aclshmemx_sdma_put_nbi(dst, src, ub_tensor, elem_size, pe, sync_id);                                         \
+        } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {                                                 \
+            /* UDMA */                                                                                                   \
+            aclshmemi_udma_put_default_nbi<TYPE>(device_state, (__gm__ TYPE*)dst.GetPhyAddr(),                         \
+                (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);                                                        \
         } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {                                               \
             /* MTE  */                                                                                                   \
             /* CopyUB Config Set */                                                                                      \
@@ -790,9 +826,6 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_PUT_TYPENAME_MEM_DETAILED_NBI);
             ub_tensor.address_.dataLen = device_state->rdma_config.ub_size;                                              \
             uint32_t sync_id = device_state->rdma_config.sync_id;                                                        \
             aclshmemx_roce_put_nbi(dst, src, ub_tensor, elem_size, pe, sync_id);                                         \
-        } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_UDMA) {                                              \
-            /* UDMA */                                                                                                   \
-            aclshmemi_udma_put_nbi((__gm__ TYPE*)dst.GetPhyAddr(), (__gm__ TYPE*)src.GetPhyAddr(), elem_size, pe);       \
         }                                                                                                                \
     }
 
@@ -832,6 +865,10 @@ ACLSHMEM_DEVICE void aclshmem_putmem_nbi(__gm__ void *dst, __gm__ void *src, uin
         uint32_t sync_id = device_state->sdma_config.sync_id;
         aclshmemx_sdma_put_nbi(reinterpret_cast<__gm__ char *>(dst), reinterpret_cast<__gm__ char *>(src), 
                                reinterpret_cast<__ubuf__ char *>(copy_ub), copy_ub_size, elem_size, pe, sync_id);
+    } else if (ACLSHMEM_UDMA_TRANSPORT_ENABLED(device_state, pe)) {
+        /* UDMA */
+        aclshmemi_udma_put_default_nbi<char>(device_state, reinterpret_cast<__gm__ char *>(dst),
+            reinterpret_cast<__gm__ char *>(src), elem_size, pe);
     } else if (device_state->topo_list[pe] & ACLSHMEM_TRANSPORT_MTE) {
         /* MTE */
         /* CopyUB Config Set */
@@ -858,5 +895,23 @@ ACLSHMEM_DEVICE void aclshmemx_set_mte_config(uint64_t offset, uint32_t ub_size,
     device_state->mte_config.ub_size = ub_size;
     device_state->mte_config.sync_id = sync_id;
 }
+
+ACLSHMEM_DEVICE void aclshmemx_set_udma_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id)
+{
+    __gm__ aclshmem_device_host_state_t *device_state = aclshmemi_get_state();
+
+    if (ub_size < ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE) {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort,
+            "UDMA MTE staging UB size %u is smaller than minimum %u bytes\n",
+            ub_size, ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE);
+        return;
+    }
+
+    device_state->udma_config.aclshmem_ub = offset;
+    device_state->udma_config.ub_size = ub_size;
+    device_state->udma_config.sync_id = sync_id;
+}
+
+#undef ACLSHMEM_UDMA_TRANSPORT_ENABLED
 
 #endif

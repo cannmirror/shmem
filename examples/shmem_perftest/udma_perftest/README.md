@@ -21,7 +21,7 @@
 | 引擎 | 默认 MTE | 显式 `ACLSHMEM_DATA_OP_UDMA` |
 | 多核并发 | 同 peer 多核 (默认 32 核切分数据) | **强制单核** (`block_dim=1`)：UDMA 不允许同 peer 多核并发 |
 | `-b/--block-size`、`--block-range` | 控制核数 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 |
-| UB 缓冲 | MTE 必需，影响传输 | UDMA 内部不消耗 UB，仅形式上保留 `--ub-size` 入参 |
+| UB 缓冲 | MTE 必需，影响传输 | 本 perftest 显式测试 UDMA 低阶接口，`--ub-size` 仅用于低阶接口 UB 入参和 CSV；高阶 UDMA RMA 默认 MTE staging 需要至少 128 B UB |
 | 测试模式 | put / bi_put / get / bi_get | put / bi_put / get / bi_get / **put_signal** |
 | SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort |
 | CSV 文件名 | `<test>_<dtype>_<pe>.csv` | `udma_<test>_<dtype>_<pe>.csv` |
@@ -55,7 +55,7 @@ cd examples/shmem_perftest/udma_perftest/
 | `--exponent <exponent>` | `-e <exponent>` | 数据量幂数 (2^exponent 字节) | - |
 | `--exponent-range <min> <max>` | - | 数据量幂数范围 | 3 17 |
 | `--loop-count <count>` | - | 循环次数 | 1000 |
-| `--ub-size <size>` | - | UB size (KB)；UDMA 实际不消耗 UB，仅传给 host 写 CSV | 16 |
+| `--ub-size <size>` | - | UB size (KB)；本 perftest 传给低阶 UDMA 接口并写入 CSV。高阶 UDMA RMA 默认 MTE staging 的 UB 配置要求至少 128 B | 16 |
 | `--metric <bw\|lat>` | - | 性能口径：`bw` 测带宽，`lat` 测单次 put_nbi 下发延时（仅 `-t put` 支持） | bw |
 | `--batch <N>` | - | BW 测试时每 N 次 `*_nbi` 后调用 `quiet`：`0` 等价于 `loop_count`（默认全异步，仅末尾一次 quiet）；`1` 表示同步；其他值按 N 切分。`lat` 模式忽略此参数。 | 0 |
 | `-pes <size>` | - | PE 数量 | 2 |
@@ -161,3 +161,4 @@ pe: 0 size: 1024 frame_id: 0
 2. UDMA 仅在 Ascend950 (`__NPU_ARCH__ == 3510`) 编译期使能；在其他 SOC 上 kernel 会通过 `aclshmemi_kernel_abort` 报错退出。
 3. **不支持 D2H / `HOST_SIDE` (DRAM)**：UDMA 引擎当前未对 Host 侧 DRAM 提供 RMA 路径，仅测 HBM。
 4. 原子操作 (`aclshmemx_udma_atomic_add` 等) 不在本 perftest 范围。
+5. 高阶 UDMA RMA 接口默认通过 `PIPE_MTE3` staging 下发 WQE，默认 UB 配置为 `offset = 189 * 1024`、`ub_size = 128` 字节、`sync_id = 0`。如果调用 `aclshmemx_set_udma_config` 修改配置，`ub_size` 必须不小于 128 字节。本 perftest 的低阶接口路径仍按显式入参使用本地 UB。

@@ -700,7 +700,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
 }
 
 // Buf-taking overload. PIPE_MTE3 (default) stages the WRITE_WITH_NOTIFY WQE in the
-// caller-provided UB scratch (size one full WQE block; wqe_size * 2 bytes, 256 B is
+// caller-provided UB scratch (size one full WQE block; wqe_size * 2 bytes, 128 B is
 // safe for the current SQ basebk_shift). PIPE_S falls through to the no-buf path and
 // ignores buf/sync_id, mirroring the put_nbi(buf) overload's S/MTE3 split.
 template <typename T, pipe_t WQE_PIPE>

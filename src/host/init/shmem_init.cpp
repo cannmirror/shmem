@@ -36,6 +36,9 @@ constexpr uint32_t DEFAULT_SDMA_UB_SIZE = 64;
 constexpr int64_t DEFAULT_SDMA_UB_OFFSET = 191 * 1024;
 constexpr uint32_t DEFAULT_RDMA_UB_SIZE = 64;
 constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
+// UDMA PIPE_MTE3 stages one full WQE block in UB; 128 B covers current data-mover opcodes.
+constexpr uint32_t DEFAULT_UDMA_UB_SIZE = ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE;
+constexpr int64_t DEFAULT_UDMA_UB_OFFSET = 189 * 1024;
 
 // initializer
 #define ACLSHMEM_DEVICE_HOST_STATE_INITIALIZER                                                    \
@@ -63,6 +66,7 @@ constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
         {0, DEFAULT_MTE_UB_SIZE, 0},                       /* aclshmem_mte_config */              \
         {DEFAULT_SDMA_UB_OFFSET, DEFAULT_SDMA_UB_SIZE, 0}, /* aclshmem_sdma_config */             \
         {DEFAULT_RDMA_UB_OFFSET, DEFAULT_RDMA_UB_SIZE, 0}, /* aclshmem_rdma_config */             \
+        {DEFAULT_UDMA_UB_OFFSET, DEFAULT_UDMA_UB_SIZE, 0}, /* aclshmem_udma_config */             \
         0,                                                 /* qp_info */                          \
         0,                                                 /* sdma_workspace_addr */              \
         NULL,                                              /* aclshmem_prof_pe_t */               \

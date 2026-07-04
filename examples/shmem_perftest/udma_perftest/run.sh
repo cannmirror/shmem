@@ -130,7 +130,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -e|--exponent <exponent>        数据量幂数"
             echo "  --exponent-range <min> <max>    数据量幂数范围"
             echo "  --loop-count <count>            循环次数 (默认 1000)"
-            echo "  --ub-size <size>                UB size(KB), UDMA 实际不消耗 UB"
+            echo "  --ub-size <size>                UB size(KB)，用于低阶 UDMA 入参和 CSV；高阶默认 MTE staging 需至少 128B"
             echo "  --metric <bw|lat>               性能口径 (lat 仅支持 -t put)"
             echo "  --batch <N>                     BW 测试时每 N 次 nbi 后调用 quiet (0=loop_count 全异步, 1=同步, 默认 0)"
             echo "  -pes <size>                     PE 数量"

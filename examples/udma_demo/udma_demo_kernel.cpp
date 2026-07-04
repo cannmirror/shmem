@@ -12,10 +12,10 @@
 #include "shmem.h"
 
 constexpr uint64_t INIT_DUMP_SIZE = 200 * 1024 * 1024;
-// PIPE_MTE3 path stages one full WQE block in caller UB; 256 B fits both
+// PIPE_MTE3 path stages one full WQE block in caller UB; 128 B fits both
 // UDMA_OP_WRITE (1 BB) and UDMA_OP_WRITE_WITH_NOTIFY (2 BB) at the current
 // SQ basebk_shift.
-constexpr uint32_t UDMA_WQE_SCRATCH_BYTES = 256;
+constexpr uint32_t UDMA_WQE_SCRATCH_BYTES = ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE;
 
 // Minimal all-gather implementation using UDMA on the default PIPE_MTE3 path.
 extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void udma_all_gather_kernel(

@@ -53,6 +53,7 @@ typedef struct {
     aclshmem_mte_config_t mte_config;   ///< Configuration information of the MTE memory transfer engine
     aclshmem_sdma_config_t sdma_config; ///< Configuration information of the SDMA memory transfer engine
     aclshmem_rdma_config_t rdma_config; ///< Configuration information of RDMA
+    aclshmem_udma_config_t udma_config; ///< Configuration information of UDMA MTE staging
     uint64_t qp_info;                 ///< Queue Pair (QP) information, used for communication mechanisms such as RDMA
 
     uint64_t sdma_workspace_addr;  /// sdma aicpu和aiv的共享内存

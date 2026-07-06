@@ -129,3 +129,5 @@
 | `bandwidth` | Bandwidth | 带宽 | 性能测试输出指标。 |
 | `latency` | Latency | 时延 | 性能测试输出指标。 |
 | `KB` / `MB` / `GB` | Kilobyte / Megabyte / Gigabyte | 千字节/兆字节/吉字节 | 文档、示例参数和性能输出中的容量单位。 |
+| `低阶接口` | Low-level API (engine-specific API) | 直接暴露底层传输引擎（UDMA、RDMA、SDMA、MTE 等）通信语义的接口 | SHMEM 中位于 `engine/` 目录下的引擎专用接口（如 `aclshmemx_udma_*`、`aclshmemx_roce_*`），需调用方自行管理 buffer 配置与同步，支持并发操作。代码中常以 lowlevel 指代。 |
+| `高阶接口` | High-level API | 屏蔽底层引擎细节、提供统一编程模型的高层抽象接口 | SHMEM 中位于 `gm2gm/` 或 `host/data_plane/` 下的封装接口（如 `aclshmem_put_*`、`aclshmem_amo_*`），内部自动管理 buffer 与同步，使用默认 buffer 不支持并发；RDMA/SDMA 高阶接口需通过 `aclshmemx_*_config` 预配置引擎参数。代码中常以 highlevel 指代。 |

@@ -36,6 +36,7 @@ target_compile_options(aclshmem_device
 target_include_directories(aclshmem_device
     PUBLIC
     ${PROJECT_SOURCE_DIR}/include/
+    ${PROJECT_SOURCE_DIR}/src/
     ${PROJECT_SOURCE_DIR}/src/device/
     ${PROJECT_SOURCE_DIR}/src/device_simt/
 )

@@ -22,12 +22,12 @@ include/
 │   │   └── engine/                         // aicore 直驱ub2gm 低阶接口，扩展接口+x
 │   │       └── shmem_device_mte.h          // aicore 直驱 mte接口
 │   ├── gm2gm/                              // device侧aicore驱动gm2gm数据面高阶和低阶接口，扩展接口+x
-│   │   ├── shmem_device_rma.h              // aicore high-level RMA 接口
-│   │   ├── shmem_device_amo.h              // aicore high-level 原子内存操作接口
-│   │   ├── shmem_device_so.h               // aicore high-level 信号操作接口
-│   │   ├── shmem_device_cc.h               // aicore high-level 集合通信接口
-│   │   ├── shmem_device_p2p_sync.h         // aicore high-level p2p同步接口
-│   │   ├── shmem_device_mo.h               // aicore high-level 内存保序接口
+│   │   ├── shmem_device_rma.h              // aicore 高阶 RMA 接口
+│   │   ├── shmem_device_amo.h              // aicore 高阶 原子内存操作接口
+│   │   ├── shmem_device_so.h               // aicore 高阶 信号操作接口
+│   │   ├── shmem_device_cc.h               // aicore 高阶 集合通信接口
+│   │   ├── shmem_device_p2p_sync.h         // aicore 高阶 p2p同步接口
+│   │   ├── shmem_device_mo.h               // aicore 高阶 内存保序接口
 │   │   └── engine/                         // aicore 直驱gm2gm 低阶接口，扩展接口+x
 │   │       ├── shmem_device_rdma.h         // aicore 直驱 rdma 接口
 │   │       ├── shmem_device_sdma.h         // aicore 直驱 sdma 接口
@@ -45,10 +45,10 @@ include/
     ├── mem/                                // host侧内存管理接口
     │   └── shmem_host_heap.h               // host内存管理接口
     ├── data_plane/                         // host侧CPU驱动数据面接口
-    │   ├── shmem_host_rma.h                // host high-level RMA 接口
-    │   ├── shmem_device_so.h               // host high-level 信号操作接口
-    │   ├── shmem_host_cc.h                 // host high-level 集合通信接口
-    │   └── shmem_host_p2p_sync.h           // host high-level p2p同步接口
+    │   ├── shmem_host_rma.h                // host 高阶 RMA 接口
+    │   ├── shmem_device_so.h               // host 高阶 信号操作接口
+    │   ├── shmem_host_cc.h                 // host 高阶 集合通信接口
+    │   └── shmem_host_p2p_sync.h           // host 高阶 p2p同步接口
     └── utils/                              // host侧dfx接口
         └── shmem_log.h                     // host dfx-log接口
 ```

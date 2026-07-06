@@ -236,7 +236,7 @@ SHMEMI_PROF_START(frame_id);
 SHMEMI_PROF_END(frame_id);
 ```
 
-Host 侧调用 `aclshmemx_show_prof()` 输出 cycles、count、avg time。
+Host 侧调用 `aclshmemx_get_prof(nullptr, true)` 输出 cycles、count、avg time。
 
 ---
 

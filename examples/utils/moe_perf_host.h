@@ -170,7 +170,7 @@ inline void MoeAppendPerfCsvRows(const MoeString &label, aclshmem_prof_pe_t **ou
         return;
     }
 
-    aclshmemx_show_prof(out_profs, false);
+    aclshmemx_get_prof(out_profs, false);
     if (out_profs == nullptr || *out_profs == nullptr) {
         return;
     }

@@ -249,9 +249,9 @@ int test_rdma_perf_test_impl(
             std::cout << "[Verification] FAILED" << std::endl;
         }
 
-        aclshmemx_show_prof(&out_profs, false);
+        aclshmemx_get_prof(&out_profs, false);
         if (out_profs == nullptr) {
-            std::cerr << "[WARN] [" << kFunc << "] aclshmemx_show_prof returned null out_profs, skip csv collection"
+            std::cerr << "[WARN] [" << kFunc << "] aclshmemx_get_prof returned null out_profs, skip csv collection"
                       << std::endl;
         } else {
             collect_prof_data_to_csv_v2(
@@ -271,12 +271,12 @@ int test_rdma_perf_test_impl(
             break;
         }
     }
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
     prof_finalized = true;
 
 cleanup:
     if (shmem_initialized && !prof_finalized) {
-        aclshmemx_show_prof(nullptr, true);
+        aclshmemx_get_prof(nullptr, true);
         prof_finalized = true;
     }
     if (dst_ptr != nullptr) {

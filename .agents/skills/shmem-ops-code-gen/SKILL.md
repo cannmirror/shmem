@@ -183,7 +183,7 @@ perf 循环结构要求：
 
 注意：`algo_bandwidth` 不乘 2，统一按 input size 计算（NCCL `algBw` 惯例）。`logical_payload_bytes` 必须在输出中注明口径（单 PE 还是全局）。**Phase 6 达标与 Round 对比 MUST 用 `[PERF]` 行的 `steady_bus_bandwidth_GBps`**，不得用 e2e 带宽。
 
-如果算子包含 `SHMEMI_PROF_START/END` 打点，`--perf` 模式还应调用 `aclshmemx_show_prof()` 输出 Device 帧数据。
+如果算子包含 `SHMEMI_PROF_START/END` 打点，`--perf` 模式还应调用 `aclshmemx_get_prof(nullptr, true)` 输出 Device 帧数据。
 
 ---
 

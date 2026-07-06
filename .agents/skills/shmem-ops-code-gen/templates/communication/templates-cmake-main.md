@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
                       << std::endl;
         }
 
-        aclshmemx_show_prof();
+        aclshmemx_get_prof(nullptr, true);
     } else {
         staging_copy(input_dev, symm_ptr, input_bytes);
         aclshmem_barrier_all();

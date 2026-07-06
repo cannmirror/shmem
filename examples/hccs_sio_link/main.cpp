@@ -461,9 +461,9 @@ int test_mixed_get_perf_path(int pe_id, int n_pes, size_t data_elements, uint64_
         return -1;
     }
 
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
     aclshmem_prof_pe_t *out_profs = nullptr;
-    aclshmemx_show_prof(&out_profs, false);
+    aclshmemx_get_prof(&out_profs, false);
     if (pe_id == prof_pe_val && out_profs != nullptr) {
         int64_t cycle2us = get_cycle2us();
         print_perf_result(out_profs, frame_id, block_dim, data_elements * sizeof(T), per_block_bytes,
@@ -550,9 +550,9 @@ int test_mixed_put_perf_path(int pe_id, int n_pes, size_t data_elements, uint64_
         return -1;
     }
     
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
     aclshmem_prof_pe_t *out_profs = nullptr;
-    aclshmemx_show_prof(&out_profs, false);
+    aclshmemx_get_prof(&out_profs, false);
     if (pe_id == prof_pe_val && out_profs != nullptr) {
         int64_t cycle2us = get_cycle2us();
         print_perf_result(out_profs, frame_id, block_dim, data_elements * sizeof(T), per_block_bytes,

@@ -724,7 +724,12 @@ void aclshmem_global_exit(int status)
     SHM_LOG_WARN("Bootstrap not initialized. Global_exit Do nothing. ");
 }
 
-void aclshmemx_show_prof(aclshmem_prof_pe_t** out_profs, bool verbose)
+void aclshmemx_show_prof()
+{
+    prof_data_print(&g_host_profs, &g_state, nullptr, true);
+}
+
+void aclshmemx_get_prof(aclshmem_prof_pe_t** out_profs, bool verbose)
 {
     // 如果 verbose 为 false 且 out_profs 为 nullptr，直接返回
     if (!verbose && out_profs == nullptr) {

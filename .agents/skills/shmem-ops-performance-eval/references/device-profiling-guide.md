@@ -1,6 +1,6 @@
 # Device 侧关键片段打点操作指南
 
-提供 SHMEMI_PROF 宏对（Device cycle 打点）及 `aclshmemx_show_prof`（Host 侧导出）的完整操作流程。
+提供 SHMEMI_PROF 宏对（Device cycle 打点）及 `aclshmemx_get_prof`（Host 侧导出）的完整操作流程。
 
 ---
 
@@ -9,7 +9,7 @@
 SHMEM 内置一套 Device 侧 cycle 级打点机制：
 
 - **Device 侧**：`SHMEMI_PROF_START(frame_id)` / `SHMEMI_PROF_END(frame_id)` 宏对，包裹需要计时的代码段
-- **Host 侧**：`aclshmemx_show_prof(nullptr, true)` 将采集到的 cycles / count / avg_us 打印到标准输出
+- **Host 侧**：`aclshmemx_get_prof(nullptr, true)` 将采集到的 cycles / count / avg_us 打印到标准输出
 
 **适用场景**：定位 kernel 内某段代码的 cycle 开销，分析通信/计算/同步各段占比，对比优化前后特定段的 cycle 变化。
 
@@ -236,7 +236,7 @@ SHMEM 在 `aclshmemx_init_attr` → `prof_util_init` 中自动完成：
 kernel 执行完成后，在 Host 侧 stream 同步后调用：
 
 ```cpp
-aclshmemx_show_prof(nullptr, true);
+aclshmemx_get_prof(nullptr, true);
 ```
 
 输出固定格式表格：
@@ -287,7 +287,7 @@ std::cout << "[PERF] e2e_us=" << e2e_us
           << " bus_bw=" << bus_bw << std::endl;
 
 // 4. 打印 Device frame 数据
-aclshmemx_show_prof(nullptr, true);
+aclshmemx_get_prof(nullptr, true);
 ```
 
 ---
@@ -296,7 +296,7 @@ aclshmemx_show_prof(nullptr, true);
 
 ### 6.1 填充 Device Frame Table
 
-根据 `aclshmemx_show_prof(nullptr, true)` 的打印输出，将 `AvgTime(us)` 填入 `performance_report.md §3.4`：
+根据 `aclshmemx_get_prof(nullptr, true)` 的打印输出，将 `AvgTime(us)` 填入 `performance_report.md §3.4`：
 
 ```
 | frame_id | phase | avg_us | max_core_us | count | percent_of_e2e | bottleneck_note |

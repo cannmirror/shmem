@@ -197,7 +197,7 @@ DFX 能力包括：
 
 - 日志级别设置和外部 logger 回调。
 - 环境变量控制日志级别、输出位置、是否打印到 stdout。
-- Device cycle profiling：通过 `SHMEMI_PROF_START/END` 打点，再由 Host 侧 `aclshmemx_show_prof` 输出统计。
+- Device cycle profiling：通过 `SHMEMI_PROF_START/END` 打点，再由 Host 侧 `aclshmemx_get_prof` 输出统计。
 - 调测文档提供 Ascend C `printf` / `DumpTensor` 等组合使用方式。
 - 内部 `under_api` 层对 ACL/RT/HAL/HCCP/OPAPI 动态加载做了封装，降低不同 CANN/驱动版本下的直接依赖耦合。
 

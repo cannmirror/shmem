@@ -385,7 +385,7 @@ int32_t execute_test_loop(const Config& config, aclrtStream stream)
                                            invp.logical_segment_bytes);
             ever_failed = ever_failed || (!success);
 
-            aclshmemx_show_prof(&out_profs, false);
+            aclshmemx_get_prof(&out_profs, false);
             collect_prof_data_to_csv_v2(
                 out_profs,
                 frame_id,
@@ -402,7 +402,7 @@ int32_t execute_test_loop(const Config& config, aclrtStream stream)
     aclshmem_free(device_mem);
     aclrtFreeHost(host_mem);
 
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
 
     if (config.mype == ACTIVE_PE) {
         // Reflect the actually tested core counts in the file name. A contiguous

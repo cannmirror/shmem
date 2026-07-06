@@ -219,7 +219,7 @@ Device 侧 profiling 以 `GetSystemCycle` 为基础：
 
 - kernel 中包含 `utils/prof/shmemi_prof.h`。
 - 在关键搬运、等待、计算片段前后插入 `SHMEMI_PROF_START(frame_id)` 和 `SHMEMI_PROF_END(frame_id)`。
-- Host 侧调用 `aclshmemx_show_prof()` 打印指定 PE、Block、Frame 的 cycles、count 和平均耗时。
+- Host 侧调用 `aclshmemx_get_prof(nullptr, true)` 打印指定 PE、Block、Frame 的 cycles、count 和平均耗时。
 - 环境变量 `SHMEM_CYCLE_PROF_PE` 指定采集哪个 PE。
 
 该能力适合定位单个搬运片段、等待片段或通信计算融合流水中的长尾。

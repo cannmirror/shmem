@@ -512,7 +512,7 @@ int main(int argc, char **argv)
                       << std::endl;
         }
 
-        aclshmemx_show_prof();
+        aclshmemx_get_prof(nullptr, true);
     } else {
         staging_copy();
         aclshmem_barrier_all();

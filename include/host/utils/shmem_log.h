@@ -36,13 +36,32 @@ ACLSHMEM_HOST_API int32_t aclshmemx_set_extern_logger(void (*func)(int level, co
 ACLSHMEM_HOST_API int32_t aclshmemx_set_log_level(int level);
 #define shmem_set_log_level aclshmemx_set_log_level
 
-/**
- * @brief Show profiling data and optionally return profiling pointer.
+
+ /**
+ * @brief Print profiling data for all PEs to the console.
  *
- * @param out_profs [out] Pointer to output profiling data. Can be nullptr if you don't need the pointer.
- * @param verbose [in] Whether to print profiling data to console. Default is true.
+ * @note **Deprecated**: This interface will be sunset in a future release. Please use
+ *       @ref aclshmemx_get_prof(aclshmem_prof_pe_t**, bool) instead, which provides the
+ *       ability to retrieve profiling data programmatically and optionally suppress console output.
+ *
+ * @deprecated Use @c aclshmemx_get_prof(nullptr, true) for equivalent behavior.
  */
-ACLSHMEM_HOST_API void aclshmemx_show_prof(aclshmem_prof_pe_t **out_profs, bool verbose);
+ACLSHMEM_HOST_API void aclshmemx_show_prof();
+
+
+/**
+ * @brief Print profiling data for all PEs and/or return profiling data pointer.
+ *
+ * @param out_profs [out] Pointer to receive the profiling data. Pass @c nullptr if only
+ *                        console output is needed.
+ * @param verbose    [in]  Whether to print the profiling report to the console.
+ *                        - @c true:  Print profiling data to the console.
+ *                        - @c false: Suppress console output.
+ *
+ * @note This is the **recommended** interface, superseding the zero-argument version
+ *       @ref aclshmemx_show_prof().
+ */
+ACLSHMEM_HOST_API void aclshmemx_get_prof(aclshmem_prof_pe_t **out_profs, bool verbose);
 
 #ifdef __cplusplus
 }

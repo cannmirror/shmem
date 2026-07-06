@@ -178,7 +178,7 @@ int test_udma_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
             std::cout << "[Verification] FAILED" << std::endl;
         }
 
-        aclshmemx_show_prof(&out_profs, false);
+        aclshmemx_get_prof(&out_profs, false);
         collect_prof_data_to_csv_v2(out_profs, frame_id, datasize, 1, g_npus, ub_size_kb, loop_count,
                                     metric == perftest::PERF_METRIC_BW, csv_data);
 
@@ -192,7 +192,7 @@ int test_udma_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
             break;
         }
     }
-    aclshmemx_show_prof(nullptr, true);
+    aclshmemx_get_prof(nullptr, true);
 
     if (sig_ptr != nullptr) {
         aclshmem_free(sig_ptr);

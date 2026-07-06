@@ -138,7 +138,7 @@ bash run.sh -mode mixed_put_perf
 - 数据按 3:5 比例分配到 SIO 和 HCCS 链路（3/5 数据走 SIO，2/5 数据走 HCCS）
 - Kernel 内部按 block 维度划分：部分 block 负责 SIO 链路传输，其余 block 负责 HCCS 链路传输
 - 使用 `aclshmemx_mte_get_nbi` / `aclshmemx_mte_put_nbi` 进行非阻塞 DMA 传输
-- 通过 cycle 计数器采集每次传输的耗时，并利用 shmem profiling 机制（`aclshmemx_show_prof`）输出统计结果
+- 通过 cycle 计数器采集每次传输的耗时，并利用 shmem profiling 机制（`aclshmemx_get_prof`）输出统计结果
 
 ### 环境变量
 

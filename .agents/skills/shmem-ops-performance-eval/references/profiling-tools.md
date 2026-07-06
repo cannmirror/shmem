@@ -30,7 +30,7 @@ avg_time = df.iloc[warmup:warmup+perf_cycles]["task_time(us)"].mean()
 
 SHMEM 内置的 Device 侧 cycle 级打点，基于 `SHMEMI_PROF_START(id)` / `SHMEMI_PROF_END(id)` 宏对。
 
-> **完整操作指南**：[device-profiling-guide.md](device-profiling-guide.md) —— 涵盖宏原理、kernel 侧 5 类 frame 打点规范、Host 侧 `aclshmemx_show_prof` 两种调用模式、数据填入性能报告的方法。本节仅提供概要。
+> **完整操作指南**：[device-profiling-guide.md](device-profiling-guide.md) —— 涵盖宏原理、kernel 侧 5 类 frame 打点规范、Host 侧 `aclshmemx_get_prof` 两种调用模式、数据填入性能报告的方法。本节仅提供概要。
 
 **使用方式**：在 kernel 代码中插入打点：
 ```cpp

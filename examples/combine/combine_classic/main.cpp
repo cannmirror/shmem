@@ -186,7 +186,7 @@ void AppendPerfCsvRows(const std::string &csv_path, const CombineArgs &args, con
         return;
     }
 
-    aclshmemx_show_prof(&out_profs, false);
+    aclshmemx_get_prof(&out_profs, false);
     if (out_profs == nullptr) {
         return;
     }

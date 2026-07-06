@@ -37,7 +37,7 @@ description: "SHMEM 算子性能采集、baseline 对比、聊天自动输出和
 
 - design.md 的 perf contract（metric、baseline、target_cases、最小规模）
 - 已通过正确性验证的算子二进制
-- profiler 环境（SHMEMI_PROF_START/END、aclshmemx_show_prof）
+- profiler 环境（SHMEMI_PROF_START/END、aclshmemx_get_prof）
 - 调用上下文（由 `shmem-ops-performance-optim` OptimStep 5 传入）：
 
 | 参数 | 含义 | 示例 |

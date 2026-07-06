@@ -297,11 +297,11 @@ bus_factor ≈ 0.875 (同 dispatch)
 
 ## 7. Device 侧关键片段打点
 
-> **完整操作指南**：[device-profiling-guide.md](device-profiling-guide.md) —— 涵盖宏实现原理、kernel 侧打点规范、Host 侧 `aclshmemx_show_prof` 操作、数据结构、cycle2us 换算、从 broadcast/mte_perftest 等 benchmark 提取的完整工作示例。
+> **完整操作指南**：[device-profiling-guide.md](device-profiling-guide.md) —— 涵盖宏实现原理、kernel 侧打点规范、Host 侧 `aclshmemx_get_prof` 操作、数据结构、cycle2us 换算、从 broadcast/mte_perftest 等 benchmark 提取的完整工作示例。
 
 性能采集 **MUST** 同时覆盖端到端指标和关键 Device 片段指标。优化判断 **NEVER** 只依赖总耗时；**MUST** 能回答"时间主要花在 copy、remote put/get、signal/wait、barrier、local compute 还是 finalize"。
 
-参考 SHMEM examples 的 profiling 模式，在 kernel 中按 phase 插入 `SHMEMI_PROF_START(frame_id)` / `SHMEMI_PROF_END(frame_id)`，Host 侧在 stream 同步后调用 `aclshmemx_show_prof()` 或等价 helper 导出每个 PE、block、frame 的 cycles、count 和平均耗时。
+参考 SHMEM examples 的 profiling 模式，在 kernel 中按 phase 插入 `SHMEMI_PROF_START(frame_id)` / `SHMEMI_PROF_END(frame_id)`，Host 侧在 stream 同步后调用 `aclshmemx_get_prof(nullptr, true)` 或等价 helper 导出每个 PE、block、frame 的 cycles、count 和平均耗时。
 
 基本要求：
 
@@ -339,7 +339,7 @@ Host 侧形态参考：
 
 ```cpp
 ACL_CHECK(aclrtSynchronizeStream(stream));
-aclshmemx_show_prof(nullptr, true);
+aclshmemx_get_prof(nullptr, true);
 ```
 
 ## 8. 计算指标
@@ -368,7 +368,7 @@ compute_utilization_percent = effective_flops / peak_flops_for_dtype_and_soc * 1
 | 场景 | 推荐方法 |
 | --- | --- |
 | API/example 级通信 | example 内部 repeats + SHMEM cycle profiling |
-| kernel 内片段定位 | `SHMEMI_PROF_START/END` + `aclshmemx_show_prof` |
+| kernel 内片段定位 | `SHMEMI_PROF_START/END` + `aclshmemx_get_prof` |
 | 算子级端到端 | msprof 或 torch_npu profiler |
 | Python/PyTorch 集成 | torch_npu profiler + 输出文件 correctness check |
 | 跨机/RDMA | 同时记录 control barrier、handle wait、网络路径和 PE 拓扑 |

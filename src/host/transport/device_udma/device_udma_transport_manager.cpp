@@ -175,6 +175,7 @@ Result UdmaTransportManager::OpenDevice(const TransportOptions& options)
         ACLSHMEM_DL_FUNC_FAILED);
 
     const uint32_t device_id = static_cast<uint32_t>(logic_id);
+    user_id_ = static_cast<uint32_t>(user_id);
     rank_id_ = options.rankId;
     rank_count_ = options.rankCount;
     role_ = options.role;
@@ -759,11 +760,11 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t device_id, uint32_t rank_c
     uint32_t eid_count = 0;
     int32_t phy_id = -1;
 
-    auto ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(static_cast<int32_t>(device_id), &phy_id);
+    auto ret = DlAclApi::AclrtGetPhyDevIdByLogicDevId(static_cast<int32_t>(user_id_), &phy_id);
     SHM_ASSERT_LOG_AND_RETURN(
         ret == 0 && phy_id >= 0,
-        "AclrtGetPhyDevIdByLogicDevId() return=" << ret << ", input device_id=" << device_id
-                                                 << ", output phy_id=" << phy_id,
+        "AclrtGetPhyDevIdByLogicDevId() return=" << ret << ", user_id=" << user_id_
+                                                 << ", logic_device_id=" << device_id << ", output phy_id=" << phy_id,
         false);
 
     if (!TopoReader::ParseRootInfo(phy_id, root_info)) {
@@ -771,7 +772,8 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t device_id, uint32_t rank_c
         return false;
     }
     phy_id_ = static_cast<uint32_t>(phy_id);
-    SHM_LOG_INFO("Resolved phy id from current device mapping, device_id=" << device_id << ", phy_id=" << phy_id);
+    SHM_LOG_INFO("Resolved phy id from current device mapping, user_id=" << user_id_
+                         << ", logic_device_id=" << device_id << ", phy_id=" << phy_id_);
     if (!TopoReader::ParseTopoInfo(root_info.topo_file_path, topo_info)) {
         SHM_LOG_ERROR("Failed to parse the topology file at path " << root_info.topo_file_path);
         return false;

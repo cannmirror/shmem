@@ -81,6 +81,7 @@ private:
 private:
     uint32_t rank_id_{0};
     uint32_t rank_count_{1};
+    uint32_t user_id_{0};
     uint32_t phy_id_{0};
     hybm_role_type role_{HYBM_ROLE_PEER};
     std::map<uint32_t, uint32_t> peer_eid_index_map_;                        // peerRankId -> local eid_index

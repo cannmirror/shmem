@@ -38,6 +38,7 @@ using rtIpcOpenMemoryFunc = int32_t (*)(void **, const char *);
 using rtIpcCloseMemoryFunc = int32_t (*)(const void *);
 using aclrtGetSocNameFunc = const char *(*)();
 using rtGetLogicDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
+using aclrtGetPhyDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using aclrtGetPhyDevIdByLogicDevIdFunc = int32_t (*)(const int32_t, int32_t *const);
 using rtGetDevicePhyIdByIndexFunc = int32_t (*)(uint32_t, uint32_t *);
 using aclrtReserveMemAddressFunc = int (*)(void **, size_t, size_t, void *, uint64_t);
@@ -204,6 +205,30 @@ public:
         return pRtGetLogicDevIdByUserDevId(userDevId, logicDevId);
     }
 
+    static inline Result AclrtGetPhyDevIdByUserDevId(const int32_t userDevId, int32_t * const phyDevId)
+    {
+        if (userDevId < 0 || phyDevId == nullptr) {
+            return ACLSHMEM_INVALID_PARAM;
+        }
+        if (pAclrtGetPhyDevIdByUserDevId != nullptr) {
+            return pAclrtGetPhyDevIdByUserDevId(userDevId, phyDevId);
+        }
+        if (pAclrtGetPhyDevIdByLogicDevId != nullptr) {
+            // Deprecated CANN API expects userDevId, not logicDevId (see MR !407).
+            return pAclrtGetPhyDevIdByLogicDevId(userDevId, phyDevId);
+        }
+        if (pRtGetDevicePhyIdByIndex != nullptr) {
+            uint32_t phy = 0;
+            const auto ret = pRtGetDevicePhyIdByIndex(static_cast<uint32_t>(userDevId), &phy);
+            if (ret != 0) {
+                return ret;
+            }
+            *phyDevId = static_cast<int32_t>(phy);
+            return 0;
+        }
+        return ACLSHMEM_UNDER_API_UNLOAD;
+    }
+
     static inline Result AclrtGetPhyDevIdByLogicDevId(const int32_t logicDevId, int32_t * const phyDevId)
     {
         if (logicDevId < 0 || phyDevId == nullptr) {
@@ -256,6 +281,7 @@ private:
     static rtIpcCloseMemoryFunc pRtIpcCloseMemory;
     static aclrtGetSocNameFunc pAclrtGetSocName;
     static rtGetLogicDevIdByUserDevIdFunc pRtGetLogicDevIdByUserDevId;
+    static aclrtGetPhyDevIdByUserDevIdFunc pAclrtGetPhyDevIdByUserDevId;
     static aclrtGetPhyDevIdByLogicDevIdFunc pAclrtGetPhyDevIdByLogicDevId;
     static rtGetDevicePhyIdByIndexFunc pRtGetDevicePhyIdByIndex;
     static aclrtReserveMemAddressFunc pAclrtReserveMemAddress;

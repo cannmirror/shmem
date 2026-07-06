@@ -51,13 +51,13 @@ list(FILTER ACLSHMEM_HOST_FILES EXCLUDE REGEX "host/transport/topo/rootinfo")
 if(NOT ACLSHMEM_UDMA_SUPPORT)
     list(FILTER ACLSHMEM_HOST_FILES EXCLUDE REGEX "host/transport/device_udma")
 endif()
-if(NOT ACLSHMEM_UDMA_SUPPORT AND NOT (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
+if(NOT SOC_TYPE STREQUAL "Ascend950")
     list(FILTER ACLSHMEM_HOST_FILES EXCLUDE REGEX "host/transport/topo")
 endif()
 if(NOT (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
     list(FILTER ACLSHMEM_HOST_FILES EXCLUDE REGEX "host/transport/device_rdma/device_rdma_transport_manager_v2")
 endif()
-if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
+if(SOC_TYPE STREQUAL "Ascend950")
     file(GLOB_RECURSE ROOT_INFO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/transport/topo/rootinfo/*.cpp)
     list(APPEND ROOT_INFO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/host/utils/under_api/dl_dcmi_api.cpp)
     list(APPEND ACLSHMEM_HOST_FILES ${ROOT_INFO_FILES})
@@ -87,7 +87,7 @@ target_include_directories(aclshmem_host
     ${PROJECT_SOURCE_DIR}/src/host/mem/heap/driver
     ${PROJECT_SOURCE_DIR}/src/host/mem/heap/driver/userspace
 )
-if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
+if(SOC_TYPE STREQUAL "Ascend950")
     target_include_directories(aclshmem_host PUBLIC
         ${PROJECT_SOURCE_DIR}/3rdparty/json/single_include
         ${ASCEND_HOME_PATH}/include/driver/
@@ -121,7 +121,7 @@ install(TARGETS shmem_utils
 
 add_library(shmem SHARED $<TARGET_OBJECTS:aclshmem_device> $<TARGET_OBJECTS:aclshmem_host>)
 target_link_options(shmem PRIVATE --cce-fatobj-link)
-if(ACLSHMEM_UDMA_SUPPORT OR (ACLSHMEM_RDMA_SUPPORT AND SOC_TYPE STREQUAL "Ascend950"))
+if(SOC_TYPE STREQUAL "Ascend950")
     target_link_libraries(shmem PRIVATE shmem_utils hcomm)
 else()
     target_link_libraries(shmem PRIVATE shmem_utils)

@@ -203,7 +203,10 @@ def verify_result():
     args = parser.parse_args()
 
     output = tensor_from_file(args.output, dtype=args.out_dtype.torch_type)
-    golden = tensor_from_file(args.golden, dtype=torch.float32)
+    if args.op_type == "CV_FUSION":
+        golden = tensor_from_file(args.golden, dtype=args.out_dtype.torch_type)
+    else:
+        golden = tensor_from_file(args.golden, dtype=torch.float32)
 
     old_pass = False
     new_pass = False

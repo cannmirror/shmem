@@ -47,39 +47,33 @@ def tensor_to_file(tensor: torch.Tensor, file_name: str) -> None:
     """
     Save tensor to binary file.
     
-    Note: For bfloat16 tensors, we convert to float32 before saving to disk.
-    This results in 4 bytes per element (vs 2 bytes for raw bf16), but ensures
-    compatibility with numpy's tofile() which doesn't support bf16 natively.
-    File size will be 2x larger for bf16 data compared to fp16.
+    All dtypes are saved in their native binary format:
+    - float16: 2 bytes/element
+    - bfloat16: 2 bytes/element (via uint16 view, since numpy doesn't support bf16 natively)
+    - float32: 4 bytes/element
+    This ensures consistency with C++ side where bf16 is also 2 bytes/element.
     """
     if tensor.dtype == torch.bfloat16:
-        tensor.to(torch.float32).numpy().tofile(file_name)
+        tensor.view(torch.uint16).numpy().tofile(file_name)
     else:
         tensor.numpy().tofile(file_name)
 
 
-def tensor_from_file(file_name: str, dtype: torch.dtype, is_fp32_format: bool = False) -> torch.Tensor:
+def tensor_from_file(file_name: str, dtype: torch.dtype) -> torch.Tensor:
     """
     Load tensor from binary file.
     
     Args:
         file_name: Path to the binary file
         dtype: Target torch dtype
-        is_fp32_format: For bfloat16 tensors, indicates the file format:
-            - False (default): Raw BF16 format (2 bytes/element), used for SHMEM/C++ output
-            - True: Float32 format (4 bytes/element), used for torch_npu reference or CPU golden
     
-    Note: For bfloat16 tensors, the file format depends on the source:
-        - SHMEM/C++ output: Raw BF16 (2 bytes/element), read as uint16 and view as bf16
-        - torch_npu/CPU golden: Float32 format (4 bytes/element), read as float32 and convert to bf16
+    All dtypes are read in their native binary format:
+    - float16: 2 bytes/element
+    - bfloat16: 2 bytes/element (read as uint16, then view as bf16)
+    - float32: 4 bytes/element
     """
     if dtype == torch.bfloat16:
-        if is_fp32_format:
-            # Float32 format: used for torch_npu reference or CPU golden
-            return torch.from_numpy(np.fromfile(file_name, dtype=np.float32)).to(torch.bfloat16)
-        else:
-            # Raw BF16 format: used for SHMEM/C++ output
-            return torch.from_numpy(np.fromfile(file_name, dtype=np.uint16)).view(torch.bfloat16)
+        return torch.from_numpy(np.fromfile(file_name, dtype=np.uint16)).view(torch.bfloat16)
     else:
         numpy_dtype = torch.empty(0, dtype=dtype).numpy().dtype
         return torch.from_numpy(np.fromfile(file_name, numpy_dtype))

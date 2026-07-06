@@ -25,6 +25,8 @@ def gen_random_data(size, dtype):
 
 
 def gen_golden_data():
+    torch.manual_seed(42)
+    np.random.seed(42)
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('comm_type', type=CommType.from_str,
@@ -85,6 +87,26 @@ def gen_golden_data():
         [CommType.ALLGATHER_MATMUL, CommType.ALLGATHER_MATMUL_PADDING, CommType.ALLGATHER_MATMUL_WITH_GATHER_RESULT]):
         golden = np.concatenate(matrix_c_list_fp32, axis=0)
         torch_output = torch.cat([t.cpu() for t in matrix_c_list_fp16_npu], dim=0)
+    elif args.comm_type in [CommType.MATMUL_REDUCE_SCATTER, CommType.MATMUL_REDUCE_SCATTER_PADDING]:
+        golden_allreduce = np.zeros_like(matrix_c_list_fp32[0], dtype=np.float32)
+        torch_allreduce = torch.zeros_like(matrix_c_list_fp16_npu[0].cpu())
+        for i in range(args.pe_size):
+            golden_allreduce += matrix_c_list_fp32[i].astype(np.float32)
+            torch_allreduce += matrix_c_list_fp16_npu[i].cpu()
+
+        m_per_pe = m // args.pe_size
+        half_elems_per_pe = (m * n) // args.pe_size
+
+        golden = np.zeros(m * n, dtype=np.float32)
+        torch_output = torch.zeros(m * n, dtype=args.out_dtype.torch_type)
+
+        for i in range(args.pe_size):
+            offset = i * half_elems_per_pe
+            golden_row_start = i * m_per_pe
+            golden_row_end = golden_row_start + m_per_pe
+            valid_len = m_per_pe * n
+            golden[offset:offset + valid_len] = golden_allreduce[golden_row_start:golden_row_end, :].flatten()
+            torch_output[offset:offset + valid_len] = torch_allreduce[golden_row_start:golden_row_end, :].flatten()
     else:
         golden = np.zeros_like(matrix_c_list_fp32[0])
         torch_output = torch.zeros_like(matrix_c_list_fp16_npu[0].cpu())
@@ -96,7 +118,7 @@ def gen_golden_data():
     golden.tofile(os.path.join(data_dir, "golden.bin"))
 
     if args.comm_type == CommType.ALLGATHER_MATMUL_WITH_GATHER_RESULT:
-        tensor_to_file(torch.cat(matrix_a_list, dim=0).to(torch.float32), os.path.join(data_dir, "gather_a.bin"))
+        tensor_to_file(torch.cat(matrix_a_list, dim=0), os.path.join(data_dir, "gather_a.bin"))
 
 
 if __name__ == '__main__':

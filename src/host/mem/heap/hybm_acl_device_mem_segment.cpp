@@ -258,6 +258,7 @@ Result MemSegmentDevice::Export(const std::shared_ptr<MemSlice> &slice, std::str
     info.sliceIndex = static_cast<uint32_t>(slice->index_);
     info.deviceId = options_.devId;
     info.logicDeviceId = logicDeviceId_;
+    info.devicePhyId = devicePhyId_;
     info.pid = pid_;
     info.rankId = options_.rankId;
     info.size = slice->size_;

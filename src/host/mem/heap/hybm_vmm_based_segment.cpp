@@ -256,6 +256,7 @@ Result HybmVmmBasedSegment::ExportInner(const std::shared_ptr<MemSlice> &slice, 
     SHM_VALIDATE_RETURN(ret == ACLSHMEM_SUCCESS, "HalMemShareHandleSetAttribute failed:" << ret, ACLSHMEM_INNER_ERROR);
     info.deviceId = options_.devId;
     info.logicDeviceId = logicDeviceId_;
+    info.devicePhyId = devicePhyId_;
     info.magic = HBM_SLICE_EXPORT_INFO_MAGIC;
     info.version = EXPORT_INFO_VERSION;
     auto localVirtualBase = reservedVirtualAddresses_[options_.rankId];
@@ -336,18 +337,10 @@ Result HybmVmmBasedSegment::Import(const std::vector<std::string> &allExInfo, vo
 
         if (options_.segType == HYBM_MST_HBM && desInfos[i].rankId != options_.rankId &&
             CanLocalHostReaches(desInfos[i].superPodId, desInfos[i].serverId, desInfos[i].logicDeviceId)) {
-            auto ret = DlAclApi::AclrtDeviceEnablePeerAccess(desInfos[i].deviceId, 0);
-            if (ret != 0) {
-                SHM_LOG_ERROR("enable device access failed:" << ret << " local_device:" << deviceId_
-                                                            << " remote_device:" << desInfos[i].deviceId
-                                                            << " logic_device:" << logicDeviceId_
-                                                            << " remote_logic:" << desInfos[i].logicDeviceId);
-                return ACLSHMEM_DL_FUNC_FAILED;
+            auto ret = EnableRemotePeerAccess(desInfos[i].devicePhyId, desInfos[i].deviceId);
+            if (ret != ACLSHMEM_SUCCESS) {
+                return ret;
             }
-            SHM_LOG_DEBUG("enable device access success local_device:" << deviceId_
-                                                                       << " remote_device:" << desInfos[i].deviceId
-                                                                       << " logic_device:" << logicDeviceId_
-                                                                       << " remote_logic:" << desInfos[i].logicDeviceId);
         }
         importMap.emplace(desInfos[i].rankId, desInfos[i]);
     }

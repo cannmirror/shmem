@@ -43,6 +43,7 @@ rtGetLogicDevIdByUserDevIdFunc DlAclApi::pRtGetLogicDevIdByUserDevId = nullptr;
 aclrtGetPhyDevIdByUserDevIdFunc DlAclApi::pAclrtGetPhyDevIdByUserDevId = nullptr;
 aclrtGetPhyDevIdByLogicDevIdFunc DlAclApi::pAclrtGetPhyDevIdByLogicDevId = nullptr;
 rtGetDevicePhyIdByIndexFunc DlAclApi::pRtGetDevicePhyIdByIndex = nullptr;
+rtEnableP2PFunc DlAclApi::pRtEnableP2P = nullptr;
 aclrtReserveMemAddressFunc DlAclApi::pAclrtReserveMemAddress = nullptr;
 aclrtReleaseMemAddressFunc DlAclApi::pAclrtReleaseMemAddress = nullptr;
 
@@ -126,6 +127,11 @@ Result DlAclApi::LoadLibrary(const std::string &libDirPath)
 
     pRtGetDevicePhyIdByIndex = reinterpret_cast<rtGetDevicePhyIdByIndexFunc>(
         dlsym(runtimeHandle, "rtGetDevicePhyIdByIndex"));
+    pRtEnableP2P = reinterpret_cast<rtEnableP2PFunc>(dlsym(runtimeHandle, "rtEnableP2P"));
+    if (pRtEnableP2P == nullptr) {
+        SHM_LOG_WARN("Optional symbol rtEnableP2P is not loaded, grouped visible P2P falls back to "
+                     "aclrtDeviceEnablePeerAccess.");
+    }
     if (pRtGetDevicePhyIdByIndex == nullptr && pAclrtGetPhyDevIdByUserDevId == nullptr &&
         pAclrtGetPhyDevIdByLogicDevId == nullptr) {
         SHM_LOG_ERROR("No phy id mapping API available (aclrtGetPhyDevIdByUserDevId, "
@@ -207,6 +213,7 @@ void DlAclApi::CleanupLibrary()
     pAclrtGetPhyDevIdByUserDevId = nullptr;
     pAclrtGetPhyDevIdByLogicDevId = nullptr;
     pRtGetDevicePhyIdByIndex = nullptr;
+    pRtEnableP2P = nullptr;
     pAclrtReserveMemAddress = nullptr;
     pAclrtReleaseMemAddress = nullptr;
 

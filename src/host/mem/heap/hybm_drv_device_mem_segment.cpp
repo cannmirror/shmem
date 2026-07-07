@@ -193,6 +193,7 @@ Result MemSegmentDevice::Export(const std::shared_ptr<MemSlice> &slice, std::str
     info.sliceIndex = static_cast<uint32_t>(slice->index_);
     info.deviceId = options_.devId;
     info.logicDeviceId = logicDeviceId_;
+    info.devicePhyId = devicePhyId_;
     info.pid = pid_;
     info.rankId = options_.rankId;
     info.size = slice->size_;
@@ -260,13 +261,9 @@ Result MemSegmentDevice::Import(const std::vector<std::string> &allExInfo, void 
         }
 
         if (CanLocalHostReaches(desInfos[i].superPodId, desInfos[i].serverId, desInfos[i].logicDeviceId)) {
-            auto ret = DlAclApi::AclrtDeviceEnablePeerAccess(desInfos[i].deviceId, 0);
-            if (ret != 0) {
-                SHM_LOG_ERROR("enable device access failed:" << ret << " local_device:" << deviceId_
-                                                            << " remote_device:" << desInfos[i].deviceId
-                                                            << " logic_device:" << logicDeviceId_
-                                                            << " remote_logic:" << desInfos[i].logicDeviceId);
-                return ACLSHMEM_DL_FUNC_FAILED;
+            auto ret = EnableRemotePeerAccess(desInfos[i].devicePhyId, desInfos[i].deviceId);
+            if (ret != ACLSHMEM_SUCCESS) {
+                return ret;
             }
         }
 

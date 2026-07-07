@@ -13,7 +13,7 @@
 #define SHMEMI_SIMT_KERNEL_DEBUG_H
 #include "utils/debug/asc_printf.h"
 #include "utils/debug/asc_assert.h"
-#include "device/utils/shmemi_kernel_debug.h"
+#include "utils/shmemi_kernel_debug.h"
 
 namespace simt
 {

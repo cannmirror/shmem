@@ -209,6 +209,12 @@ Result UdmaTransportManager::Prepare(const HybmTransPrepareOptions& options)
     deviceJettyManager_->SetLocalMemInfos(localMemInfoMap_);
     deviceJettyManager_->SetEids(hccpEidMap_);
     deviceJettyManager_->SetPeerRoutes(peerEidIndexMap_, peerRemoteEidIndexMap_);
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    if (deviceJettyManager_->SetGlobalRoutes(allLocalRoutes_) != ACLSHMEM_SUCCESS) {
+        SHM_LOG_ERROR("Set global routes failed, allLocalRoutes_ size = " << allLocalRoutes_.size());
+        return ACLSHMEM_INNER_ERROR;
+    }
+#endif
     ret = deviceJettyManager_->Startup();
     if (ret != ACLSHMEM_SUCCESS) {
         SHM_LOG_ERROR("Jetty manager startup failed, ret = " << ret);
@@ -398,9 +404,19 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t deviceId, uint32_t rankCou
         ctxHandleMap_[peer] = ctxHandle;
     }
 
+    // The N x N allgather already exists in v1.5.0: it is required to obtain the "peer -> me"
+    // column, since localRouteByPeer[me] only holds this rank's EID toward each peer while the
+    // EID that `peer` uses toward `me` lives in `peer`'s row. Keeping it in the OFF build does
+    // not add overhead relative to v1.5.0.
     std::vector<int32_t> allRouteByPeer(rankCount * rankCount, INVALID_EID_INDEX);
     g_boot_handle.allgather(
         localRouteByPeer.data(), allRouteByPeer.data(), sizeof(int32_t) * rankCount, &g_boot_handle);
+
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Stash the full N x N routing matrix so the relay path can later look up
+    // "actual_pe's local EID toward relay_pe" as the target EID for a relay-mode WQE.
+    allLocalRoutes_ = allRouteByPeer; // "任意源 rank → 任意目标 rank" 的本地 EID 路由表
+#endif
 
     for (uint32_t peer = 0; peer < rankCount; ++peer) {
         if (peer == rankId_) {

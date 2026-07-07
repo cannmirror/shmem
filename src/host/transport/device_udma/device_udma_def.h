@@ -56,12 +56,12 @@ struct ACLSHMEMUDMACqCtx {
 };
 
 struct ACLSHMEMAIVUDMAInfo {
-    uint32_t qpNum;  /* number of QP per connection */
-    uint64_t sqPtr;  /* pointer to send queue address array of size [PE_NUM][qpNum] */
-    uint64_t rqPtr;  /* pointer to receive queue address array of size [PE_NUM][qpNum] */
-    uint64_t scqPtr; /* pointer to send completion queue address array of size [PE_NUM][qpNum] */
-    uint64_t rcqPtr; /* pointer to receive completion queue address array of size [PE_NUM][qpNum] */
-    uint64_t memPtr; /* pointer to memory region array of size [MAX_PE_NUM] */
+    uint32_t qpNum;     /* number of QP per connection */
+    uint64_t sqPtr;     /* pointer to send queue array of size [N*N][qpNum] indexed by actualPe*N+relayPe (N from aclshmemi_get_total_pe) */
+    uint64_t rqPtr;     /* pointer to receive queue array */
+    uint64_t scqPtr;    /* pointer to send completion queue array */
+    uint64_t rcqPtr;    /* pointer to receive completion queue array */
+    uint64_t memPtr;    /* pointer to memory region array of size [N*N] */
 };
 
 } // namespace device

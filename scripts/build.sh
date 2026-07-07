@@ -83,6 +83,7 @@ function print_usage()
     echo "  -examples                  Build with examples"
     echo "  -enable_rdma               Enable RDMA support. For Ascend950, must be used with -rdma_backend"
     echo "  -enable_simt               Enable SIMT support"
+    echo "  -enable_relay              Enable UDMA relay (detour) support. Requires -soc_type Ascend950 (UDMA)"
     echo "  -python_extension          Build Python extension"
     echo "  -python_example            Build Python example"
     echo "  -gendoc                    Generate documentation"
@@ -115,6 +116,11 @@ function fn_whl_build()
 {
     echo "Python extension enabled. Copying and packaging Python wheel..."
     export SOC_TYPE=${SOC_TYPE}
+    # setup.py reads COMPILE_OPTIONS from the environment and forwards it to CMake. Without
+    # exporting it here, wheel builds silently drop every -D flag accumulated in COMPILE_OPTIONS
+    # (e.g. -DACLSHMEM_RELAY_SUPPORT/-DACLSHMEM_RDMA_SUPPORT/-DACLSHMEM_SIMT_SUPPORT), producing a
+    # wheel whose C++ build differs from the native fn_build output.
+    export COMPILE_OPTIONS=${COMPILE_OPTIONS}
     if [ "$SOC_TYPE" = "Ascend950" ]; then
         export ACLSHMEM_UDMA_SUPPORT=ON
     fi
@@ -333,6 +339,10 @@ while [[ $# -gt 0 ]]; do
             COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_SIMT_SUPPORT=ON"
             shift
             ;;
+        -enable_relay)
+            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_RELAY_SUPPORT=ON"
+            shift
+            ;;
         -python_extension)
             PYEXPAND_TYPE=ON
             shift
@@ -409,6 +419,18 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Validate relay parameter dependencies: relay is built on top of UDMA, which is only
+# enabled for Ascend950 (see fn_build -DACLSHMEM_UDMA_SUPPORT). Fail early with a clear
+# message instead of relying solely on the CMake FATAL_ERROR.
+if [ -n "$(echo "$COMPILE_OPTIONS" | grep -o '\-DACLSHMEM_RELAY_SUPPORT=ON')" ]; then
+    if [ "$SOC_TYPE" != "Ascend950" ]; then
+        echo "Error: -enable_relay requires UDMA support, which is only enabled for Ascend950."
+        echo "       Please add -soc_type Ascend950 when using -enable_relay."
+        print_usage
+        exit 1
+    fi
+fi
 
 # Validate RDMA parameter dependencies
 if [ -n "$RDMA_BACKEND" ]; then

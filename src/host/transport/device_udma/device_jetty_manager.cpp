@@ -64,18 +64,58 @@ Result DeviceJettyManager::SetPeerRoutes(
     return ACLSHMEM_SUCCESS;
 }
 
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+Result DeviceJettyManager::SetGlobalRoutes(const std::vector<int32_t>& globalRoutes) noexcept
+{
+    if (globalRoutes.size() != static_cast<size_t>(rankCount_) * rankCount_) {
+        SHM_LOG_ERROR(
+            "SetGlobalRoutes size mismatch: got " << globalRoutes.size() << ", expected "
+                                                  << static_cast<size_t>(rankCount_) * rankCount_);
+        return ACLSHMEM_INNER_ERROR;
+    }
+    globalRoutes_ = globalRoutes;
+    return ACLSHMEM_SUCCESS;
+}
+#endif
+
 Result DeviceJettyManager::Shutdown() noexcept
 {
     int ret = 0;
-    for (auto& stateEntry : jettyStateMap_) {
-        auto& state = stateEntry.second;
-        if (transportMode_ != TransportModeT::CONN_RM && state.qpHandle != nullptr) {
-            ret = DlHccpV2Api::RaCtxQpUnbind(state.qpHandle);
-            if (ret != 0) {
-                SHM_LOG_WARN("Qp unbind failed, eidIndex = " << state.eidIndex << ", ret = " << ret);
+    // Teardown order (both paths): unbind every local QP first, then unimport the remote QPs,
+    // then destroy the local qpHandles below. Unbind is identical for both paths; only the
+    // unimport bookkeeping differs (slot-indexed for relay, per-peer for direct).
+    if (transportMode_ != TransportModeT::CONN_RM) {
+        for (auto& stateEntry : jettyStateMap_) {
+            auto& state = stateEntry.second;
+            if (state.qpHandle != nullptr) {
+                ret = DlHccpV2Api::RaCtxQpUnbind(state.qpHandle);
+                if (ret != 0) {
+                    SHM_LOG_WARN("Qp unbind failed, eidIndex = " << state.eidIndex << ", ret = " << ret);
+                }
             }
         }
+    }
 
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Relay path: remote QPs are slot-indexed. Unimport with the ctxHandle recorded at import time.
+    for (size_t slot = 0; slot < relayRemoteQpBySlot_.size(); ++slot) {
+        if (relayRemoteQpBySlot_[slot] == nullptr) {
+            continue;
+        }
+        ret = DlHccpV2Api::RaCtxQpUnimport(relayRemoteQpCtxBySlot_[slot], relayRemoteQpBySlot_[slot]);
+        if (ret != 0) {
+            SHM_LOG_WARN("Qp unimport failed, slot: " << slot << ", ret: " << ret);
+        }
+        relayRemoteQpBySlot_[slot] = nullptr;
+        relayRemoteQpCtxBySlot_[slot] = nullptr;
+    }
+#endif
+
+    for (auto& stateEntry : jettyStateMap_) {
+        auto& state = stateEntry.second;
+#if !defined(ACLSHMEM_RELAY_SUPPORT)
+        // Direct path: remote QPs are stored per-peer on their owning bucket. Unimport them before
+        // destroying this state's local qpHandle below.
         for (uint32_t peer = 0; peer < rankCount_; ++peer) {
             if (peer == rankId_ || state.remoteQpHandleList.empty() || state.remoteQpHandleList[peer] == nullptr) {
                 continue;
@@ -87,6 +127,7 @@ Result DeviceJettyManager::Shutdown() noexcept
             }
             state.remoteQpHandleList[peer] = nullptr;
         }
+#endif
 
         if (state.qpHandle != nullptr) {
             ret = DlHccpV2Api::RaCtxQpDestroy(state.qpHandle);
@@ -139,8 +180,13 @@ bool DeviceJettyManager::ReserveUdmaInfoSpace() noexcept
     constexpr uint32_t qpNum = 1;
     auto wqSize = sizeof(ACLSHMEMUDMAWQCtx) * qpNum;
     auto cqSize = sizeof(ACLSHMEMUDMACqCtx) * qpNum;
-    auto oneQpSize = 2U * (wqSize + cqSize) + sizeof(ACLSHMEMUBmemInfo) * qpNum; // 2 means (sq + rq) (scq + rcq)
-    udmaInfoSize_ = sizeof(ACLSHMEMAIVUDMAInfo) + oneQpSize * rankCount_;
+    auto oneSlotSize = 2U * (wqSize + cqSize) + sizeof(ACLSHMEMUBmemInfo) * qpNum; // (sq+rq) + (scq+rcq) + memInfo
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    const uint32_t slotCount = rankCount_ * rankCount_; // Each (actual_pe, relay_pe) pair gets one slot.
+#else
+    const uint32_t slotCount = rankCount_; // Direct path: one slot per target pe.
+#endif
+    udmaInfoSize_ = sizeof(ACLSHMEMAIVUDMAInfo) + oneSlotSize * slotCount;
 
     SHM_VALIDATE_RETURN(
         aclrtMalloc(&udmaInfo_, udmaInfoSize_, ACL_MEM_MALLOC_HUGE_FIRST) == 0,
@@ -318,6 +364,145 @@ Result DeviceJettyManager::JettyImport() noexcept
         localQpImportByEid.data(), allQpImportByEid.data(), sizeof(QpImportInfoT) * eidCount_, &g_boot_handle);
     g_boot_handle.allgather(localQpKeyByEid.data(), allQpKeyByEid.data(), sizeof(QpKeyT) * eidCount_, &g_boot_handle);
 
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    SHM_VALIDATE_RETURN(
+        ImportRelayQps(allQpImportByEid, allQpKeyByEid) == ACLSHMEM_SUCCESS, "Relay qp import failed.",
+        ACLSHMEM_INNER_ERROR);
+#else
+    SHM_VALIDATE_RETURN(
+        ImportDirectQps(allQpImportByEid, allQpKeyByEid) == ACLSHMEM_SUCCESS, "Direct qp import failed.",
+        ACLSHMEM_INNER_ERROR);
+#endif
+
+    SHM_LOG_INFO("Qp import success");
+    return ACLSHMEM_SUCCESS;
+}
+
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+Result DeviceJettyManager::ResolveRelaySlotRoute(
+    uint32_t actualRank, uint32_t relayRank, uint32_t fallbackLocalEid, bool& skip, uint32_t& localEid,
+    uint32_t& remoteEid) noexcept
+{
+    skip = false;
+    localEid = fallbackLocalEid;
+    remoteEid = fallbackLocalEid;
+
+    // Diagonal (actual==relay) where actual is a real peer means "peer relays to itself" --
+    // physically meaningless. The slot is left unused; callers skip it.
+    if (actualRank == relayRank && actualRank != rankId_) {
+        skip = true;
+        return ACLSHMEM_SUCCESS;
+    }
+
+    // Source EID bucket: "this rank's port toward relayRank" for relay paths, or "this rank's port
+    // toward actualRank" for the (actual=peer, relay=self) direct path -- the direct slot egresses
+    // straight to actualRank, so it must use the bucket dedicated to that direction.
+    if (actualRank != rankId_ && relayRank == rankId_) {
+        auto localRouteIt = peerLocalEidMap_.find(actualRank);
+        if (localRouteIt == peerLocalEidMap_.end()) {
+            SHM_LOG_ERROR("Missing local route for direct peer rank " << actualRank);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        localEid = localRouteIt->second;
+    } else if (relayRank != rankId_) {
+        auto localRouteIt = peerLocalEidMap_.find(relayRank);
+        if (localRouteIt == peerLocalEidMap_.end()) {
+            SHM_LOG_ERROR("Missing local route for relay rank " << relayRank);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        localEid = localRouteIt->second;
+    }
+
+    // Target EID: actualRank's port toward relayRank. fabric forwards by this EID via relay.
+    if (actualRank != rankId_) {
+        if (relayRank == rankId_) {
+            // (actual=peer, relay=self) is the direct path. The peer's port toward us is
+            // peerRemoteEidMap_[actual] (allgather'd from peer's peerLocalEidMap_[me]).
+            auto remoteRouteIt = peerRemoteEidMap_.find(actualRank);
+            if (remoteRouteIt == peerRemoteEidMap_.end()) {
+                SHM_LOG_ERROR("Missing remote route for peer rank " << actualRank);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            remoteEid = remoteRouteIt->second;
+        } else {
+            // Look up actualRank's local EID toward relayRank in the global routing matrix.
+            if (globalRoutes_.size() != static_cast<size_t>(rankCount_) * rankCount_) {
+                SHM_LOG_ERROR(
+                    "globalRoutes_ size " << globalRoutes_.size() << " != rankCount^2 "
+                                          << rankCount_ * rankCount_);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            int32_t r = globalRoutes_[actualRank * rankCount_ + relayRank];
+            if (r < 0 || static_cast<uint32_t>(r) >= eidCount_) {
+                SHM_LOG_ERROR(
+                    "Invalid global route for (actual=" << actualRank << ", relay=" << relayRank << "): " << r);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            remoteEid = static_cast<uint32_t>(r);
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
+Result DeviceJettyManager::ImportRelayQps(
+    const std::vector<QpImportInfoT>& allQpImportByEid, const std::vector<QpKeyT>& allQpKeyByEid) noexcept
+{
+    // Import one remote QP per device slot (actualPe * N + relayPe). Slot indexing avoids the lossy
+    // eidIndex->relay inversion: several relays that share a single local egress EID (e.g. multiple
+    // cross-node peers behind one NIC port) each keep their own remote QP handle and tpn here.
+    relayRemoteQpBySlot_.assign(static_cast<size_t>(rankCount_) * rankCount_, nullptr);
+    relayRemoteQpCtxBySlot_.assign(static_cast<size_t>(rankCount_) * rankCount_, nullptr);
+    relayTpnBySlot_.assign(static_cast<size_t>(rankCount_) * rankCount_, 0);
+
+    const uint32_t fallbackLocalEid = GetFallbackLocalEid();
+    for (uint32_t actualRank = 0; actualRank < rankCount_; ++actualRank) {
+        for (uint32_t relayRank = 0; relayRank < rankCount_; ++relayRank) {
+            // The self-target (actualRank == rankId_) slots are local; no remote QP to import.
+            if (actualRank == rankId_) {
+                continue;
+            }
+            bool skip = false;
+            uint32_t localEid = 0;
+            uint32_t remoteEid = 0;
+            if (ResolveRelaySlotRoute(actualRank, relayRank, fallbackLocalEid, skip, localEid, remoteEid) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+            if (skip) {
+                continue;
+            }
+
+            // The local egress bucket (source EID) owns the ctxHandle used for the import.
+            auto stateIt = jettyStateMap_.find(localEid);
+            if (stateIt == jettyStateMap_.end()) {
+                SHM_LOG_ERROR("Missing local jetty state for EID index " << localEid);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            auto& state = stateIt->second;
+
+            const uint32_t slot = actualRank * rankCount_ + relayRank;
+            QpImportInfoT qpImportInfo = allQpImportByEid[actualRank * eidCount_ + remoteEid];
+            qpImportInfo.in.key = allQpKeyByEid[actualRank * eidCount_ + remoteEid];
+            int ret = DlHccpV2Api::RaCtxQpImport(state.ctxHandle, &qpImportInfo, &relayRemoteQpBySlot_[slot]);
+            if (ret != 0) {
+                SHM_LOG_ERROR(
+                    "Qp import failed, slot (actual=" << actualRank << ", relay=" << relayRank
+                                                      << ") localEid: " << localEid << " remoteEid: " << remoteEid
+                                                      << " ret: " << ret);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            relayRemoteQpCtxBySlot_[slot] = state.ctxHandle;
+            relayTpnBySlot_[slot] = qpImportInfo.out.ub.tpn;
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
+#else
+Result DeviceJettyManager::ImportDirectQps(
+    const std::vector<QpImportInfoT>& allQpImportByEid, const std::vector<QpKeyT>& allQpKeyByEid) noexcept
+{
+    // Direct path (v1.5.0 equivalent): each bucket imports only the peers whose local egress EID
+    // equals that bucket's eidIndex. Never references globalRoutes_ / relayPe.
     for (auto& stateEntry : jettyStateMap_) {
         auto& state = stateEntry.second;
         for (uint32_t peer = 0; peer < rankCount_; ++peer) {
@@ -351,22 +536,62 @@ Result DeviceJettyManager::JettyImport() noexcept
             state.tpnList[peer] = qpImportInfo.out.ub.tpn;
         }
     }
-
-    SHM_LOG_INFO("Qp import success");
     return ACLSHMEM_SUCCESS;
 }
+#endif
 
 Result DeviceJettyManager::JettyBind() noexcept
 {
     if (transportMode_ == TransportModeT::CONN_RM) {
         return ACLSHMEM_SUCCESS; // no need to bind in RM mode
     }
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Relay path: bind every imported slot QP (slot-indexed). The local endpoint is the qpHandle of
+    // the slot's local egress bucket (source EID resolved by ResolveRelaySlotRoute).
+    const uint32_t fallbackLocalEid = GetFallbackLocalEid();
+    for (uint32_t actualRank = 0; actualRank < rankCount_; ++actualRank) {
+        if (actualRank == rankId_) {
+            continue;
+        }
+        for (uint32_t relayRank = 0; relayRank < rankCount_; ++relayRank) {
+            const uint32_t slot = actualRank * rankCount_ + relayRank;
+            void* remoteQp = relayRemoteQpBySlot_[slot];
+            if (remoteQp == nullptr) {
+                continue; // skipped diagonal / self slots were never imported
+            }
+            bool skip = false;
+            uint32_t localEid = 0;
+            uint32_t remoteEid = 0;
+            if (ResolveRelaySlotRoute(actualRank, relayRank, fallbackLocalEid, skip, localEid, remoteEid) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+            if (skip) {
+                continue;
+            }
+            auto stateIt = jettyStateMap_.find(localEid);
+            if (stateIt == jettyStateMap_.end()) {
+                SHM_LOG_ERROR("Missing local jetty state for EID index " << localEid);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            int ret = DlHccpV2Api::RaCtxQpBind(stateIt->second.qpHandle, remoteQp);
+            if (ret != 0) {
+                SHM_LOG_ERROR(
+                    "Qp bind failed, slot (actual=" << actualRank << ", relay=" << relayRank << ") ret: " << ret);
+                return ACLSHMEM_INNER_ERROR;
+            }
+        }
+    }
+#else
     for (auto& stateEntry : jettyStateMap_) {
         auto& state = stateEntry.second;
         for (uint32_t peer = 0; peer < rankCount_; ++peer) {
             if (peer == rankId_) {
                 continue;
             }
+            // Direct path (v1.5.0 equivalent): each bucket only imported the peers whose local
+            // egress EID equals that bucket's eidIndex, so only bind those. Other peers' handles
+            // on this bucket are null and must not be bound.
             auto localRouteIt = peerLocalEidMap_.find(peer);
             if (localRouteIt == peerLocalEidMap_.end() || localRouteIt->second != state.eidIndex) {
                 continue;
@@ -378,6 +603,7 @@ Result DeviceJettyManager::JettyBind() noexcept
             }
         }
     }
+#endif
     SHM_LOG_INFO("Qp bind success.");
     return ACLSHMEM_SUCCESS;
 }
@@ -472,7 +698,15 @@ void DeviceJettyManager::FillUdmaMem(ACLSHMEMUBmemInfo& srcMem, ACLSHMEMUBmemInf
 void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
 {
     SHM_LOG_DEBUG("=======================rank [" << rankId_ << "] host info====================");
-    auto tempWQCtx = ((ACLSHMEMUDMAWQCtx*)hostInfo.sqPtr)[rankId_];
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // N*N layout: sample the (rankId_, rankId_) self-direct slot.
+    const uint32_t sampleSlot = rankId_ * rankCount_ + rankId_;
+#else
+    // Original v1.5.0 single-dimension layout: slot == pe. The table only has rankCount_ entries,
+    // so indexing must stay within [0, rankCount_).
+    const uint32_t sampleSlot = rankId_;
+#endif
+    auto tempWQCtx = ((ACLSHMEMUDMAWQCtx*)hostInfo.sqPtr)[sampleSlot];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqn: " << tempWQCtx.wqn);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.bufAddr: " << tempWQCtx.bufAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeShiftSize: " << tempWQCtx.wqeShiftSize);
@@ -484,7 +718,7 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.sl: " << tempWQCtx.sl);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] WQCtx.wqeCnt: " << tempWQCtx.wqeCnt);
 
-    auto tempCQCtx = ((ACLSHMEMUDMACqCtx*)hostInfo.scqPtr)[rankId_];
+    auto tempCQCtx = ((ACLSHMEMUDMACqCtx*)hostInfo.scqPtr)[sampleSlot];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.cqn: " << tempCQCtx.cqn);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.bufAddr: " << tempCQCtx.bufAddr);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.cqeShiftSize: " << tempCQCtx.cqeShiftSize);
@@ -494,7 +728,7 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.dbMode: " << static_cast<int>(tempCQCtx.dbMode));
     SHM_LOG_DEBUG("rank[" << rankId_ << "] CQCtx.dbAddr: " << tempCQCtx.dbAddr);
 
-    auto tempMemInfo = ((ACLSHMEMUBmemInfo*)hostInfo.memPtr)[rankId_];
+    auto tempMemInfo = ((ACLSHMEMUBmemInfo*)hostInfo.memPtr)[sampleSlot];
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.token_value_valid: " << tempMemInfo.token_value_valid);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.rmt_jetty_type: " << tempMemInfo.rmt_jetty_type);
     SHM_LOG_DEBUG("rank[" << rankId_ << "] MemInfo.target_hint: " << static_cast<int>(tempMemInfo.target_hint));
@@ -507,6 +741,125 @@ void DeviceJettyManager::PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const
 
     // eidAddr points to device memory, so only log the pointer here.
 }
+
+Result DeviceJettyManager::FillOneUdmaSlot(
+    ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid, uint32_t fallbackLocalEid,
+    uint32_t slot, uint32_t actualRank, uint32_t localEid, uint32_t remoteEid, uint32_t remoteTpn) noexcept
+{
+    auto stateIt = jettyStateMap_.find(localEid);
+    if (stateIt == jettyStateMap_.end()) {
+        const auto fallbackStateIt = jettyStateMap_.find(fallbackLocalEid);
+        if (fallbackStateIt == jettyStateMap_.end()) {
+            SHM_LOG_ERROR("Missing local jetty state for EID index " << localEid);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        stateIt = fallbackStateIt;
+    }
+    auto& state = stateIt->second;
+
+    FillUdmaWq(state.localWq, ((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr)[slot]);
+    FillUdmaWq(state.localWq, ((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr)[slot]);
+    FillUdmaCq(state.localCq, ((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr)[slot]);
+    FillUdmaCq(state.localCq, ((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr)[slot]);
+
+    ACLSHMEMUBmemInfo memInfo{};
+    if (actualRank == rankId_) {
+        auto localMemIt = localMemInfoMap_.find(localEid);
+        if (localMemIt != localMemInfoMap_.end()) {
+            memInfo = localMemIt->second;
+        }
+    } else {
+        memInfo = allMemByEid[actualRank * eidCount_ + remoteEid];
+        memInfo.tpn = remoteTpn;
+    }
+    FillUdmaMem(memInfo, ((ACLSHMEMUBmemInfo*)copyInfo->memPtr)[slot]);
+    ((ACLSHMEMUBmemInfo*)copyInfo->memPtr)[slot].eidAddr =
+        (uint64_t)((HccpEid*)hccpEidDevice_ + actualRank * eidCount_ + remoteEid);
+    return ACLSHMEM_SUCCESS;
+}
+
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+Result DeviceJettyManager::FillRelayUdmaSlots(
+    ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid,
+    uint32_t fallbackLocalEid) noexcept
+{
+    // Fill every (actual_pe, relay_pe) slot. Route resolution is shared with ImportRelayQps via
+    // ResolveRelaySlotRoute so import and fill agree on (localEid, remoteEid) for each slot. The
+    // per-slot tpn is read back from relayTpnBySlot_ (slot-indexed, so relays sharing one local
+    // egress EID keep distinct tpn values).
+    for (uint32_t actualRank = 0; actualRank < rankCount_; ++actualRank) {
+        for (uint32_t relayRank = 0; relayRank < rankCount_; ++relayRank) {
+            bool skip = false;
+            uint32_t localEid = 0;
+            uint32_t remoteEid = 0;
+            if (ResolveRelaySlotRoute(actualRank, relayRank, fallbackLocalEid, skip, localEid, remoteEid) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+            if (skip) {
+                continue;
+            }
+
+            const uint32_t slot = actualRank * rankCount_ + relayRank;
+            const uint32_t remoteTpn = relayTpnBySlot_[slot];
+            if (FillOneUdmaSlot(
+                    copyInfo, allMemByEid, fallbackLocalEid, slot, actualRank, localEid, remoteEid, remoteTpn) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
+#else
+Result DeviceJettyManager::FillDirectUdmaSlots(
+    ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid,
+    uint32_t fallbackLocalEid) noexcept
+{
+    // Direct path (v1.5.0 equivalent): single-layer loop, one slot per target peer (slot == peer).
+    // Only depends on peerLocalEidMap_ / peerRemoteEidMap_; never references globalRoutes_.
+    for (uint32_t peer = 0; peer < rankCount_; ++peer) {
+        const uint32_t slot = peer;
+        // Source EID bucket: this rank's port toward peer (fallback for the self slot).
+        uint32_t localEid = fallbackLocalEid;
+        // Target EID: peer's port toward us.
+        uint32_t remoteEid = fallbackLocalEid;
+        if (peer != rankId_) {
+            auto localRouteIt = peerLocalEidMap_.find(peer);
+            if (localRouteIt == peerLocalEidMap_.end()) {
+                SHM_LOG_ERROR("Missing local route for direct peer rank " << peer);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            localEid = localRouteIt->second;
+            auto remoteRouteIt = peerRemoteEidMap_.find(peer);
+            if (remoteRouteIt == peerRemoteEidMap_.end()) {
+                SHM_LOG_ERROR("Missing remote route for peer rank " << peer);
+                return ACLSHMEM_INNER_ERROR;
+            }
+            remoteEid = remoteRouteIt->second;
+        }
+
+        // Direct path tpn is stored per-peer on the owning bucket (v1.5.0 layout). Resolve it here
+        // the same way FillOneUdmaSlot resolves the state (localEid, falling back if absent).
+        uint32_t remoteTpn = 0;
+        if (peer != rankId_) {
+            auto stateIt = jettyStateMap_.find(localEid);
+            if (stateIt == jettyStateMap_.end()) {
+                stateIt = jettyStateMap_.find(fallbackLocalEid);
+            }
+            if (stateIt != jettyStateMap_.end()) {
+                remoteTpn = stateIt->second.tpnList[peer];
+            }
+        }
+
+        if (FillOneUdmaSlot(copyInfo, allMemByEid, fallbackLocalEid, slot, peer, localEid, remoteEid, remoteTpn) !=
+            ACLSHMEM_SUCCESS) {
+            return ACLSHMEM_INNER_ERROR;
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
+#endif
 
 Result DeviceJettyManager::FillUdmaInfo() noexcept
 {
@@ -544,67 +897,37 @@ Result DeviceJettyManager::FillUdmaInfo() noexcept
     }
     // construct udma info in host
     constexpr uint32_t qpNum = 1;
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    const uint32_t slotCount = rankCount_ * rankCount_; // Each (actual_pe, relay_pe) pair gets one slot.
+#else
+    const uint32_t slotCount = rankCount_; // Direct path: one slot per target pe.
+#endif
     std::vector<uint8_t> udmaInfoBuffer(udmaInfoSize_, 0);
     auto copyInfo = reinterpret_cast<ACLSHMEMAIVUDMAInfo*>(udmaInfoBuffer.data());
     copyInfo->qpNum = qpNum;
     copyInfo->sqPtr = (uint64_t)(copyInfo + 1);
-    copyInfo->rqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr + rankCount_ * qpNum);
-    copyInfo->scqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr + rankCount_ * qpNum);
-    copyInfo->rcqPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr + rankCount_ * qpNum);
-    copyInfo->memPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr + rankCount_ * qpNum);
+    copyInfo->rqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr + slotCount * qpNum);
+    copyInfo->scqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr + slotCount * qpNum);
+    copyInfo->rcqPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr + slotCount * qpNum);
+    copyInfo->memPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr + slotCount * qpNum);
 
     uint32_t fallbackLocalEid = GetFallbackLocalEid();
-    const auto fallbackStateIt = jettyStateMap_.find(fallbackLocalEid);
-    for (uint32_t rank = 0; rank < rankCount_; ++rank) {
-        uint32_t localEid = fallbackLocalEid;
-        uint32_t remoteEid = fallbackLocalEid;
-        if (rank != rankId_) {
-            auto localRouteIt = peerLocalEidMap_.find(rank);
-            auto remoteRouteIt = peerRemoteEidMap_.find(rank);
-            if (localRouteIt == peerLocalEidMap_.end() || remoteRouteIt == peerRemoteEidMap_.end()) {
-                SHM_LOG_ERROR("Missing route for peer rank " << rank);
-                return ACLSHMEM_INNER_ERROR;
-            }
-            localEid = localRouteIt->second;
-            remoteEid = remoteRouteIt->second;
-        }
-
-        auto stateIt = jettyStateMap_.find(localEid);
-        if (stateIt == jettyStateMap_.end()) {
-            if (fallbackStateIt == jettyStateMap_.end()) {
-                SHM_LOG_ERROR("Missing local jetty state for EID index " << localEid);
-                return ACLSHMEM_INNER_ERROR;
-            }
-            stateIt = fallbackStateIt;
-        }
-        auto& state = stateIt->second;
-
-        FillUdmaWq(state.localWq, ((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr)[rank]);
-        FillUdmaWq(state.localWq, ((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr)[rank]);
-        FillUdmaCq(state.localCq, ((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr)[rank]);
-        FillUdmaCq(state.localCq, ((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr)[rank]);
-
-        ACLSHMEMUBmemInfo memInfo{};
-        if (rank == rankId_) {
-            auto localMemIt = localMemInfoMap_.find(localEid);
-            if (localMemIt != localMemInfoMap_.end()) {
-                memInfo = localMemIt->second;
-            }
-        } else {
-            memInfo = allMemByEid[rank * eidCount_ + remoteEid];
-            memInfo.tpn = state.tpnList[rank];
-        }
-        FillUdmaMem(memInfo, ((ACLSHMEMUBmemInfo*)copyInfo->memPtr)[rank]);
-        ((ACLSHMEMUBmemInfo*)copyInfo->memPtr)[rank].eidAddr =
-            (uint64_t)((HccpEid*)hccpEidDevice_ + rank * eidCount_ + remoteEid);
-    }
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    SHM_VALIDATE_RETURN(
+        FillRelayUdmaSlots(copyInfo, allMemByEid, fallbackLocalEid) == ACLSHMEM_SUCCESS,
+        "Fill relay udma slots failed.", ACLSHMEM_INNER_ERROR);
+#else
+    SHM_VALIDATE_RETURN(
+        FillDirectUdmaSlots(copyInfo, allMemByEid, fallbackLocalEid) == ACLSHMEM_SUCCESS,
+        "Fill direct udma slots failed.", ACLSHMEM_INNER_ERROR);
+#endif
     PrintHostInfo(*copyInfo);
     // link position in device
     copyInfo->sqPtr = (uint64_t)((ACLSHMEMAIVUDMAInfo*)udmaInfo_ + 1);
-    copyInfo->rqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr + rankCount_ * qpNum);
-    copyInfo->scqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr + rankCount_ * qpNum);
-    copyInfo->rcqPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr + rankCount_ * qpNum);
-    copyInfo->memPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr + rankCount_ * qpNum);
+    copyInfo->rqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->sqPtr + slotCount * qpNum);
+    copyInfo->scqPtr = (uint64_t)((ACLSHMEMUDMAWQCtx*)copyInfo->rqPtr + slotCount * qpNum);
+    copyInfo->rcqPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->scqPtr + slotCount * qpNum);
+    copyInfo->memPtr = (uint64_t)((ACLSHMEMUDMACqCtx*)copyInfo->rcqPtr + slotCount * qpNum);
     ret = aclrtMemcpy(udmaInfo_, udmaInfoSize_, copyInfo, udmaInfoSize_, ACL_MEMCPY_HOST_TO_DEVICE);
     if (ret != 0) {
         SHM_LOG_ERROR("Copy udma info to device failed: " << ret);

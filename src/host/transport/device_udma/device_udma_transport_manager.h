@@ -80,6 +80,13 @@ private:
     std::map<uint32_t, void*> ctxHandleMap_;              // peerRankId -> ctxHandle
     std::map<uint32_t, uint32_t> peerEidIndexMap_;        // peerRankId -> local eidIndex
     std::map<uint32_t, uint32_t> peerRemoteEidIndexMap_;  // peerRankId -> remote eidIndex
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Full N x N routing table from allgather: allLocalRoutes_[rank][peer] = the local-port
+    // EID-index that `rank` uses to reach `peer`. Used to compute target EIDs for relay paths
+    // (rank=actual_pe, peer=relay_pe gives the EID of actual_pe's port that physically connects
+    // toward relay_pe, which is the rmt_eid we need so the fabric routes via relay_pe).
+    std::vector<int32_t> allLocalRoutes_;
+#endif
     static std::map<uint32_t, void*> storedCtxHandleMap_; // eidIndex -> ctxHandle
     static bool tsdOpened_;
     static bool raInitialized_;

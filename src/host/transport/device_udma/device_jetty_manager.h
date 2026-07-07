@@ -55,6 +55,12 @@ public:
     Result SetPeerRoutes(
         const std::map<uint32_t, uint32_t>& peerLocalEidMap,
         const std::map<uint32_t, uint32_t>& peerRemoteEidMap) noexcept;
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Full N x N routing matrix from PrepareOpenDevice's allgather.
+    // entry[rank * N + peer] is the local-port eidIndex that `rank` uses to reach `peer`.
+    // Used to compute target EIDs for (actual_pe, relay_pe) slot in relay mode.
+    Result SetGlobalRoutes(const std::vector<int32_t>& globalRoutes) noexcept;
+#endif
     Result Startup() noexcept;
     Result Shutdown() noexcept;
     void* GetJettyInfoAddress() noexcept;
@@ -75,8 +81,41 @@ private:
     void FillUdmaWq(ACLSHMEMUDMAWQCtx& srcWq, ACLSHMEMUDMAWQCtx& dstWq) const;
     void FillUdmaCq(ACLSHMEMUDMACqCtx& srcCq, ACLSHMEMUDMACqCtx& dstCq) const;
     void FillUdmaMem(ACLSHMEMUBmemInfo& srcMem, ACLSHMEMUBmemInfo& dstMem) const;
+    // Write one resolved (localEid, remoteEid) tuple into the UDMA info slot `slot` for target
+    // `actualRank`. `remoteTpn` is the imported tpn for this slot, resolved by the caller (peer-
+    // indexed for direct, slot-indexed for relay). Shared by the direct and relay fill loops.
+    Result FillOneUdmaSlot(
+        ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid, uint32_t fallbackLocalEid,
+        uint32_t slot, uint32_t actualRank, uint32_t localEid, uint32_t remoteEid, uint32_t remoteTpn) noexcept;
     Result FillUdmaInfo() noexcept;
     void PrintHostInfo(ACLSHMEMAIVUDMAInfo& hostInfo) const;
+
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    // Resolve the (local egress EID, remote target EID) pair for one device slot (actualRank,
+    // relayRank). Shared by ImportRelayQps and FillRelayUdmaSlots so import and fill stay in lock
+    // step. Sets `skip` for the meaningless (actual==relay, actual!=self) diagonal.
+    Result ResolveRelaySlotRoute(
+        uint32_t actualRank, uint32_t relayRank, uint32_t fallbackLocalEid, bool& skip, uint32_t& localEid,
+        uint32_t& remoteEid) noexcept;
+    // Relay-mode QP import: import one remote QP per device slot (actualPe * N + relayPe). Slot
+    // indexing (instead of the lossy eidIndex->relay inversion) lets multiple relays that share one
+    // local egress EID each keep their own remote QP / tpn.
+    Result ImportRelayQps(
+        const std::vector<QpImportInfoT>& allQpImportByEid, const std::vector<QpKeyT>& allQpKeyByEid) noexcept;
+    // Relay-mode slot fill: N*N (actual_pe, relay_pe) slots resolved from globalRoutes_.
+    Result FillRelayUdmaSlots(
+        ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid,
+        uint32_t fallbackLocalEid) noexcept;
+#else
+    // Direct-mode QP import (v1.5.0 equivalent): each bucket imports only the peers whose local
+    // egress EID equals that bucket's eidIndex.
+    Result ImportDirectQps(
+        const std::vector<QpImportInfoT>& allQpImportByEid, const std::vector<QpKeyT>& allQpKeyByEid) noexcept;
+    // Direct-mode slot fill (v1.5.0 equivalent): N slots, one per target peer (slot == peer).
+    Result FillDirectUdmaSlots(
+        ACLSHMEMAIVUDMAInfo* copyInfo, const std::vector<ACLSHMEMUBmemInfo>& allMemByEid,
+        uint32_t fallbackLocalEid) noexcept;
+#endif
 
     const uint32_t deviceId_;
     const uint32_t rankId_;
@@ -88,6 +127,16 @@ private:
     std::map<uint32_t, void*> tokenIdHandleMap_;            // eidIndex -> tokenIdHandle
     std::map<uint32_t, uint32_t> peerLocalEidMap_;          // peerRankId -> local eidIndex
     std::map<uint32_t, uint32_t> peerRemoteEidMap_;         // peerRankId -> remote eidIndex
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    std::vector<int32_t> globalRoutes_;                     // [rank * rankCount + peer] -> rank's local eidIndex toward peer
+    // Slot-indexed relay remote-QP / tpn storage, sized N*N and addressed by (actualPe * N +
+    // relayPe). Unlike the per-bucket peer-indexed PerEidJettyState::{remoteQpHandleList,tpnList},
+    // this keeps a distinct handle/tpn for every (actual, relay) slot even when several relays
+    // share one local egress EID (e.g. cross-node peers behind the same NIC port).
+    std::vector<void*> relayRemoteQpBySlot_;                // [actualPe * rankCount + relayPe] -> imported remote QP handle
+    std::vector<void*> relayRemoteQpCtxBySlot_;             // [actualPe * rankCount + relayPe] -> ctxHandle used for import
+    std::vector<uint32_t> relayTpnBySlot_;                  // [actualPe * rankCount + relayPe] -> imported tpn
+#endif
     std::map<uint32_t, PerEidJettyState> jettyStateMap_;    // eidIndex -> per-EID jetty state
     TransportModeT transportMode_ = TransportModeT::CONN_RM;
 

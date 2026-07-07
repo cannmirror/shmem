@@ -33,12 +33,14 @@ enum class aclshmemi_udma_opcode_t : uint32_t {
 };
 
 struct ACLSHMEMAIVUDMAInfo {
-    uint32_t qpNum;  // number of QP per connection
-    uint64_t sqPtr;  // pointer to send queue address array of size [PE_NUM][qpNum]
-    uint64_t rqPtr;  // pointer to receive queue address array of size [PE_NUM][qpNum]
-    uint64_t scqPtr; // pointer to send completion queue address array of size [PE_NUM][qpNum]
-    uint64_t rcqPtr; // pointer to receive completion queue address array of size [PE_NUM][qpNum]
-    uint64_t memPtr; // pointer to memory region array of size [MAX_PE_NUM]
+    uint32_t qpNum;     // number of QP per connection
+    // send queue array: relay OFF is [N][qpNum] indexed by pe; relay ON is [N*N][qpNum] indexed
+    // by actualPe*N+relayPe (N from aclshmemi_get_total_pe). rq/scq/rcq/mem follow the same layout.
+    uint64_t sqPtr;
+    uint64_t rqPtr;     // pointer to receive queue array
+    uint64_t scqPtr;    // pointer to send completion queue array
+    uint64_t rcqPtr;    // pointer to receive completion queue array
+    uint64_t memPtr;    // pointer to memory region array
 };
 
 struct ACLSHMEMUBmemInfo {
@@ -250,16 +252,18 @@ ACLSHMEM_DEVICE void aclshmemi_udma_poll_cq_update_info(
  *
  * @param remoteAddr             [in] address in remote HBM
  * @param localAddr              [in] address in lcoal HBM
- * @param pe                     [in] destination PE ID
+ * @param pe                     [in] destination PE ID (actual destination)
  * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
- * @param opcode                 [in] udma opcode in aclshmemi_udma_opcode_t enum class
  * @param messageLen             [in] message length in Bytes
  * @param params                 [in] extra parameters
+ * @param relay_pe               [in] PE whose port EID is used as the WQE rmt_eid. Defaults to `pe`
+ *                                    (direct path). When != pe, the SQE rmt_eid is the actual_pe's
+ *                                    local EID toward relay_pe, so the fabric routes via relay_pe.
  */
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
-    const aclshmemi_udma_params_t<T, OP_CODE>& params = {});
+    const aclshmemi_udma_params_t<T, OP_CODE>& params = {}, uint32_t relay_pe = static_cast<uint32_t>(-1));
 
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm__ ACLSHMEMUDMAWQCtx*& qpCtxEntry);
 
@@ -274,25 +278,18 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_update_info(uint32_t curHead, __gm
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen);
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    uint32_t relay_pe = static_cast<uint32_t>(-1));
 
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_write_notify(
     __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
     const aclshmemi_udma_params_t<T, OP_CODE>& params = {});
 
-/**
- * @brief Asynchronous UDMA READ function.
- *
- * @param destDmaAddr            [in] destination address in local HBM
- * @param srcDmaAddr             [in] source address in remote HBM
- * @param srcPe                  [in] source PE ID
- * @param qpIdx                  [in] QP index in multi-QP scenario (default 0 for single QP)
- * @param messageLen             [in] message length in Bytes
- */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_read(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen);
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen,
+    uint32_t relay_pe = static_cast<uint32_t>(-1));
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_get_nbi(__gm__ T* dst, __gm__ T* src, uint32_t elem_size, int pe);

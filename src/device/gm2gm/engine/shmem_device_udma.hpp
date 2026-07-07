@@ -14,6 +14,7 @@
 
 #include "kernel_operator.h"
 #include "device/shmem_def.h"
+#include "shmemi_device_common.h"
 #include "shmemi_device_udma.h"
 #include "utils/shmemi_kernel_debug.h"
 #include "../host_device/shmemi_host_device_constant.h"
@@ -398,23 +399,48 @@ ACLSHMEM_DEVICE void assert_not_self_send(uint32_t pe)
     }
 }
 
+// Converge the UDMA slot index computation into a single inline helper. The signature is
+// identical for both builds -- the (pe, relay_pe) parameters are unconditionally present, no
+// #if on the parameter list. Only the function body is compile-time gated:
+//   * OFF (direct path, original v1.5.0 behavior): slot == pe. relay_pe is ignored, and neither
+//     aclshmemi_get_my_pe nor aclshmemi_get_total_pe is read -- zero extra work on the hot path.
+//   * ON (relay path): slot == pe * rankCount + actualRelayPe, where actualRelayPe falls back to
+//     myPe when relay_pe == -1.
+ACLSHMEM_DEVICE uint32_t aclshmemi_udma_compute_slot(
+    uint32_t pe, uint32_t relay_pe = static_cast<uint32_t>(-1))
+{
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    uint32_t myPe = static_cast<uint32_t>(aclshmemi_get_my_pe());
+    uint32_t rankCount = static_cast<uint32_t>(aclshmemi_get_total_pe());
+    uint32_t actualRelayPe = (relay_pe == static_cast<uint32_t>(-1)) ? myPe : relay_pe;
+    return pe * rankCount + actualRelayPe;
+#else
+    (void)relay_pe; // direct path: ignore relay_pe, no extra computation
+    return pe;
+#endif
+}
+
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
-    const aclshmemi_udma_params_t<T, OP_CODE>& params)
+    const aclshmemi_udma_params_t<T, OP_CODE>& params, uint32_t relay_pe)
 {
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     ACLSHMEM_DEBUG_FUNC(assert_not_self_send, pe);
-    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
+    // Unified slot computation for both builds (call site is identical, no #if here). OFF returns
+    // pe (direct path); ON returns pe*N+actualRelayPe. Direct/OFF callers pass relay_pe == -1,
+    // which compute_slot ignores while returning pe.
+    uint32_t slot = aclshmemi_udma_compute_slot(pe, relay_pe);
+    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, slot, qpIdx);
     auto wqeSize = 1 << qpCtxEntry->baseBkShift; // basebk_shift
     uint32_t curHead = qpCtxEntry->head;
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
     uint32_t wqeCnt = qpCtxEntry->wqeCnt;
     // Poll CQ if send queue is full
-    poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, pe, qpIdx);
-    // Get memory info
+    poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, slot, qpIdx);
+    // Get memory info for this (actualPe, relayPe) slot
     __gm__ ACLSHMEMUBmemInfo* remoteMemInfo =
-        (__gm__ ACLSHMEMUBmemInfo*)(udmaInfo->memPtr + sizeof(ACLSHMEMUBmemInfo) * pe);
+        (__gm__ ACLSHMEMUBmemInfo*)(udmaInfo->memPtr + sizeof(ACLSHMEMUBmemInfo) * slot);
     // Write SQE to HBM
     __gm__ ACLSHMEMSqeCtx* sqeCtx = aclshmemi_udma_get_sqe_ctx(qpCtxEntry, curHead, wqeSize);
     aclshmemi_udma_fill_sqe_ctx<T, OP_CODE>(sqeCtx, remoteAddr, remoteMemInfo, curHead, params);
@@ -469,7 +495,7 @@ template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
     __ubuf__ uint8_t* ubScratch, uint32_t syncId,
-    const aclshmemi_udma_params_t<T, OP_CODE>& params = {})
+    const aclshmemi_udma_params_t<T, OP_CODE>& params = {}, uint32_t relay_pe = static_cast<uint32_t>(-1))
 {
     static_assert(
         OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE ||
@@ -478,15 +504,19 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
         "PIPE_MTE3 WQE path only supports UDMA_OP_WRITE / UDMA_OP_WRITE_WITH_NOTIFY / UDMA_OP_READ");
 
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
-    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, pe, qpIdx);
+    // Unified slot computation for both builds (call site is identical, no #if here). OFF returns
+    // pe (direct path); ON returns pe*N+actualRelayPe. Direct/OFF callers pass relay_pe == -1,
+    // which compute_slot ignores while returning pe.
+    uint32_t slot = aclshmemi_udma_compute_slot(pe, relay_pe);
+    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = aclshmemi_udma_get_qp_ctx(udmaInfo, slot, qpIdx);
     auto wqeSize = 1 << qpCtxEntry->baseBkShift;
     uint32_t curHead = qpCtxEntry->head;
     ACLSHMEM_DEBUG_FUNC(assert_qp_params_valid, qpCtxEntry);
     uint32_t wqeCnt = qpCtxEntry->wqeCnt;
-    poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, pe, qpIdx);
+    poll_cq_when_sq_overflow(qpCtxEntry, wqeCnt, slot, qpIdx);
 
     __gm__ ACLSHMEMUBmemInfo* remoteMemInfo =
-        (__gm__ ACLSHMEMUBmemInfo*)(udmaInfo->memPtr + sizeof(ACLSHMEMUBmemInfo) * pe);
+        (__gm__ ACLSHMEMUBmemInfo*)(udmaInfo->memPtr + sizeof(ACLSHMEMUBmemInfo) * slot);
 
     // Stage WQE (SQE + optional notify + SGE) in caller's UB scratch. Reuse the
     // address-space-templated fill helper so SQE field assignments are not duplicated.
@@ -518,16 +548,17 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     qpCtxEntry->wqeCnt = wqeCnt;
+    ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeGm, (uint32_t)sizeof(T));
 }
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write_mte3(
     __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
-    __ubuf__ uint8_t* ubScratch, uint32_t syncId)
+    __ubuf__ uint8_t* ubScratch, uint32_t syncId, uint32_t relay_pe = static_cast<uint32_t>(-1))
 {
     aclshmemi_udma_post_send_mte3<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE>(
         reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), pe, qpIdx,
-        messageLen, ubScratch, syncId);
+        messageLen, ubScratch, syncId, {}, relay_pe);
 }
 
 template <typename T>
@@ -543,11 +574,12 @@ ACLSHMEM_DEVICE void aclshmemi_udma_write_notify_mte3(
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen)
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
+    uint32_t relay_pe)
 {
     aclshmemi_udma_post_send<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE>(
         reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), pe, qpIdx,
-        messageLen);
+        messageLen, {}, relay_pe);
 }
 
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
@@ -562,22 +594,46 @@ ACLSHMEM_DEVICE void aclshmemi_udma_write_notify(
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_read(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen)
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen,
+    uint32_t relay_pe)
 {
     aclshmemi_udma_post_send<T, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
         reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), srcPe, qpIdx,
-        messageLen);
+        messageLen, {}, relay_pe);
 }
 
 ACLSHMEM_DEVICE void aclshmemx_udma_quiet(int pe)
 {
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     uint32_t qpNum = udmaInfo->qpNum;
-    // Only support one qp, multi-qp will be support later.
+    uint32_t actualPe = static_cast<uint32_t>(pe);
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    uint32_t rankCount = static_cast<uint32_t>(aclshmemi_get_total_pe());
+    // Drain every (pe, relay_pe) slot. Slots that never received a post_send have wqeCnt==0
+    // and poll_cq returns immediately. UDMA does not support self ops (pe == myPe), so the
+    // (pe, pe) diagonal is never posted to and host leaves it unfilled -- skip it.
+    for (uint32_t relayPe = 0; relayPe < rankCount; ++relayPe) {
+        if (relayPe == actualPe) {
+            continue;
+        }
+        uint32_t slot = actualPe * rankCount + relayPe;
+        __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry =
+            (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (slot * qpNum + 0) * sizeof(ACLSHMEMUDMAWQCtx));
+        uint32_t wqeCnt = qpCtxEntry->wqeCnt;
+        if (wqeCnt == 0) {
+            continue;
+        }
+        aclshmemi_udma_poll_cq(slot, 0, wqeCnt);
+    }
+#else
+    // Original direct path: poll only the single slot == pe. Does not read rankCount.
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry =
-        (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (pe * qpNum + 0) * sizeof(ACLSHMEMUDMAWQCtx));
+        (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (actualPe * qpNum + 0) * sizeof(ACLSHMEMUDMAWQCtx));
     uint32_t wqeCnt = qpCtxEntry->wqeCnt;
-    aclshmemi_udma_poll_cq(pe, 0, wqeCnt);
+    if (wqeCnt != 0) {
+        aclshmemi_udma_poll_cq(actualPe, 0, wqeCnt);
+    }
+#endif
 }
 
 template <typename T>
@@ -683,6 +739,146 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     }
 }
 
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe,
+    uint32_t sync_id)
+{
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+        ACLSHMEM_DEBUG_FUNC(
+            aclshmemi_kernel_printf, "udma relay put: pe=%d relay_pe=%d\n", pe, relay_pe);
+        int rankCount = aclshmemi_get_total_pe();
+        int myPe = aclshmemi_get_my_pe();
+        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount ||
+            pe == relay_pe || pe == myPe || relay_pe == myPe) {
+            ACLSHMEM_DEBUG_FUNC(
+                aclshmemi_kernel_abort,
+                "udma relay put: invalid pe=%d relay_pe=%d (myPe=%d rankCount=%d); "
+                "require 0<=actual,relay<rankCount, actual!=relay, neither equals myPe\n",
+                pe, relay_pe, myPe, rankCount);
+            return;
+        }
+        auto ptr = aclshmem_ptr(dst, pe);
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            aclshmemi_udma_write_mte3<uint8_t>(
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u,
+                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id,
+                static_cast<uint32_t>(relay_pe));
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemi_udma_write<uint8_t>(
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u,
+                elem_size * sizeof(T), static_cast<uint32_t>(relay_pe));
+        }
+#else
+        // sizeof(T) == 0 is always false but depends on T, so it only fires when this template is
+        // actually instantiated (i.e. relay API is called) rather than at parse time. A plain
+        // static_assert(false, ...) would break the whole OFF build even when relay is never used.
+        static_assert(sizeof(T) == 0,
+            "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+#endif
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
+}
+
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
+    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src,
+    const AscendC::LocalTensor<T>& buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
+{
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    aclshmemx_udma_relay_put_nbi<T, WQE_PIPE>(
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
+        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, relay_pe, sync_id);
+#else
+    (void)dst;
+    (void)src;
+    (void)buf;
+    (void)elem_size;
+    (void)pe;
+    (void)relay_pe;
+    (void)sync_id;
+    static_assert(sizeof(T) == 0,
+        "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+#endif
+}
+
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe,
+    uint32_t sync_id)
+{
+    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
+                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+        ACLSHMEM_DEBUG_FUNC(
+            aclshmemi_kernel_printf, "udma relay get: pe=%d relay_pe=%d\n", pe, relay_pe);
+        int rankCount = aclshmemi_get_total_pe();
+        int myPe = aclshmemi_get_my_pe();
+        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount ||
+            pe == relay_pe || pe == myPe || relay_pe == myPe) {
+            ACLSHMEM_DEBUG_FUNC(
+                aclshmemi_kernel_abort,
+                "udma relay get: invalid pe=%d relay_pe=%d (myPe=%d rankCount=%d); "
+                "require 0<=actual,relay<rankCount, actual!=relay, neither equals myPe\n",
+                pe, relay_pe, myPe, rankCount);
+            return;
+        }
+        auto ptr = aclshmem_ptr(src, pe);
+        if constexpr (WQE_PIPE == PIPE_MTE3) {
+            // For UDMA_OP_READ the SQE's "remoteAddr" slot carries src (remote) and
+            // "localAddr" carries dst (local), matching aclshmemi_udma_read().
+            aclshmemi_udma_post_send_mte3<uint8_t, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0u,
+                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id, {},
+                static_cast<uint32_t>(relay_pe));
+        } else {
+            (void)buf;
+            (void)sync_id;
+            aclshmemi_udma_read<uint8_t>(
+                (__gm__ uint8_t*)dst, (__gm__ uint8_t*)ptr, static_cast<uint32_t>(pe), 0u,
+                elem_size * sizeof(T), static_cast<uint32_t>(relay_pe));
+        }
+#else
+        // sizeof(T) == 0 is always false but depends on T, so it only fires when this template is
+        // actually instantiated (i.e. relay API is called) rather than at parse time. A plain
+        // static_assert(false, ...) would break the whole OFF build even when relay is never used.
+        static_assert(sizeof(T) == 0,
+            "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+#endif
+    } else {
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
+    }
+}
+
+template <typename T, pipe_t WQE_PIPE>
+ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
+    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src,
+    const AscendC::LocalTensor<T>& buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
+{
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    aclshmemx_udma_relay_get_nbi<T, WQE_PIPE>(
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
+        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, relay_pe, sync_id);
+#else
+    (void)dst;
+    (void)src;
+    (void)buf;
+    (void)elem_size;
+    (void)pe;
+    (void)relay_pe;
+    (void)sync_id;
+    static_assert(sizeof(T) == 0,
+        "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+#endif
+}
+
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
     __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe)
@@ -747,8 +943,14 @@ ACLSHMEM_DEVICE uint64_t aclshmemi_udma_get_amo_addr(uint32_t pe, uint32_t qp_id
 {
     __gm__ ACLSHMEMAIVUDMAInfo* udmaInfo = aclshmemi_udma_qp_info_fetch();
     uint32_t qp_num = udmaInfo->qpNum;
+    // Atomic ops only run on the direct path, so reuse the same slot as aclshmemi_udma_post_send's
+    // default (relay = self). Gate the layout exactly like compute_slot: OFF is the original
+    // v1.5.0 single-dimension table where slot = pe; ON is the N*N table where the direct bucket
+    // is (actual=pe, relay=self) = pe*N + myPe. Using the N*N formula on OFF would read amoAddr
+    // from the wrong (out-of-bounds) slot and corrupt atomic fetch data.
+    uint32_t slot = aclshmemi_udma_compute_slot(pe);
     __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr
-        + (pe * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
+        + (slot * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
     auto amo_addr = qpCtxEntry->amoAddr;
     return amo_addr;
 }

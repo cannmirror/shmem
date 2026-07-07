@@ -32,9 +32,9 @@ typedef struct {
     int32_t version;
     int my_pe;
     int n_pes;
-    int32_t inner_sockFd;          // for mf backend              
+    int32_t inner_sockFd;          // for mf backend
     sockaddr_t addr;              // 动态传入的地址（含端口）
-    uint64_t magic;
+    uint64_t magic;               // uid.so socket 层校验 magic；低 16 位复用为 config_store 连接 magic
 } aclshmemi_bootstrap_uid_state_t;
 #define shmemx_bootstrap_uid_state_t aclshmemi_bootstrap_uid_state_t
 #endif // ACLSHMEM_ACLSHMEMI_HOST_DEF_H

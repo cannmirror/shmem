@@ -13,6 +13,11 @@
 #define ACLSHMEM_MAX_TRANSPORT_NUM 16
 
 #include "host_device/shmem_common_types.h"
+
+// Default connection magic (non-zero) — avoids collision with socket
+// libraries that use magic=0 as their default.
+constexpr uint16_t SHMEMI_DEFAULT_CONN_MAGIC = 0x0ACC;
+
 #define ACLSHMEM_MAX_HANDLE_IP_PORT_LEN 64
 typedef struct aclshmemi_bootstrap_attr {
     aclshmemi_bootstrap_attr() : initialize_mf(0), mpi_comm(NULL), uid_args(NULL)
@@ -55,6 +60,8 @@ typedef struct aclshmemi_bootstrap_handle {
     bool is_bootstraped = false;
     bool use_attr_ipport = false;
     bool tls_enable = false;
+
+    uint16_t session_magic = SHMEMI_DEFAULT_CONN_MAGIC;
 
     char ipport[ACLSHMEM_MAX_HANDLE_IP_PORT_LEN];
 } aclshmemi_bootstrap_handle_t;

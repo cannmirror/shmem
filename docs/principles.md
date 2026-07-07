@@ -16,7 +16,7 @@
 
 ### 内存堆的初始化
 <p style="text-indent: 2em;">当前基于驱动能力实现分配虚拟内存、再分配物理内存然后实现虚拟内存和物理内存间的映射，可以在连续的虚拟地址空间管理访问共享内存地址。实际效果和流程可以参考acl接口： <a
-href=https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/API/appdevgapi/aclcppdevg_03_0114.html>ACL虚拟内存管理接口</a></p>
+href="https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/API/appdevgapi/aclcppdevg_03_0114.html">ACL虚拟内存管理接口</a></p>
 
 ![image](images/principles/3.png)
 

@@ -28,6 +28,8 @@ SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
 ## 多实例相关
 由于每个实例都有独立的bootstrap，每个bootstrap构建时需要提供一个可用端口
 
+> **注意**：default 模式下每个初始化实例独占端口，端口被占用期间不支持再次初始化。多个并发实例需使用不同端口，单实例重复初始化场景请确保前一次 `finalize` 已释放端口后再重新初始化，避免端口冲突。
+
 * `SHMEM_INSTANCE_PORT_RANGE`:直接指定可用的端口范围。
 SHMEM_INSTANCE_PORT_RANGE配置示例：
 export SHMEM_INSTANCE_PORT_RANGE=1024:2047

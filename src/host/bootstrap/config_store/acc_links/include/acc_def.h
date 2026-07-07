@@ -32,11 +32,15 @@ constexpr uint32_t UNO_7 = 7;
 constexpr uint32_t UNO_2 = 2;
 constexpr uint32_t UNO_1 = 1;
 
+// Default connection magic (non-zero) — avoids collision with socket
+// libraries that use magic=0 as their default.
+constexpr uint16_t DEFAULT_CONN_MAGIC = 0x0ACC;
+
 /**
  * @brief Header of connecting to server
  */
 struct AccConnReq {
-    int16_t magic = 0;
+    uint16_t magic = DEFAULT_CONN_MAGIC;
     int16_t version = 0;
     uint64_t rankId = 0;
 };
@@ -104,7 +108,7 @@ struct AccTcpServerOptions {
     uint16_t keepaliveProbeInterval = UNO_2; /* tcp keepalive probe interval */
     bool reusePort = true;                   /* reuse listen port */
     bool enableListener = false;             /* start listener or not */
-    int16_t magic = 0;                       /* magic number of  */
+    uint16_t magic = DEFAULT_CONN_MAGIC;        /* magic number for connection isolation */
     int16_t version = 0;                     /* version */
     uint32_t maxWorldSize = UNO_1024;        /* max client number */
     int32_t sockFd = -1;                     /* server sockFd for listen */

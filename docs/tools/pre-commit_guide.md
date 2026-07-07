@@ -77,7 +77,7 @@ git commit --no-verify -m "your message"
 
 ### 主配置文件
 
-[`.pre-commit-config.yaml`](../.pre-commit-config.yaml) - 定义要运行的检查工具和参数
+[`.pre-commit-config.yaml`](../../.pre-commit-config.yaml) - 定义要运行的检查工具和参数
 
 ### Python 工具配置
 

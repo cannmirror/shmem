@@ -9,28 +9,37 @@
  */
 
 #include "store_tcp_config.h"
-#include "store_message_packer.h"
+#include <chrono>
 #include "host/shmem_host_def.h"
 #include "shmemi_logger.h"
+#include "store_message_packer.h"
 #include "store_net_common.h"
 
 namespace shm {
 namespace store {
-constexpr auto CONNECT_RETRY_MAX_TIMES = 60;
+// Connection retry max times: with usleep(1ms) per retry, 20000 retries ≈ 20s total patience.
+constexpr auto CONNECT_RETRY_MAX_TIMES = 20000;
 
 class ClientWaitContext : public ClientCommonContext {
 public:
-    ClientWaitContext(std::mutex &mtx, std::condition_variable &cond) noexcept
-        : waitMutex_{mtx},
-          waitCond_{cond},
-          finished_{false}
+    explicit ClientWaitContext(int64_t timeoutMs = kDefaultSendMsgTimeoutMs) noexcept
+        : finished_{false},
+          timeoutMs_{timeoutMs}
     {
     }
 
     std::shared_ptr<shm::acc::AccTcpRequestContext> WaitFinished() noexcept override
     {
         std::unique_lock<std::mutex> locker{waitMutex_};
-        waitCond_.wait(locker, [this]() { return finished_; });
+        if (timeoutMs_ > 0) {
+            if (!waitCond_.wait_for(locker, std::chrono::milliseconds(timeoutMs_), [this]() { return finished_; })) {
+                SHM_LOG_ERROR("WaitFinished timeout after " << timeoutMs_ << "ms, link may be broken");
+                responseInfo_ = nullptr;
+                finished_ = true;
+            }
+        } else {
+            waitCond_.wait(locker, [this]() { return finished_; });
+        }
         auto copy = responseInfo_;
         locker.unlock();
 
@@ -62,9 +71,10 @@ public:
     }
 
 private:
-    std::mutex &waitMutex_;
-    std::condition_variable &waitCond_;
+    std::mutex waitMutex_;
+    std::condition_variable waitCond_;
     bool finished_;
+    int64_t timeoutMs_;
     std::shared_ptr<shm::acc::AccTcpRequestContext> responseInfo_;
 };
 
@@ -117,12 +127,14 @@ private:
 };
 
 std::atomic<uint32_t> TcpConfigStore::reqSeqGen_{0};
-TcpConfigStore::TcpConfigStore(std::string ip, uint16_t port, bool isServer, int32_t rankId, int32_t sockFd) noexcept
+TcpConfigStore::TcpConfigStore(std::string ip, uint16_t port, bool isServer, int32_t rankId, int32_t sockFd,
+                               uint16_t magic) noexcept
     : serverIp_{std::move(ip)},
       serverPort_{port},
       isServer_{isServer},
       rankId_{rankId},
-      sockFd_{sockFd}
+      sockFd_{sockFd},
+      magic_{magic}
 {
 }
 
@@ -171,7 +183,9 @@ Result TcpConfigStore::Startup(const AcclinkTlsOption &tlsOption, int reconnectR
     }
 
     if (isServer_) {
-        accServer_ = SmMakeRef<AccStoreServer>(serverIp_, serverPort_, sockFd_);
+        SHM_LOG_INFO("Rank " << rankId_ << " starting as SERVER on " << serverIp_ << ":" << serverPort_
+            << " magic=" << magic_);
+        accServer_ = SmMakeRef<AccStoreServer>(serverIp_, serverPort_, sockFd_, magic_);
         if (accServer_ == nullptr) {
             SHM_LOG_ERROR("Failed to create AccStoreServer instance");
             Shutdown();
@@ -200,6 +214,9 @@ Result TcpConfigStore::Startup(const AcclinkTlsOption &tlsOption, int reconnectR
 
     shm::acc::AccConnReq connReq;
     connReq.rankId = rankId_;
+    connReq.magic = magic_;
+    SHM_LOG_INFO("Rank " << rankId_ << " connecting as CLIENT to " << serverIp_ << ":" << serverPort_
+        << " magic=" << magic_);
     result = accClient_->ConnectToPeerServer(serverIp_, serverPort_, connReq, retryMaxTimes, accClientLink_);
     if (result != 0) {
         SHM_LOG_ERROR("connect to server failed, result: " << result);
@@ -268,7 +285,7 @@ Result TcpConfigStore::GetReal(const std::string &key, std::vector<uint8_t> &val
     request.userDef = timeoutMs;
 
     auto packedRequest = SmemMessagePacker::Pack(request);
-    auto response = SendMessageBlocked(packedRequest);
+    auto response = SendMessageBlocked(packedRequest, timeoutMs);
     if (response == nullptr) {
         SHM_LOG_ERROR("send get for key: " << key << ", get null response");
         return IO_ERROR;
@@ -482,7 +499,8 @@ Result TcpConfigStore::Unwatch(uint32_t wid) noexcept
 }
 
 std::shared_ptr<shm::acc::AccTcpRequestContext> TcpConfigStore::SendMessageBlocked(
-    const std::vector<uint8_t> &reqBody) noexcept
+    const std::vector<uint8_t> &reqBody,
+    int64_t timeoutMs) noexcept
 {
     if (accClientLink_ == nullptr) {
         SHM_LOG_ERROR("accClientLink_ is null, connection not established");
@@ -491,9 +509,7 @@ std::shared_ptr<shm::acc::AccTcpRequestContext> TcpConfigStore::SendMessageBlock
 
     auto seqNo = reqSeqGen_.fetch_add(1U);
 
-    std::mutex waitRespMutex;
-    std::condition_variable waitRespCond;
-    auto waitContext = std::make_shared<ClientWaitContext>(waitRespMutex, waitRespCond);
+    auto waitContext = std::make_shared<ClientWaitContext>(timeoutMs);
 
     std::unique_lock<std::mutex> msgCtxLocker{msgCtxMutex_};
     msgClientContext_.emplace(seqNo, waitContext);
@@ -509,6 +525,10 @@ std::shared_ptr<shm::acc::AccTcpRequestContext> TcpConfigStore::SendMessageBlock
     }
 
     auto response = waitContext->WaitFinished();
+    if (response == nullptr) {
+        std::unique_lock<std::mutex> locker{msgCtxMutex_};
+        msgClientContext_.erase(seqNo);
+    }
     return response;
 }
 

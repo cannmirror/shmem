@@ -31,4 +31,10 @@ void test_mutil_task_with_uid(
     uint64_t local_mem_size,
     int process_count);
 
+void test_mutil_task_uid_loop(
+    std::function<void(int, int, uint64_t, aclshmemx_uniqueid_t&)> func,
+    uint64_t local_mem_size,
+    int process_count,
+    int loop_count = 20);
+
 #endif // UNITTEST_H

@@ -16,7 +16,7 @@
 #include <acl/acl.h>
 #include "shmem.h"
 
-#if defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_UNIQUEID_MULTI_INSTANCE) || defined(RUN_WITH_MPI) || defined(RUN_UNIQUEID_WITH_DEFAULT)
+#if defined(RUN_WITH_UNIQUEID) || defined(RUN_WITH_UNIQUEID_MULTI_INSTANCE) || defined(RUN_WITH_MPI) || defined(RUN_UNIQUEID_WITH_DEFAULT) || defined(STRESS_LOOP_COUNT)
 #include <mpi.h>
 #endif
 
@@ -170,7 +170,11 @@ int uid_multi_instance_create(int pe_id, std::vector<int> &dev_list, uint64_t in
             std::cout << "[ERROR] pe " << pe_id << ": create instance " << instance_id << " failed!" << std::endl;
             return 1;
         }
+#ifdef STRESS_LOOP_COUNT
+        // Suppress per-iteration log in stress mode
+#else
         std::cout << "pe " << pe_id << ": shmem create instance "<< instance_id << " init SUCCESS" << std::endl;
+#endif
     }
 
     // Destroy MPI SubGroup
@@ -188,7 +192,11 @@ int uid_multi_instance_destroy(int pe_id, std::vector<int> &dev_list, uint64_t i
     if (std::find(dev_list.begin(), dev_list.end(), pe_id) != dev_list.end()) {
         status = aclshmemx_finalize(instance_id);
         if (status == ACLSHMEM_SUCCESS) {
+#ifdef STRESS_LOOP_COUNT
+            // Suppress per-iteration log in stress mode
+#else
             std::cout << "pe " << pe_id << ": shmem finalize instance "<< instance_id << " init SUCCESS" << std::endl;
+#endif
         }
     }
     return status;
@@ -211,6 +219,11 @@ int run_main(int argc, char* argv[]) {
     int device_id = pe % g_npu;
     aclrtSetDevice(device_id);
 
+#ifdef STRESS_LOOP_COUNT
+    int fail_count = 0;
+    for (int iter = 0; iter < STRESS_LOOP_COUNT; ++iter) {
+#endif
+
     uint64_t inst1_id = 1;
     std::vector<int> inst1_devices = {0, 1, 2, 3};
     status = uid_multi_instance_create(pe, inst1_devices, inst1_id);
@@ -221,6 +234,19 @@ int run_main(int argc, char* argv[]) {
     status = uid_multi_instance_destroy(pe, inst2_devices, inst2_id);
 
     status = uid_multi_instance_destroy(pe, inst1_devices, inst1_id);
+
+#ifdef STRESS_LOOP_COUNT
+        if (status != ACLSHMEM_SUCCESS) {
+            ++fail_count;
+            std::cerr << "[ERROR] pe " << pe << ": iteration " << iter << " failed!" << std::endl;
+        }
+    }
+    if (pe == 0) {
+        std::cout << "[STRESS] " << STRESS_LOOP_COUNT << " iterations, "
+                  << fail_count << " failures" << std::endl;
+    }
+    if (fail_count > 0) status = ACLSHMEM_INNER_ERROR;
+#endif
 
     aclrtResetDevice(device_id);
     aclFinalize();

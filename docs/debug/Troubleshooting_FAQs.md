@@ -103,6 +103,18 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 2. 检查端口是否被占用，`netstat -tuln | grep <端口号>`
 3. 调整环境变量`SHMEM_UID_SESSION_ID`及实际执行文件所使用的ip及端口号
 
+### default 模式同一端口多次初始化失败
+#### Q: 使用 default 模式（`ACLSHMEMX_INIT_WITH_DEFAULT`）时，对同一端口进行多次初始化（例如在同一进程中创建多个实例，或重复调用初始化接口而未更换端口），出现端口已被占用的错误。
+
+错误日志特征：
+- 日志中出现 `address in use for bind listen on ...` 或 `ACC_LINK_ADDRESS_IN_USE`
+- 或 `startup acc tcp server on port: ... already in use.`
+- 或 `bind failed` / `bind socket fail` 相关错误
+
+#### A: default 模式下每次初始化都会绑定一个独立端口。若端口已被前一个实例占用（未 finalize），则再次初始化会因端口冲突而失败。解决方案：
+1. **多实例场景**：设置 `SHMEM_INSTANCE_PORT_RANGE=start:end`，并将 `ip_port` 中的端口设为 `0`（如 `tcp://127.0.0.1:0`），框架会根据 `instance_id` 自动分配 `start_port + instance_id` 作为实际端口，保证各实例使用不同的端口。
+2. **单实例多次初始化场景**：确保每次初始化时使用不同的可用端口，或确保上一次初始化已完成 `finalize` 释放端口后再进行下一次初始化。
+
 ### 未通过环境变量配置ip/port，且使用自动搜索可用网口时失败
 #### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时自动搜索可用网口（IPv4/IPv6均可，排除lo/docker/veth/br-/virbr/tun/tap等虚拟接口），查询失败时错误日志如下: 
 

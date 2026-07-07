@@ -507,6 +507,7 @@ int32_t aclshmemx_init_attr(aclshmemx_bootstrap_t bootstrap_flags, aclshmemx_ini
         check_attr(attributes),
         "An error occurred while checking the initialization attributes. Please check the initialization parameters.");
     ACLSHMEM_CHECK_RET(version_compatible(), "ACLSHMEM Version mismatch.");
+
     // init bootstrap
     ACLSHMEM_CHECK_RET(aclshmemi_bootstrap_init(bootstrap_flags, attributes));
     ACLSHMEM_CHECK_RET(aclshmemi_state_init_attr(attributes));
@@ -563,6 +564,9 @@ static int32_t aclshmemi_finalize_impl(uint64_t instance_id)
         ACLSHMEM_CHECK_RET(aclshmemi_instance_ctx_destroy(instance_id));
         return ACLSHMEM_SUCCESS;
     }
+
+    ACLSHMEM_CHECK_RET(aclshmemi_control_barrier_all());
+
     // shmem submodules finalize
     ACLSHMEM_CHECK_RET(aclshmemi_team_finalize());
     ACLSHMEM_CHECK_RET(aclshmemi_signal_finalize());
@@ -590,6 +594,11 @@ static int32_t aclshmemi_finalize_impl(uint64_t instance_id)
         }
         g_state_host.default_stream = nullptr;
     }
+
+
+    // Synchronize all ranks before destroying the store, so that no rank
+    // can start the next init while another rank's store is still alive.
+    ACLSHMEM_CHECK_RET(aclshmemi_control_barrier_all());
     aclshmemi_bootstrap_finalize();
 
     // Only When Process have no instance, then release init_manager.

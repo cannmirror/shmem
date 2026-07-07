@@ -51,6 +51,10 @@ constexpr uint32_t SMEM_ID_MAX = 63;
 constexpr uint64_t SMEM_LOCAL_SIZE_MAX = 40 * 1024 * 1024 * 1024L;
 constexpr uint32_t MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+// Default connection magic (non-zero) — avoids collision with socket
+// libraries that use magic=0 as their default.
+constexpr uint16_t SMEM_DEFAULT_CONN_MAGIC = 0x0ACC;
+
 typedef int (*smem_decrypt_handler)(const char *cipherText, size_t cipherTextLen, char *plainText,
                                     size_t &plainTextLen);
 } // namespace store

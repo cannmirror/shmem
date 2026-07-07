@@ -22,6 +22,10 @@
 namespace shm {
 namespace store {
 
+// Default SEND/RECV timeout (ms) for operations without user-specified timeout.
+// Aligned with SMEM_DEFAUT_WAIT_TIME to match control_operation_timeout semantics.
+constexpr int64_t kDefaultSendMsgTimeoutMs = SMEM_DEFAUT_WAIT_TIME * 1000;
+
 class ClientCommonContext {
 public:
     virtual ~ClientCommonContext() = default;
@@ -33,7 +37,8 @@ public:
 
 class TcpConfigStore : public ConfigStore {
 public:
-    TcpConfigStore(std::string ip, uint16_t port, bool isServer, int32_t rankId = 0, int32_t sockFd = -1) noexcept;
+    TcpConfigStore(std::string ip, uint16_t port, bool isServer, int32_t rankId = 0, int32_t sockFd = -1,
+                   uint16_t magic = SMEM_DEFAULT_CONN_MAGIC) noexcept;
     ~TcpConfigStore() noexcept override;
 
     Result Startup(const AcclinkTlsOption &tlsOption, int reconnectRetryTimes = -1) noexcept;
@@ -68,7 +73,9 @@ protected:
     Result GetReal(const std::string &key, std::vector<uint8_t> &value, int64_t timeoutMs) noexcept override;
 
 private:
-    std::shared_ptr<shm::acc::AccTcpRequestContext> SendMessageBlocked(const std::vector<uint8_t> &reqBody) noexcept;
+    std::shared_ptr<shm::acc::AccTcpRequestContext> SendMessageBlocked(
+        const std::vector<uint8_t> &reqBody,
+        int64_t timeoutMs = kDefaultSendMsgTimeoutMs) noexcept;
     Result LinkBrokenHandler(const shm::acc::AccTcpLinkComplexPtr &link) noexcept;
     Result ReceiveResponseHandler(const shm::acc::AccTcpRequestContext &context) noexcept;
     Result SendWatchRequest(const std::vector<uint8_t> &reqBody,
@@ -92,6 +99,7 @@ private:
     const bool isServer_;
     const int32_t rankId_;
     int32_t sockFd_;
+    uint16_t magic_;
 };
 using TcpConfigStorePtr = SmRef<TcpConfigStore>;
 }  // namespace store

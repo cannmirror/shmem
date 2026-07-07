@@ -7,6 +7,11 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include <net/if.h>
+#include <unistd.h>
+#include "sotre_net.h"
+#include "acc_tcp_server.h"
+#include "acc_common_util.h"
 #include "acc_tcp_server_default.h"
 
 #include <net/if.h>
@@ -362,12 +367,16 @@ Result AccTcpServerDefault::HandleNewConnection(const AccConnReq &req, const Acc
 {
     ASSERT_RETURN(newLink.Get() != nullptr, ACC_INVALID_PARAM);
     if (req.magic != options_.magic) {
-        LOG_ERROR("New link connected but magic mismatched, refuse the link from " << newLink->ShortName());
+        LOG_ERROR("New link connected but magic mismatched (expected=" << options_.magic
+            << " received=" << req.magic << " rank=" << req.rankId
+            << " from=" << newLink->ShortName() << "), refuse the link");
         return ACC_ERROR;
     }
 
     if (req.version != options_.version) {
-        LOG_ERROR("New link connected but version mismatched, refuse the link from " << newLink->ShortName());
+        LOG_ERROR("New link connected but version mismatched (expected=" << options_.version
+            << " received=" << req.version << " rank=" << req.rankId
+            << " from=" << newLink->ShortName() << "), refuse the link");
         return ACC_ERROR;
     }
 
@@ -533,36 +542,50 @@ Result AccTcpServerDefault::ConnectToPeerServer(const std::string &peerIp, uint1
                                                 uint32_t maxRetryTimes, AccTcpLinkComplexPtr &newLink)
 {
     IpType ipType = IPNONE;
-    auto tmpFD {-1};
-    if (CreateSocket(peerIp, ipType, tmpFD) != ACC_OK) {
-        return ACC_ERROR;
+    // Resolve ipType once: 127.0.0.1 → IpV4, etc.
+    {
+        auto tmpFD {-1};
+        if (CreateSocket(peerIp, ipType, tmpFD) != ACC_OK) {
+            return ACC_ERROR;
+        }
+        SafeCloseFd(tmpFD);
     }
     std::string ipAndPort = peerIp + ":" + std::to_string(port);
 
-    int flags = 1;
-    setsockopt(tmpFD, SOL_TCP, TCP_NODELAY, reinterpret_cast<void*>(&flags), sizeof(flags));
-    int synCnt = 1; /* Set connect() retry time for quick connect */
-    setsockopt(tmpFD, IPPROTO_TCP, TCP_SYNCNT, &synCnt, sizeof(synCnt));
-
     mf_sockaddr addr {};
     if (!ConstructSocketAddress(ipType, addr, peerIp, port)) {
-        SafeCloseFd(tmpFD);
         return ACC_ERROR;
     }
 
     uint32_t timesRetried = 0;
     int lastErrno = 0;
 
-    while (timesRetried < maxRetryTimes) {
-        LOG_INFO("Trying to connect to " << ipAndPort);
+    LOG_INFO("ConnectToPeerServer: trying " << ipAndPort << " rank=" << req.rankId << " magic=" << req.magic);
 
-        if ((ipType == IpV4 && ::connect(tmpFD, reinterpret_cast<struct sockaddr*>(&addr.ip.ipv4),
+    while (timesRetried < maxRetryTimes) {
+        auto tmpFD {-1};
+        if (CreateSocket(peerIp, ipType, tmpFD) != ACC_OK) {
+            return ACC_ERROR;
+        }
+        int flags = 1;
+        setsockopt(tmpFD, SOL_TCP, TCP_NODELAY, reinterpret_cast<void *>(&flags), sizeof(flags));
+
+        if ((ipType == IpV4 && ::connect(tmpFD, reinterpret_cast<struct sockaddr *>(&addr.ip.ipv4),
             sizeof(addr.ip.ipv4)) == 0)
-            || (ipType == IpV6 && ::connect(tmpFD, reinterpret_cast<struct sockaddr*>(&addr.ip.ipv6),
+            || (ipType == IpV6 && ::connect(tmpFD, reinterpret_cast<struct sockaddr *>(&addr.ip.ipv6),
             sizeof(addr.ip.ipv6)) == 0)) {
             struct timeval timeout = {ACC_LINK_RECV_TIMEOUT, 0};
             setsockopt(tmpFD, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-            return Handshake(tmpFD, req, ipAndPort, newLink);
+            auto result = Handshake(tmpFD, req, ipAndPort, newLink);
+            if (result == ACC_OK) {
+                return ACC_OK;
+            }
+            // Handshake failed — server accepted TCP but closed before reply
+            // (accept thread not ready, or server still tearing down).
+            // Socket is dead; close and let the next iteration create a new one.
+            SafeCloseFd(tmpFD);
+        } else {
+            SafeCloseFd(tmpFD);
         }
 
         if (errno == EINTR) {
@@ -574,12 +597,13 @@ Result AccTcpServerDefault::ConnectToPeerServer(const std::string &peerIp, uint1
             lastErrno = errno;
         }
 
-        // interval between each retry, 1 sec for each time,
-        sleep(1);
+        // Use usleep(1ms) instead of sleep(1s) so that connect retries are 1000x faster.
+        // This prevents the two PEs from sleeping in lockstep and retrying simultaneously;
+        // a 1ms interval gives the remote server ample time to become ready between attempts.
+        usleep(1000);
         timesRetried++;
     }
 
-    SafeCloseFd(tmpFD);
     LOG_ERROR("Failed to connect to " << ipAndPort << " after tried " << timesRetried << " times");
     return ACC_ERROR;
 }
@@ -734,7 +758,8 @@ Result AccTcpServerDefault::Handshake(int &tmpFD, const AccConnReq &connReq, con
     }
 
     newLink = tmpLink.Get();
-    LOG_INFO("Connect to " << ipAndPort << " successfully, with ssl " << (tlsOption_.enableTls ? "enable" : "disable"));
+    LOG_INFO("Connect to " << ipAndPort << " successfully, rank=" << connReq.rankId
+        << " magic=" << connReq.magic << " ssl=" << (tlsOption_.enableTls ? "enable" : "disable"));
     return ACC_OK;
 }
 }  // namespace acc

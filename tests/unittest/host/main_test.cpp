@@ -458,6 +458,113 @@ void test_mutil_task_with_uid(
     }
 }
 
+// UID init/finalize loop helper.  In each iteration rank 0 calls
+// aclshmemx_get_uniqueid() to obtain a fresh UID (with a fresh socket fd
+// and magic), then distributes it to the other ranks through
+// pre-created pipes.  All ranks call func(), barrier, then finalize.
+void test_mutil_task_uid_loop(
+    std::function<void(int, int, uint64_t, aclshmemx_uniqueid_t&)> func,
+    uint64_t local_mem_size,
+    int process_count,
+    int loop_count)
+{
+    if (process_count == 0) return;
+
+    const char* session_id = "127.0.0.1:8666";
+
+    pid_t pids[process_count];
+    int status[process_count];
+
+    // pipes for rank-0 → other-ranks UID distribution (intra-iteration)
+    std::vector<std::array<int, 2>> uid_to_rank(process_count);
+    for (int i = 1; i < process_count; ++i) {
+        if (pipe(uid_to_rank[i].data()) != 0) {
+            ADD_FAILURE() << "pipe(uid_to_rank[" << i << "]) failed: " << strerror(errno);
+            return;
+        }
+    }
+
+    for (int i = 0; i < process_count; ++i) {
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            ADD_FAILURE() << "fork[" << i << "] failed: " << strerror(errno);
+            for (int k = 0; k < i; ++k) { kill(pids[k], SIGKILL); waitpid(pids[k], &status[k], 0); }
+            for (int j = 1; j < process_count; ++j) {
+                close(uid_to_rank[j][0]); close(uid_to_rank[j][1]);
+            }
+            return;
+        }
+        if (pids[i] == 0) {
+            // --- child ---
+            if (i == 0) {
+                setenv("SHMEM_UID_SESSION_ID", session_id, 1);
+                for (int j = 1; j < process_count; ++j) close(uid_to_rank[j][0]);
+            } else {
+                for (int j = 1; j < process_count; ++j) {
+                    if (j == i) close(uid_to_rank[j][1]);
+                    else { close(uid_to_rank[j][0]); close(uid_to_rank[j][1]); }
+                }
+            }
+
+            int32_t device_id = i % test_gnpu_num + test_first_npu;
+            aclInit(nullptr);
+            aclrtSetDevice(device_id);
+            aclshmemx_set_conf_store_tls(false, nullptr, 0);
+
+            for (int loop = 0; loop < loop_count; ++loop) {
+                aclshmemx_uniqueid_t uid{};
+                if (i == 0) {
+                    int ret = aclshmemx_get_uniqueid(&uid);
+                    if (ret != ACLSHMEM_SUCCESS || uid.version != ACLSHMEM_UNIQUEID_VERSION) {
+                        raise(SIGUSR2);
+                    }
+                    for (int j = 1; j < process_count; ++j) {
+                        if (write_full(uid_to_rank[j][1], &uid, sizeof(uid)) != sizeof(uid)) {
+                            raise(SIGUSR2);
+                        }
+                    }
+                } else {
+                    if (read_full(uid_to_rank[i][0], &uid, sizeof(uid)) != sizeof(uid)) {
+                        raise(SIGUSR2);
+                    }
+                }
+                func(i + test_first_rank, test_global_ranks, local_mem_size, uid);
+            }
+
+            aclrtResetDevice(device_id);
+            aclFinalize();
+
+            if (i == 0) {
+                for (int j = 1; j < process_count; ++j) close(uid_to_rank[j][1]);
+            } else {
+                close(uid_to_rank[i][0]);
+            }
+            raise(::testing::Test::HasFailure() ? SIGUSR2 : SIGUSR1);
+        }
+    }
+
+    for (int j = 1; j < process_count; ++j) {
+        close(uid_to_rank[j][0]);
+        close(uid_to_rank[j][1]);
+    }
+
+    for (int i = 0; i < process_count; ++i) {
+        pid_t pid_ret = waitpid(pids[i], &status[i], 0);
+        if (pid_ret == -1) {
+            ADD_FAILURE() << "waitpid[" << i << "] failed: " << strerror(errno);
+            continue;
+        }
+        if (WIFSIGNALED(status[i])) {
+            int sig = WTERMSIG(status[i]);
+            if (sig != SIGUSR1) {
+                FAIL();
+            }
+        } else {
+            FAIL();
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     int idx = 1;

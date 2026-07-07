@@ -3,6 +3,8 @@
 
 SHMEM当前提供了三种flag用于初始化：
     - ACLSHMEMX_INIT_WITH_DEFAULT 默认初始化流程，可以不依赖第三方库完成初始化，但需要保证设定的ipport空闲
+
+> **注意**：default 模式下每个初始化实例独占端口，端口被占用期间不支持再次初始化。多个并发实例需使用不同端口；单实例重复初始化场景请确保前一次 `finalize` 已释放端口后再重新初始化，避免端口冲突。
     - ACLSHMEMX_INIT_WITH_MPI 依赖MPI的多进程管理能力的初始化流程
     - ACLSHMEMX_INIT_WITH_UNIQUEID 运行时依赖第三方库广播能力（MPI_Bcast/torch.distributed.broadcast等）的初始化流程
 

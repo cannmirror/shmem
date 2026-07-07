@@ -263,6 +263,10 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
     int32_t status = ACLSHMEM_SUCCESS;
     void *arg;
     g_boot_handle.use_attr_ipport = false;
+    // Reset session_magic to default at entry so that a non-UID init
+    // (or a DEFAULT init after a previous UID init/finalize cycle)
+    // never picks up a stale value from a prior session.
+    g_boot_handle.session_magic = SHMEMI_DEFAULT_CONN_MAGIC;
     if (flags & ACLSHMEMX_INIT_WITH_UNIQUEID) {
         SHM_LOG_INFO("ACLSHMEMX_INIT_WITH_UNIQUEID");
         plugin_name = BOOTSTRAP_MODULE_CONFIG_STORE;
@@ -306,6 +310,20 @@ int32_t aclshmemi_bootstrap_init(int flags, aclshmemx_init_attr_t *attr) {
         SHM_LOG_ERROR("Unknown Type for bootstrap");
         return ACLSHMEM_INVALID_PARAM;
     }
+
+    // Connection magic for init/finalize loop isolation.
+    // If a valid UID struct is available (explicit UID mode or DEFAULT
+    // fallback to UID args), derive session_magic from the low 16 bits of
+    // uid_state->magic.  Otherwise session_magic stays at the default
+    // value that was set at function entry.
+    if ((flags & ACLSHMEMX_INIT_WITH_UNIQUEID) && arg != nullptr && is_uid_args_valid(arg)) {
+        auto* uid_state = reinterpret_cast<aclshmemi_bootstrap_uid_state_t*>(arg);
+        if (uid_state->magic) {
+            g_boot_handle.session_magic = static_cast<uint16_t>(uid_state->magic);
+        }
+    }
+    SHM_LOG_INFO("bootstrap session_magic=" << g_boot_handle.session_magic);
+
     aclshmemi_bootstrap_loader();
     if (!plugin_hdl) {
         SHM_LOG_ERROR("Bootstrap unable to load " << plugin_name

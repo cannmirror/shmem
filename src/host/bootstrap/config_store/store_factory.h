@@ -36,10 +36,11 @@ public:
      * @param rankId rank id, default 0
      * @param connMaxRetry Maximum number of retry times for the client to connect to the server.
      * @param sockFd listen socket fd, default -1
+     * @param magic session magic for distinguishing init/finalize cycles, default SMEM_DEFAULT_CONN_MAGIC
      * @return Newly created store
      */
     static StorePtr CreateStore(const std::string &ip, uint16_t port, bool isServer, int32_t rankId = 0,
-        int32_t connMaxRetry = -1, int32_t sockFd = -1) noexcept;
+        int32_t connMaxRetry = -1, int32_t sockFd = -1, uint16_t magic = SMEM_DEFAULT_CONN_MAGIC) noexcept;
 
     /**
      * @brief Destroy on exist store

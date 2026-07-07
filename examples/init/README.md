@@ -57,6 +57,18 @@ bash run.sh -mode uid_multi -pesize 4
 unset SHMEM_UID_SOCK_IFNAME
 ```
 
+执行 uid_multi_stress 流程，4 pe（uid_multi 循环压测）
+```bash
+# 编译时定义 STRESS_LOOP_COUNT=20，循环执行 20 次 uid_multi 创建/销毁流程
+# enpxxx需要替换为ip addr指令获得的网卡
+export SHMEM_UID_SOCK_IFNAME=enpxxxxxxx:inet4
+
+bash run.sh -mode uid_multi_stress -pesize 4
+
+unset SHMEM_UID_SOCK_IFNAME
+```
+如需修改循环次数，编辑 CMakeLists.txt 中 RUN_MODE=6 对应的 `STRESS_LOOP_COUNT` 值后重新运行。
+
 执行 uid_default 流程，2 pe
 ```bash
 bash run.sh -mode uid_default -pesize 2

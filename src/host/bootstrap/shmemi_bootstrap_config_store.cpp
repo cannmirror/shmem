@@ -62,7 +62,14 @@ int config_store_get_unique_id(void* uid) {
         }
     }
     SHM_LOG_INFO("get master IP value:" << pta_env_ip);
-    return shm::utils::aclshmemi_set_ip_info((aclshmemx_uniqueid_t *)uid, sockType, pta_env_ip, pta_env_port, is_from_ifa);
+    int ret = shm::utils::aclshmemi_set_ip_info((aclshmemx_uniqueid_t *)uid, sockType, pta_env_ip, pta_env_port, is_from_ifa);
+    // Populate the uid internal magic field so its low 16 bits can be
+    // reused as the config_store connection magic in aclshmemi_bootstrap_init.
+    if (ret == ACLSHMEM_SUCCESS) {
+        auto* uid_state = reinterpret_cast<aclshmemi_bootstrap_uid_state_t*>(uid);
+        ret = shm::utils::shmem_get_uid_magic(uid_state);
+    }
+    return ret;
 }
 
 // Plugin pre-initialization entry function. 
@@ -222,16 +229,25 @@ int32_t init_config_store(aclshmemi_bootstrap_handle_t* handle)
     auto state = static_cast<ConfigStoreState*>(handle->bootstrap_state);
     if (!state) return ACLSHMEM_INNER_ERROR;
 
+    // Read per-session connection magic — set by the framework
+    // in aclshmemi_bootstrap_init().
+    uint16_t magic = handle->session_magic;
+
     shm::store::StoreFactory::SetTlsInfo(false, nullptr, 0);
     int32_t sock_fd = handle->sockFd;
     shm::store::UrlExtraction option;
     std::string url(handle->ipport);
     SHM_ASSERT_RETURN(option.ExtractIpPortFromUrl(url) == ACLSHMEM_SUCCESS, ACLSHMEM_INVALID_PARAM);
+    SHM_LOG_INFO("init_config_store: rank=" << handle->mype << "/" << handle->npes
+        << " ipport=" << handle->ipport << " ip=" << option.ip << " port=" << option.port
+        << " magic=" << magic << " isServer=" << (handle->mype == 0 ? "true" : "false"));
     if (handle->mype == 0) {
-        state->store_ = shm::store::StoreFactory::CreateStore(option.ip, option.port, true, 0, -1, sock_fd);
+        state->store_ = shm::store::StoreFactory::CreateStore(option.ip, option.port, true, 0, -1, sock_fd, magic);
     }
     else {
-        state->store_ = shm::store::StoreFactory::CreateStore(option.ip, option.port, false, handle->mype, handle->timeOut);
+        // Pass -1 to use CONNECT_RETRY_MAX_TIMES (120s total),
+        // not handle->timeOut which is in seconds but interpreted as retry count.
+        state->store_ = shm::store::StoreFactory::CreateStore(option.ip, option.port, false, handle->mype, -1, -1, magic);
     }
     return ACLSHMEM_SUCCESS;
 }

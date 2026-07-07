@@ -80,9 +80,9 @@ void *aclshmem_calloc(size_t nmemb, size_t size)
         }
     }
 
-    auto ret = aclshmemi_control_barrier_all();
-    if (ret != 0) {
-        SHM_LOG_ERROR("calloc mem barrier failed, ret: " << ret);
+    int ctrl_ret = aclshmemi_control_barrier_all();
+    if (ctrl_ret != 0) {
+        SHM_LOG_ERROR("calloc mem barrier failed, ret: " << ctrl_ret);
         if (ptr != nullptr) {
             aclshmemi_memory_manager->release(ptr);
             ptr = nullptr;
@@ -103,7 +103,7 @@ void *aclshmem_align(size_t alignment, size_t size)
     auto ptr = aclshmemi_memory_manager->aligned_allocate(alignment, size);
     auto ret = aclshmemi_control_barrier_all();
     if (ret != 0) {
-        SHM_LOG_ERROR("aclshmem_align barrier failed, ret: " << ret);
+        SHM_LOG_ERROR("aclshmem_align mem barrier failed, ret: " << ret);
         if (ptr != nullptr) {
             aclshmemi_memory_manager->release(ptr);
             ptr = nullptr;
@@ -120,6 +120,12 @@ void aclshmem_free(void *ptr)
         return;
     }
     if (ptr == nullptr) {
+        return;
+    }
+
+    int ctrl_ret = aclshmemi_control_barrier_all();
+    if (ctrl_ret != 0) {
+        SHM_LOG_ERROR("free mem barrier failed, ret: " << ctrl_ret);
         return;
     }
 
@@ -227,9 +233,9 @@ void *aclshmemx_calloc(size_t nmemb, size_t size, aclshmem_mem_type_t mem_type)
             ptr = nullptr;
         }
     }
-    auto ret = aclshmemi_control_barrier_all();
-    if (ret != 0) {
-        SHM_LOG_ERROR("calloc mem barrier failed, ret: " << ret);
+    int ctrl_ret = aclshmemi_control_barrier_all();
+    if (ctrl_ret != 0) {
+        SHM_LOG_ERROR("calloc mem barrier failed, ret: " << ctrl_ret);
         if (ptr != nullptr) {
             mem_manager->release(ptr);
             ptr = nullptr;
@@ -252,7 +258,7 @@ void *aclshmemx_align(size_t alignment, size_t size, aclshmem_mem_type_t mem_typ
     auto ptr = mem_manager->aligned_allocate(alignment, size);
     auto ret = aclshmemi_control_barrier_all();
     if (ret != 0) {
-        SHM_LOG_ERROR("aclshmem_align barrier failed, ret: " << ret);
+        SHM_LOG_ERROR("align mem barrier failed, ret: " << ret);
         if (ptr != nullptr) {
             mem_manager->release(ptr);
             ptr = nullptr;
@@ -278,10 +284,17 @@ void aclshmemx_free(void *ptr, aclshmem_mem_type_t mem_type)
         SHM_LOG_ERROR("Memory Heap Not Initialized.");
         return;
     }
-    auto ret = mem_type == HOST_SIDE ? aclshmemi_host_memory_manager->release(ptr) : aclshmemi_memory_manager->release(ptr);;
+
+    int ctrl_ret = aclshmemi_control_barrier_all();
+    if (ctrl_ret != 0) {
+        SHM_LOG_ERROR("free mem barrier failed, ret: " << ctrl_ret);
+        return;
+    }
+
+    auto ret = mem_type == HOST_SIDE ? aclshmemi_host_memory_manager->release(ptr) : aclshmemi_memory_manager->release(ptr);
     if (ret != 0) {
         SHM_LOG_ERROR("release failed: " << ret);
     }
 
-    SHM_LOG_DEBUG("aclshmem_free " << ret);
+    SHM_LOG_DEBUG("aclshmemx_free " << ret);
 }

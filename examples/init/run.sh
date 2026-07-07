@@ -119,9 +119,12 @@ case "$MODE" in
     uid_default)
         MODE_ID=5
         ;;
+    uid_multi_stress)
+        MODE_ID=6
+        ;;
     *)
-        echo "Error: Invalid mode '$MODE'! Only 'default'/'mpi'/'uid'/'uid_multi'/'uid_default' are allowed"
-        echo "Usage: $0 [-mode <default|mpi|uid|uid_multi|uid_default>] [-pesize <num>]"
+        echo "Error: Invalid mode '$MODE'! Only 'default'/'mpi'/'uid'/'uid_multi'/'uid_default'/'uid_multi_stress' are allowed"
+        echo "Usage: $0 [-mode <default|mpi|uid|uid_multi|uid_default|uid_multi_stress>] [-pesize <num>]"
         exit 1
         ;;
 esac
@@ -132,6 +135,12 @@ EXECUTABLE_NAME="init_examples"
 case "$MODE" in
     mpi|uid|default|uid_default)
     export SHMEM_UID_SESSION_ID=$SESSION_ID
+    ;;
+    uid_multi|uid_multi_stress)
+    if [ -z "$SHMEM_UID_SOCK_IFNAME" ]; then
+        echo "Warning: SHMEM_UID_SOCK_IFNAME is not set. Please export it before running, e.g.: export SHMEM_UID_SOCK_IFNAME=eth0:inet4"
+    fi
+    ;;
 esac
 
 echo "=== Prepare build directory ==="
@@ -165,7 +174,7 @@ echo "=== Launch executable (mode: ${MODE}, pesize: ${NUM_PROCESSES}) ==="
 
 
 case "$MODE" in
-    mpi|uid|uid_multi|uid_default)
+    mpi|uid|uid_multi|uid_multi_stress|uid_default)
         if [ -f "hostfile" ]; then
             echo "Found hostfile, run mpirun with -f hostfile"
             mpirun -f hostfile ./build/bin/"${EXECUTABLE_NAME}" "$GNPU_NUM"

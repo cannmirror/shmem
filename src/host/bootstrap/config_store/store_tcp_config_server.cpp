@@ -19,10 +19,11 @@
 namespace shm {
 namespace store {
 std::atomic<uint64_t> StoreWaitContext::idGen_{1UL};
-AccStoreServer::AccStoreServer(std::string ip, uint16_t port, int32_t sockFd) noexcept
+AccStoreServer::AccStoreServer(std::string ip, uint16_t port, int32_t sockFd, uint16_t magic) noexcept
     : listenIp_{std::move(ip)},
       listenPort_{port},
       sockFd_{sockFd},
+      magic_{magic},
       requestHandlers_{
           {MessageType::SET, &AccStoreServer::SetHandler},       {MessageType::GET, &AccStoreServer::GetHandler},
           {MessageType::ADD, &AccStoreServer::AddHandler},       {MessageType::REMOVE, &AccStoreServer::RemoveHandler},
@@ -39,6 +40,7 @@ Result AccStoreServer::AccServerStart(shm::acc::AccTcpServerPtr &accTcpServer,
     options.enableListener = true;
     options.linkSendQueueSize = shm::acc::UNO_48;
     options.sockFd = sockFd_;
+    options.magic = magic_;
 
     shm::acc::AccTlsOption tlsOpt = ConvertTlsOption(tlsOption);
     Result result;
@@ -74,6 +76,7 @@ Result AccStoreServer::Startup(const AcclinkTlsOption &tlsOption) noexcept
         return ACLSHMEM_SUCCESS;
     }
 
+    SHM_LOG_INFO("AccStoreServer starting on " << listenIp_ << ":" << listenPort_ << " magic=" << magic_);
     auto tmpAccTcpServer = shm::acc::AccTcpServer::Create();
     if (tmpAccTcpServer == nullptr) {
         SHM_LOG_ERROR("create acc tcp server failed");
@@ -109,7 +112,7 @@ Result AccStoreServer::Startup(const AcclinkTlsOption &tlsOption) noexcept
 
 void AccStoreServer::Shutdown(bool afterFork) noexcept
 {
-    SHM_LOG_INFO("start to shutdown Acc Store Server");
+    SHM_LOG_INFO("shutting down AccStoreServer on " << listenIp_ << ":" << listenPort_ << " magic=" << magic_);
     if (accTcpServer_ == nullptr) {
         return;
     }
@@ -170,7 +173,8 @@ Result AccStoreServer::ReceiveMessageHandler(const shm::acc::AccTcpRequestContex
 Result AccStoreServer::LinkConnectedHandler(const shm::acc::AccConnReq &req,
                                             const shm::acc::AccTcpLinkComplexPtr &link) noexcept
 {
-    SHM_LOG_INFO("new link connected, linkId: " << link->Id() << ", rank: " << req.rankId);
+    SHM_LOG_INFO("new link connected, linkId: " << link->Id() << ", rank: " << req.rankId
+        << ", server_magic=" << magic_ << ", remote_magic=" << req.magic);
     return ACLSHMEM_SUCCESS;
 }
 

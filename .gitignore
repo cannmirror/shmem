@@ -38,7 +38,16 @@
 /cmake-build-*/
 /build/
 /Build/
+/build*/
 /install/
+**/build/
+
+# CMake build artifacts (any nesting level)
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/*.dir/
 
 sync_config.jsonc
 /tests/examples/matmul_allreduce/__pycache__

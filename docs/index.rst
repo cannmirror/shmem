@@ -42,14 +42,15 @@ Welcome to Shmem's Documentation!
     :caption: Multi_Instance
     :name: Multi_Instance
 
-    multi_instance.md
+    principles/multi_instance.md
 
 .. toctree::
     :maxdepth: 2
     :caption: Architecture
     :name: Architecture
 
-    principles.md
+    principles/init_finalize.md
+    principles/team.md
     code_organization.md
 
 .. toctree::

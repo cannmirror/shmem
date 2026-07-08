@@ -117,7 +117,7 @@ include/
     ├── conf.py                      // conf文件
     ├── index.rst                    // 目录树
     ├── multi_instance.md            // 多实例支持
-    ├── principles.md                // SHMEM原理概述
+    ├── principles/                  // SHMEM原理概述（init/finalize、Config Store、team 等）
     ├── quickstart.md                // 快速开始
 ```
 

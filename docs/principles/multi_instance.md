@@ -162,11 +162,12 @@ aclshmem_finalize();   // 释放当前活动实例 2
 
 ## 相关代码与文档
 
-- Host   多实例切换：[src/host/init/shmem_init.cpp](../src/host/init/shmem_init.cpp)
-- Device 多实例切换：[src/device/shmemi_device_common.hpp](../src/device/shmemi_device_common.hpp)
-- Team   多实例限制逻辑：[src/host/team/shmem_team.cpp](../src/host/team/shmem_team.cpp)
-- 对应示例：[examples/multi_instance](../examples/multi_instance/README.md)
+- 初始化/终止流程（含多实例 ctx 创建、端口分配与 finalize）：[init_finalize.md](init_finalize.md)
+- Host   多实例切换：[src/host/init/shmem_init.cpp](../../src/host/init/shmem_init.cpp)
+- Device 多实例切换：[src/device/shmemi_device_common.hpp](../../src/device/shmemi_device_common.hpp)
+- Team   多实例限制逻辑：[src/host/team/shmem_team.cpp](../../src/host/team/shmem_team.cpp)
+- 对应示例：[examples/multi_instance](../../examples/multi_instance/README.md)
 
 ---
 
-最后更新：2026-06-29
+最后更新：2026-07-03

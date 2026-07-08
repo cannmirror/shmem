@@ -416,39 +416,89 @@ int RdmaTransportManagerV2::ValidateRanksPerNic() const
 
 void RdmaTransportManagerV2::CopyAiWQInfo(struct AiQpRMAWQ& dest, const SqContext& src) noexcept
 {
-    const auto& roceSq = src.contextInfo.roceSq;
-    dest.wqn = roceSq.qpn;
-    dest.bufAddr = roceSq.sqVa;
-    dest.wqeSize = roceSq.wqeSize;
-    dest.depth = roceSq.depth;
-    dest.headAddr = roceSq.headAddr;
-    dest.tailAddr = roceSq.tailAddr;
-    dest.sl = roceSq.sl;
-    dest.dbAddr = roceSq.dbVa;
-    dest.dbMode = static_cast<shm::DBMode>(roceSq.dbMode);
-    SHM_LOG_DEBUG(
-        "rank[" << rankId_ << "] CopyAiWQInfo, wqn=" << dest.wqn << ", bufAddr=0x" << std::hex << dest.bufAddr
-                << std::dec << ", wqeSize=" << dest.wqeSize << ", depth=" << dest.depth << ", headAddr=0x" << std::hex
-                << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr << std::dec << ", sl="
-                << dest.sl << ", dbAddr=0x" << std::hex << dest.dbAddr << std::dec << ", dbMode=" << int(dest.dbMode));
+    if (IsRoceSqV2Format(src)) {
+        // 新版格式 (2026-07-07 及之后 CANN)
+        const auto& roceSq = src.contextInfo.roceSq;
+        dest.wqn = roceSq.qpn;
+        dest.bufAddr = roceSq.sqVa;
+        dest.wqeSize = roceSq.wqeSize;
+        dest.depth = roceSq.depth;
+        dest.headAddr = roceSq.headAddr;
+        dest.tailAddr = roceSq.tailAddr;
+        dest.sl = roceSq.sl;
+        dest.dbAddr = roceSq.dbHwVa;
+        dest.dbSwVa = roceSq.dbSwVa;
+        dest.mtuShift = roceSq.mtuShift;
+        dest.dbMode = DBMode::SW_DB;  // 新版默认软件doorbell
+        SHM_LOG_DEBUG(
+            "rank[" << rankId_ << "] CopyAiWQInfo(V2), wqn=" << dest.wqn << ", bufAddr=0x" << std::hex << dest.bufAddr
+                    << std::dec << ", wqeSize=" << dest.wqeSize << ", depth=" << dest.depth << ", headAddr=0x"
+                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr
+                    << std::dec << ", sl=" << dest.sl << ", dbAddr=0x" << std::hex << dest.dbAddr
+                    << ", dbSwVa=0x" << std::hex << dest.dbSwVa << std::dec
+                    << ", mtuShift=" << static_cast<int>(dest.mtuShift));
+    } else {
+        // 旧版格式 (2026-07-07 之前 CANN) - 回退兼容
+        auto v1 = ExtractSqContextRoceV1(src);
+        dest.wqn = v1.qpn;
+        dest.bufAddr = v1.sqVa;
+        dest.wqeSize = v1.wqeSize;
+        dest.depth = v1.depth;
+        dest.headAddr = v1.headAddr;
+        dest.tailAddr = v1.tailAddr;
+        dest.sl = v1.sl;
+        dest.dbAddr = v1.dbVa;
+        dest.dbSwVa = 0;            // 旧版无软doorbell
+        dest.mtuShift = 0;          // 旧版无此字段，填0
+        dest.dbMode = (v1.dbMode == 0) ? DBMode::HW_DB : DBMode::SW_DB;
+        SHM_LOG_DEBUG(
+            "rank[" << rankId_ << "] CopyAiWQInfo(V1 fallback), wqn=" << dest.wqn << ", bufAddr=0x" << std::hex
+                    << dest.bufAddr << std::dec << ", wqeSize=" << dest.wqeSize << ", depth=" << dest.depth
+                    << ", headAddr=0x" << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex
+                    << dest.tailAddr << std::dec << ", sl=" << dest.sl << ", dbAddr=0x" << std::hex << dest.dbAddr
+                    << std::dec << ", dbMode=" << static_cast<int>(v1.dbMode));
+    }
 }
 
 void RdmaTransportManagerV2::CopyAiCQInfo(struct AiQpRMACQ& dest, const CqContext& src) noexcept
 {
-    const auto& roceCq = src.contextInfo.roceCq;
-    dest.cqn = roceCq.cqn;
-    dest.bufAddr = roceCq.cqVa;
-    dest.cqeSize = roceCq.cqeSize;
-    dest.depth = roceCq.cqDepth;
-    dest.headAddr = roceCq.headAddr;
-    dest.tailAddr = roceCq.tailAddr;
-    dest.dbAddr = roceCq.dbVa;
-    dest.dbMode = static_cast<shm::DBMode>(roceCq.dbMode);
-    SHM_LOG_DEBUG(
-        "rank[" << rankId_ << "] CopyAiCQInfo, cqn=" << dest.cqn << ", bufAddr=0x" << std::hex << dest.bufAddr
-                << std::dec << ", cqeSize=" << dest.cqeSize << ", depth=" << dest.depth << ", headAddr=0x" << std::hex
-                << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr << std::dec
-                << ", dbAddr=0x" << std::hex << dest.dbAddr << std::dec << ", dbMode=" << int(dest.dbMode));
+    if (IsRoceCqV2Format(src)) {
+        // 新版格式 (2026-07-07 之后 CANN)
+        const auto& roceCq = src.contextInfo.roceCq;
+        dest.cqn = roceCq.cqn;
+        dest.bufAddr = roceCq.cqVa;
+        dest.cqeSize = roceCq.cqeSize;
+        dest.depth = roceCq.cqDepth;
+        dest.headAddr = roceCq.headAddr;
+        dest.tailAddr = roceCq.tailAddr;
+        dest.dbAddr = roceCq.dbHwVa;
+        dest.dbSwVa = roceCq.dbSwVa;
+        dest.dbMode = DBMode::SW_DB;  // 新版默认软件doorbell
+        SHM_LOG_DEBUG(
+            "rank[" << rankId_ << "] CopyAiCQInfo(V2), cqn=" << dest.cqn << ", bufAddr=0x" << std::hex << dest.bufAddr
+                    << std::dec << ", cqeSize=" << dest.cqeSize << ", depth=" << dest.depth << ", headAddr=0x"
+                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr
+                    << std::dec << ", dbAddr=0x" << std::hex << dest.dbAddr << ", dbSwVa=0x" << std::hex
+                    << dest.dbSwVa << std::dec);
+    } else {
+        // 旧版格式 (2026-07-07 之前 CANN) - 回退兼容
+        auto v1 = ExtractCqContextRoceV1(src);
+        dest.cqn = v1.cqn;
+        dest.bufAddr = v1.cqVa;
+        dest.cqeSize = v1.cqeSize;
+        dest.depth = v1.cqDepth;
+        dest.headAddr = v1.headAddr;
+        dest.tailAddr = v1.tailAddr;
+        dest.dbAddr = v1.dbVa;
+        dest.dbSwVa = 0;            // 旧版无软doorbell
+        dest.dbMode = (v1.dbMode == 0) ? DBMode::HW_DB : DBMode::SW_DB;
+        SHM_LOG_DEBUG(
+            "rank[" << rankId_ << "] CopyAiCQInfo(V1 fallback), cqn=" << dest.cqn << ", bufAddr=0x" << std::hex
+                    << dest.bufAddr << std::dec << ", cqeSize=" << dest.cqeSize << ", depth=" << dest.depth
+                    << ", headAddr=0x" << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex
+                    << dest.tailAddr << std::dec << ", dbAddr=0x" << std::hex << dest.dbAddr << std::dec
+                    << ", dbMode=" << static_cast<int>(v1.dbMode));
+    }
 }
 
 void RdmaTransportManagerV2::FillQpPreSettingCopyInfo(AiQpRMAQueueInfo*& copyInfo)

@@ -14,6 +14,9 @@
 #include <hcomm/hcomm_res.h>
 
 #include <cstdint>
+#include <cstring>
+
+#include "dl_comm_def.h"
 
 namespace shm {
 
@@ -127,12 +130,13 @@ struct SqContext {
             uint64_t sqVa;
             uint64_t headAddr;
             uint64_t tailAddr;
-            uint64_t dbVa;
+            uint64_t dbHwVa;
+            uint64_t dbSwVa;
             uint32_t qpn;
             uint32_t wqeSize;
             uint32_t depth;
-            int8_t dbMode;
             uint8_t sl;
+            uint8_t mtuShift;
         } roceSq;
         uint8_t raws[120];
     } contextInfo;
@@ -154,11 +158,11 @@ struct CqContext {
             uint64_t cqVa;
             uint64_t headAddr;
             uint64_t tailAddr;
-            uint64_t dbVa;
+            uint64_t dbHwVa;
+            uint64_t dbSwVa;
             uint32_t cqn;
             uint32_t cqeSize;
             uint32_t cqDepth;
-            int8_t dbMode;
         } roceCq;
         uint8_t raws[120];
     } contextInfo;
@@ -182,6 +186,69 @@ struct ChannelEntity {
     CqContext *cqContextAddr;
     uint8_t reserve[160];
 };
+
+// ============================================================
+// 旧版 CANN (2026-07-07 之前) ROCE 上下文结构体，用于向后兼容
+// ============================================================
+struct SqContextRoceV1 {
+    uint64_t sqVa;
+    uint64_t headAddr;
+    uint64_t tailAddr;
+    uint64_t dbVa;
+    uint32_t qpn;
+    uint32_t wqeSize;
+    uint32_t depth;
+    int8_t   dbMode;
+    uint8_t  sl;
+};
+
+struct CqContextRoceV1 {
+    uint64_t cqVa;
+    uint64_t headAddr;
+    uint64_t tailAddr;
+    uint64_t dbVa;
+    uint32_t cqn;
+    uint32_t cqeSize;
+    uint32_t cqDepth;
+    int8_t   dbMode;
+};
+
+// 检测 SqContext 是否为新版 V2 格式 (2026-07-07 及之后)
+// 通过 $ASCEND_HOME_PATH/share/info/hcomm/version.info 中的 timestamp 字段判断
+inline bool IsRoceSqV2Format(const SqContext &ctx)
+{
+    if (ctx.type != SQ_CONTEXT_TYPE_ROCE) {
+        return true;  // 非 ROCE 类型无需区分
+    }
+    return IsHcommV2();
+}
+
+// 检测 CqContext 是否为新版 V2 格式
+inline bool IsRoceCqV2Format(const CqContext &ctx)
+{
+    if (ctx.type != CQ_CONTEXT_TYPE_ROCE) {
+        return true;
+    }
+    return IsHcommV2();
+}
+
+// 从 SqContext 的原始字节中提取旧版 V1 字段 (SqContext::raws 覆盖整个 union)
+inline SqContextRoceV1 ExtractSqContextRoceV1(const SqContext &ctx)
+{
+    SqContextRoceV1 v1{};
+    static_assert(sizeof(v1) <= sizeof(ctx.contextInfo.raws), "SqContextRoceV1 too large");
+    (void)memcpy_s(&v1, sizeof(v1), ctx.contextInfo.raws, sizeof(v1));
+    return v1;
+}
+
+// 从 CqContext 的原始字节中提取旧版 V1 字段
+inline CqContextRoceV1 ExtractCqContextRoceV1(const CqContext &ctx)
+{
+    CqContextRoceV1 v1{};
+    static_assert(sizeof(v1) <= sizeof(ctx.contextInfo.raws), "CqContextRoceV1 too large");
+    (void)memcpy_s(&v1, sizeof(v1), ctx.contextInfo.raws, sizeof(v1));
+    return v1;
+}
 
 } // namespace shm
 

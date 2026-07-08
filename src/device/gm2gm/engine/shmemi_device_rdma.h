@@ -45,10 +45,14 @@ struct aclshmemi_rdma_sq_ctx {
     uint64_t head_addr; // work queue head (Producer Index) address
     uint64_t tail_addr; // work queue tail (Consumer Index) address
     aclshmemi_rdma_db_mode_t db_mode;
-    uint64_t db_addr;  // doorbell address
+    uint64_t db_addr;  // doorbell address (legacy, kept for backward compatibility)
     uint32_t sl;       // service level
     uint64_t amo_addr; // addr for atomic operation
     uint32_t amo_lkey; // lkey for amo_addr
+    // hns1825 (Ascend950) specific fields
+    uint64_t db_sw_addr; // software shadow doorbell address (used by hns_1825)
+    uint8_t  mtu_shift;  // MTU shift for WQE size calculation (used by hns_1825)
+    uint8_t  reserved[7]; // padding
 };
 
 struct aclshmemi_rdma_cq_ctx {
@@ -59,7 +63,9 @@ struct aclshmemi_rdma_cq_ctx {
     uint64_t head_addr; // work queue head (Producer Index) address
     uint64_t tail_addr; // work queue tail (Consumer Index) address
     aclshmemi_rdma_db_mode_t db_mode;
-    uint64_t db_addr; // doorbell address
+    uint64_t db_addr; // doorbell address (used by XSCALE/indie/hns_1825)
+    // hns1825 (Ascend950) specific fields
+    uint64_t db_sw_addr; // software shadow doorbell address
 };
 
 struct aclshmemi_rdma_sge {

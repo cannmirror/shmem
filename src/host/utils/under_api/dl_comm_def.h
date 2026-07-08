@@ -122,6 +122,10 @@ HybmGvaVersion HybmGetGvaVersion();
 std::string GetCannVersion();
 bool CannVersionCheck(const std::string &requiredVer);
 
+uint64_t GetHcommTimestampVersion();
+
+bool IsHcommV2();
+
 static bool DriverVersionCheck(const std::string &ver);
 
 int32_t HalGvaPrecheck(void);

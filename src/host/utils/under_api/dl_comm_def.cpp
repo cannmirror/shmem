@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <cstdint>
@@ -148,6 +149,74 @@ bool CannVersionCheck(const std::string &requiredVer)
         return true;
     }
     return VersionGreaterOrEqual(currentVer, requiredVer);
+}
+
+// ============================================================
+// HCOMM 控制面版本检测（通过 version.info 中的 timestamp 字段）
+// ============================================================
+static uint64_t cachedHcommTimestamp = 0;
+static std::once_flag hcommTimestampOnce;
+
+static void QueryHcommTimestamp()
+{
+    std::string cannHomePath = std::getenv("ASCEND_HOME_PATH") ? std::getenv("ASCEND_HOME_PATH") : "";
+    if (cannHomePath.empty()) {
+        SHM_LOG_WARN("ASCEND_HOME_PATH environment variable not set, default to hcomm V2");
+        return;
+    }
+
+    std::string versionFilePath = cannHomePath + "/share/info/hcomm/version.info";
+    std::ifstream infile(versionFilePath, std::ifstream::in);
+    if (!infile.is_open()) {
+        SHM_LOG_WARN("Cannot open hcomm version.info: " << versionFilePath << ", default to V2");
+        return;
+    }
+
+    std::string line;
+    while (getline(infile, line)) {
+        auto found = line.find("timestamp=");
+        if (found != 0) {
+            continue;
+        }
+        // 格式: timestamp=20260707_000327035
+        std::string tsStr = line.substr(std::string("timestamp=").length());
+        // 提取 YYYYMMDD 部分 (前8位) + 小时分钟 (第9位开始的4位)
+        // "20260707_000327035" -> 去掉下划线，取前12位: "202607070003"
+        tsStr.erase(std::remove(tsStr.begin(), tsStr.end(), '_'), tsStr.end());
+        if (tsStr.length() >= 12) {
+            tsStr = tsStr.substr(0, 12);  // YYYYMMDDHHMM
+            try {
+                cachedHcommTimestamp = std::stoull(tsStr);
+            } catch (...) {
+                SHM_LOG_WARN("Failed to parse hcomm timestamp: " << tsStr << ", default to V2");
+            }
+        }
+        break;
+    }
+    infile.close();
+
+    if (cachedHcommTimestamp == 0) {
+        SHM_LOG_WARN("No valid timestamp in hcomm version.info, default to V2");
+    } else {
+        SHM_LOG_INFO("HCOMM version timestamp: " << cachedHcommTimestamp);
+    }
+}
+
+uint64_t GetHcommTimestampVersion()
+{
+    std::call_once(hcommTimestampOnce, QueryHcommTimestamp);
+    return cachedHcommTimestamp;
+}
+
+bool IsHcommV2()
+{
+    uint64_t ts = GetHcommTimestampVersion();
+    if (ts == 0) {
+        return true;  // 读取失败，默认使用新版 V2
+    }
+    // 2026-07-07 00:00 = 202607070000
+    constexpr uint64_t HCOMM_V2_CUTOFF = 202607070000ULL;
+    return ts >= HCOMM_V2_CUTOFF;
 }
 
 std::string GetDriverVersionPath(const std::string &driverEnvStr, const std::string &keyStr)

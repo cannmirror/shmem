@@ -7,6 +7,8 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include <algorithm>
+
 #include <chrono>
 #include "shmemi_logger.h"
 #include "dl_acl_api.h"

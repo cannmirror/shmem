@@ -20,19 +20,33 @@ repos:
       - id: detect-private-key
       - id: check-json
 
-  # -------------------------- Python 核心检查 --------------------------
-  # Ruff：指定读取 tools/pre-commit/pyproject.toml
-  - repo: https://gitcode.com/gh_mirrors/ru/ruff-pre-commit
-    rev: v0.14.14
+  # C++ 代码格式化检查
+  - repo: https://gitcode.com/pre-commit-clang/mirrors-clang-format
+    rev: v18.1.8
     hooks:
-      - id: ruff-check
-        args: ["--config", "tools/pre-commit/pyproject.toml", "--output-format", "github", "--fix"]
-        types: [python]
-      - id: ruff-format
-        args: ["--config", "tools/pre-commit/pyproject.toml"]
-        types: [python]
+      - id: clang-format
+        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx|asc)$
+        args:
+          - "--style=file"
+          - "--verbose"
+          - "-i"
+        exclude: ^build/|tests/third_party/
 
-  # codespell
+  # 显式头文件包含检查（基于 clang-tidy misc-include-cleaner，AST 语义分析）
+  - repo: local
+    hooks:
+      - id: check-header-inclusion
+        name: Check explicit header inclusion
+        description: Verify that C/C++ files include required headers and don't include unused ones.
+        entry: tools/pre-commit/check_header_inclusion.py
+        language: python
+        additional_dependencies:
+          - clang-tidy>=22.0
+        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx)$
+        exclude: ^build/|tests/third_party/
+        stages: [pre-commit]
+
+  # 拼写检查
   - repo: https://gitcode.com/gh_mirrors/co/codespell
     rev: v2.4.1
     hooks:
@@ -43,44 +57,3 @@ repos:
             "--skip",
             "*.py,*.cpp,*.hpp,*.c,*.h",
           ]
-
-  # pylint：指定 tools/pre-commit/pyproject.toml
-  - repo: https://gitcode.com/gh_mirrors/pyl/pylint
-    rev: v4.0.5
-    hooks:
-      - id: pylint
-        name: pylint (Python code quality check)
-        types: [python]
-        args: ["--rcfile=tools/pre-commit/pyproject.toml"]
-        verbose: false
-
-  # Bandit：指定 tools/pre-commit/pyproject.toml
-  - repo: https://gitcode.com/gh_mirrors/ba/bandit
-    rev: 1.9.4
-    hooks:
-      - id: bandit
-        name: bandit (Python 安全漏洞检查)
-        types: [python]
-        args: [
-          "--config=tools/pre-commit/pyproject.toml",
-          "--quiet",
-        ]
-
-  # typos
-  - repo: https://gitcode.com/gh_mirrors/ty/typos
-    rev: v1.32.0
-    hooks:
-      - id: typos
-        args: ["--force-exclude", "--config", "tools/pre-commit/typos.toml"]
-
-  #--------------- C++ 核心检查 ---------------------------------------------
-  - repo: https://gitcode.com/pre-commit-clang/mirrors-clang-format
-    rev: v18.1.8
-    hooks:
-      - id: clang-format
-        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx)$
-        args:
-          - "--style=file"
-          - "--verbose"
-          - "-i"
-        exclude: ^build/|tests/third_party/

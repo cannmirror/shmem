@@ -22,6 +22,10 @@ endif()
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
 
 project(SHMEM LANGUAGES C CXX)
+
+# 生成 compile_commands.json，供 clang-tidy 等工具使用
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include(CheckCXXCompilerFlag)
 
 # 配置 ccache

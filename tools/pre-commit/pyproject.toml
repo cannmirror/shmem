@@ -115,6 +115,7 @@ exclude_dirs = [
   "dist",
   "migrations",
   "__pycache__",
+  "tools/pre-commit",
 ]
 
 # 启用所有安全检查

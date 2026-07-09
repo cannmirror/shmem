@@ -5,27 +5,13 @@ aclGraph图结构如下：
 
 ## 环境要求
 
-- 运行本示例需要机器具备RDMA环境（RDMA网卡及驱动已正确安装配置）。
-
-### 检查RDMA环境
-```bash
-lspci | grep -i RDMA
-for i in {0..7}; do hccn_tool -i $i -net_health -g; done
-```
-可用环境命令输出如下：  
-![](../../docs/images/rdma_env.png)
+同[rdma_demo](../rdma_demo/README.md)中的环境要求。
 
 ## 使用方式
-1.在shmem/目录编译:
-- Ascend910B/C 平台:
-```bash
-bash scripts/build.sh -enable_rdma -examples
-```
-- Ascend950 平台:
-```bash
-bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -examples
-```
+1.在shmem/目录编译。RDMA 编译参数（Ascend910B/C，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../docs/compilation_build_guide.md#rdma参数使用说明)。
+
 2.1 在shmem/rdma_aclgraph_demo目录运行:
+> 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](../rdma_demo/README.md#ibv_extend_drivers-环境变量)。
 ```bash
 bash run.sh # 单机双卡用例
 ```

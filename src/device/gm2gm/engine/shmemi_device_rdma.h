@@ -14,7 +14,7 @@
 #include "device/shmem_def.h"
 #include "utils/shmemi_kernel_debug.h"
 
-enum class aclshmemi_rdma_backend_t : uint32_t { IN_DIE = 0, XSCALE };
+enum class aclshmemi_rdma_backend_t : uint32_t { IN_DIE = 0, XSCALE, HNS_1825 };
 
 enum class aclshmemi_rdma_opcode_t : uint32_t { OP_RDMA_READ = 0, OP_RDMA_WRITE, OP_RDMA_WRITE_WITH_IMM };
 

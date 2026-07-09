@@ -13,6 +13,7 @@
 #include "kernel_operator.h"
 #include "rdma_device_backend_in_die.hpp"
 #include "rdma_device_backend_xscale.hpp"
+#include "rdma_device_backend_hns_1825.hpp"
 #include "rdma_device_backend_base.h"
 
 template <typename T, bool IS_MASKED, aclshmemi_rdma_backend_t B>

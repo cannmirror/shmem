@@ -15,21 +15,48 @@ for i in {0..7}; do hccn_tool -i $i -net_health -g; done
 
 #### Ascend950平台
 使用`ibv_devinfo`命令检查RDMA设备信息。
+
+云脉网卡：
 ```bash
 ibv_devinfo | grep xscale
 ```
-可用环境命令输出如下：  
 ![](../../docs/images/nda-check.png)
+
+1825网卡：
+```bash
+ibv_devinfo | grep hrn
+```
+![](../../docs/images/hns1825-check.png)
+
+> 注：1825 网卡同端口通信时，若未开启交换机端口桥，RDMA 可能无法正常收发数据。端口桥配置详见[常见问题 - 端口桥配置](../../docs/debug/Troubleshooting_FAQs.md#同端口通信需开启端口桥)。
+
+### IBV_EXTEND_DRIVERS 环境变量
+Ascend950 平台运行前需设置 `IBV_EXTEND_DRIVERS` 环境变量，指向对应网卡的插件库：
+
+- **云脉网卡（XSCALE）**：
+  ```bash
+  export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so>
+  ```
+- **1825 网卡（HNS_1825）**：
+  ```bash
+  export IBV_EXTEND_DRIVERS=<path_to_libhrn5-rdmav34.so>
+  ```
+  > 注：\<path_to_libxscale_nda.so\>是libxscale_nda.so的路径，\<path_to_libhrn5-rdmav34.so\>是libhrn5-rdmav34.so的路径。
+
 ## 使用方式
 ### 编译
-在shmem/目录执行以下命令进行编译：
+在shmem/目录执行以下命令进行编译（RDMA 后端完整参数说明见 [编译与构建 - RDMA 参数使用说明](../../docs/compilation_build_guide.md#rdma参数使用说明)）：
 - Ascend910B/C 平台:
 ```bash
 bash scripts/build.sh -enable_rdma -examples
 ```
-- Ascend950 平台:
+- Ascend950 平台（云脉网卡 XSCALE）:
 ```bash
 bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -examples
+```
+- Ascend950 平台（1825 网卡 HNS_1825）:
+```bash
+bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend HNS_1825 -examples
 ```
 ### 运行
 #### 方式一：在`examples/rdma_demo`目录下执行`bash run.sh`
@@ -40,16 +67,13 @@ bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -exa
     ```bash
     bash run.sh -pes 4
     ```
-    > 注：Ascend950平台需要在`run.sh`中设置`IBV_EXTEND_DRIVERS`环境变量：
-    > ```bash
-    > export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so>
-    > ```
+    > 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](#ibv_extend_drivers-环境变量)。
 
 #### 方式二：在shmem/目录手动运行命令
 - 单机2卡执行命令
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
-    export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅Ascend950平台需要
+    export IBV_EXTEND_DRIVERS=<path_to_plugin.so>  # 仅Ascend950平台需要根据网卡类型进行环境变量设置，详见环境变量说明
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
     ./build/bin/rdma_demo 2 0 tcp://127.0.0.1:8765 2 0 0 & # PE 0
     ./build/bin/rdma_demo 2 1 tcp://127.0.0.1:8765 2 0 0 & # PE 1
@@ -61,18 +85,18 @@ bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -exa
     在机器A执行如下命令：
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
-    export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅Ascend950平台需要
+    export IBV_EXTEND_DRIVERS=<path_to_plugin.so>  # 仅Ascend950平台需要根据网卡类型进行环境变量设置，详见环境变量说明
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
     ./build/bin/rdma_demo 2 0 tcp://ip1:8765 1 0 0 # PE 0
     ```
     同时，在机器B执行如下命令：
     ```bash
     export PROJECT_ROOT=<shmem-root-directory>
-    export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅Ascend950平台需要
+    export IBV_EXTEND_DRIVERS=<path_to_plugin.so>  # 仅Ascend950平台需要根据网卡类型进行环境变量设置，详见环境变量说明
     export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
     ./build/bin/rdma_demo 2 1 tcp://ip1:8765 1 1 0 # PE 1
     ```
-    > 注：\<shmem-root-directory\>为SHMEM项目的根目录。
+    > 注：\<shmem-root-directory\>为SHMEM项目的根目录，\<path_to_plugin.so\>为根据网卡类型设置的插件库路径。
     >
     > 如需在容器中运行跨机测试，启动容器时指定`--net=host`模式即可。
 

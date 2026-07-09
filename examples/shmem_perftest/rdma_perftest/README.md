@@ -22,7 +22,7 @@
 | `-b/--block-size`、`--block-range` | 控制核数 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 |
 | UB 缓冲 | MTE 必需，影响传输 | UDMA 内部不消耗 UB，仅形式上保留 `--ub-size` 入参 | RDMA 必须，大小至少为 64B，默认为 64B |
 | 测试模式 | put / bi_put / get / bi_get | put / bi_put / get / bi_get / **put_signal** | put / bi_put / get / bi_get |
-| SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort | **Ascend950（需配合云脉网卡）或 Ascend910B/C** |
+| SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort | **Ascend950（需指定 `XSCALE` 或 `HNS_1825` 后端）或 Ascend910B/C** |
 | CSV 文件名 | `<test>_<dtype>_<pe>.csv` | `udma_<test>_<dtype>_<pe>.csv` | `rdma_<test>_<dtype>_<pe>.csv` |
 
 ## 环境要求
@@ -31,27 +31,15 @@
 
 ## 编译说明
 
-RDMA 功能需要在编译时启用 `-enable_rdma` 参数，并根据 SOC 类型进行配置：
-
-**Ascend910B/C 平台**（默认配置）：
-```bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-bash scripts/build.sh -examples -enable_rdma
-```
-
-**Ascend950 平台**（需指定云脉网卡后端）：
-```bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-bash scripts/build.sh -examples -enable_rdma -soc_type Ascend950 -rdma_backend XSCALE
-```
+RDMA 功能需要在编译时启用 `-enable_rdma` 参数，并根据 SOC 类型配置后端。RDMA 编译参数（Ascend910B/C，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../../docs/compilation_build_guide.md#rdma参数使用说明)。
 
 ## 使用方法
 
 ### 基本用法
-
+> 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](../../rdma_demo/README.md#ibv_extend_drivers-环境变量)。
 ```bash
 cd examples/shmem_perftest/rdma_perftest/
-./run.sh [选项]
+bash run.sh [选项]
 ```
 
 ### 命令行参数
@@ -127,6 +115,6 @@ pe: 0 size: 1024 frame_id: 0
 ## 已知约束
 
 1. RDMA 头文件注明：concurrent RMA/AMO operations to the same PE are not supported。本 perftest 通过 `block_dim=1` 规避，多核场景留作后续扩展。
-2. RDMA 功能需要在编译时启用 `-enable_rdma` 参数，否则编译期会报错；Ascend950 平台还需额外指定 `-soc_type Ascend950 -rdma_backend XSCALE` 参数。
+2. RDMA 功能需要在编译时启用 `-enable_rdma` 参数，否则编译期会报错；Ascend950 平台还需额外指定 `-soc_type Ascend950` 及 `-rdma_backend XSCALE`（或 `HNS_1825`）参数。
 3. **不支持 D2H / `HOST_SIDE` (DRAM)**: RDMA 引擎当前未对 Host 侧 DRAM 提供 RMA 路径，仅测 HBM。
 4. 原子操作不在本 perftest 范围。

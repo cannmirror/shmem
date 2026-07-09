@@ -744,7 +744,8 @@ bool RdmaTransportManagerV2::ReserveRdmaInfoSpace() noexcept
     }
 
     uint32_t atomicSize = ATOMIC_MAX_NUM * sizeof(uint64_t) * rankCount_; // 128 是最大的 atomic 并发数
-    atomicSize = ALIGN_UP(atomicSize, 512);
+    // HNS 1825 atomic MR 注册需要 4K 对齐。
+    atomicSize = ALIGN_UP(atomicSize, 4096);
     ret = DlAclApi::AclrtMalloc(&atomicSharedMemory_, atomicSize, 0);
     if (ret != 0) {
         SHM_LOG_ERROR("rank[" << rankId_ << "] allocate device atomic size: " << atomicSize << ", failed: " << ret);
@@ -766,7 +767,8 @@ bool RdmaTransportManagerV2::RegisterAtomicMemory() noexcept
     }
 
     uint32_t atomicSize = ATOMIC_MAX_NUM * sizeof(uint64_t) * rankCount_;
-    atomicSize = ALIGN_UP(atomicSize, 512);
+    // HNS 1825 atomic MR 注册需要 4K 对齐。
+    atomicSize = ALIGN_UP(atomicSize, 4096);
 
     CommMem commMem{};
     commMem.type = COMM_MEM_TYPE_DEVICE;

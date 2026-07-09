@@ -31,7 +31,7 @@ SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本
 - `-examples`：构建examples目录下所有用例
 - `-python_example`：对部分examples目录下用例提供torch接入能力
 - `-enable_rdma`：构建并启用RDMA相关能力。 Ascend910B/C 默认配置 RDMA 后端类型，Ascend950 需要配合 `-rdma_backend` 来指定后端类型。
-- `-rdma_backend`：指定RDMA后端类型（Ascend910B/C 不支持该选项），可选值为 `XSCALE`（使用云脉网卡）。**必须配合 `-enable_rdma` 使用**，否则会报错。参数顺序不限。
+- `-rdma_backend`：指定RDMA后端类型（Ascend910B/C 不支持该选项），可选值为 `XSCALE`（使用云脉网卡）或 `HNS_1825`（使用 1825 网卡）。**必须配合 `-enable_rdma` 使用**，否则会报错。参数顺序不限。
 - `-enable_ascendc_dump`：启用`AscendC_Dump`模式，用于对算子内核代码进行调测
 - `-package`：构建py扩展的whl包
     * 生成run包SHMEM\_{version}\_linux-{arch}.run，生成路径为{project_root}/package/{arch}/
@@ -68,6 +68,9 @@ SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本
 # Ascend950 平台启用RDMA并指定后端为 XSCALE（参数顺序示例1）
 bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE
 
+# Ascend950 平台启用RDMA并指定后端为 HNS_1825
+bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend HNS_1825
+
 # Ascend950 平台启用RDMA并指定后端为 XSCALE（参数顺序示例2）
 bash scripts/build.sh -enable_rdma -soc_type Ascend950 -rdma_backend XSCALE
 
@@ -94,13 +97,15 @@ bash scripts/build.sh -enable_rdma -rdma_backend XSCALE
 
 `-rdma_backend` 参数支持以下后端类型：
 - `XSCALE`：云脉网卡后端（仅 Ascend950 支持）
+- `HNS_1825`：1825 网卡后端（仅 Ascend950 支持）
 
 **⚠️ 重要提示：**
 
 1. **自动生成的编译定义**：
    - CMake 会根据 `-rdma_backend` 的值自动生成以下编译定义，用户不应手动设置：
      - 当 `-rdma_backend XSCALE` 时，自动添加 `-DACLSHMEMI_RDMA_K_BACKEND_XSCALE=1`
-     - 未指定后端时，自动添加 `-DACLSHMEMI_RDMA_K_BACKEND_IN_DIE=1`
+     - 当 `-rdma_backend HNS_1825` 时，自动添加 `-DACLSHMEMI_RDMA_K_BACKEND_HNS_1825=1`
+     - 未指定后端时，不添加上述后端宏，设备侧默认选择 `IN_DIE`
    - 手动定义这些宏可能导致编译冲突或功能异常
 
 2. **禁止手动定义的内部宏**：

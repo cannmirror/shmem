@@ -13,56 +13,16 @@
 - **barrier_team_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier(team, buf, sync_id)` 显式传入参数
 
 ## 环境要求
-
-运行本示例需要机器具备 RDMA 环境（RDMA 网卡及驱动已正确安装配置）。
-
-### 检查 RDMA 环境
-
-#### Ascend910B/C 平台
-
-```bash
-for i in {0..7}; do hccn_tool -i $i -ip -g; done
-for i in {0..7}; do hccn_tool -i $i -net_health -g; done
-```
-
-> 注：7 需要根据实际要查看的卡数修改。
-
-可用环境命令输出如下：
-
-![](../../docs/images/rdma_env.png)
-
-#### Ascend950 平台
-
-使用 `ibv_devinfo` 命令检查 RDMA 设备信息。
-
-```bash
-ibv_devinfo | grep xscale
-```
-
-可用环境命令输出如下：
-
-![](../../docs/images/nda-check.png)
+同[rdma_demo](../rdma_demo/README.md)中的环境要求。
 
 ## 使用方式
 
 ### 编译
 
-在 `shmem/` 目录执行以下命令进行编译：
-
-- Ascend910B/C 平台：
-
-```bash
-bash scripts/build.sh -enable_rdma -examples
-```
-
-- Ascend950 平台：
-
-```bash
-bash scripts/build.sh -soc_type Ascend950 -enable_rdma -rdma_backend XSCALE -examples
-```
+在shmem/目录编译。RDMA 编译参数（Ascend910B/C，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../docs/compilation_build_guide.md#rdma参数使用说明)。
 
 ### 运行
-
+> 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](../rdma_demo/README.md#ibv_extend_drivers-环境变量)。
 #### 方式一：在 `examples/rdma_sync_barrier_demo` 目录下执行 `bash run.sh`
 
 `run.sh` 支持通过参数指定 demo 类型，默认为 `sync_all`。
@@ -78,24 +38,19 @@ bash run.sh barrier_team       # 运行 barrier_team demo
 bash run.sh barrier_team_buf   # 运行 barrier_team(buf, sync_id) demo
 ```
 
-> 注：Ascend950 平台需要在 `run.sh` 中设置 `IBV_EXTEND_DRIVERS` 环境变量：
-> ```bash
-> export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so>
-> ```
-
 #### 方式二：在 `shmem/` 目录手动运行命令
 
 - 单机 2 卡执行命令
 
 ```bash
 export PROJECT_ROOT=<shmem-root-directory>
-export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅 Ascend950 平台需要
+export IBV_EXTEND_DRIVERS=<path_to_plugin.so> # 仅 Ascend950 平台需要根据网卡类型进行环境变量设置，详见环境变量说明
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 ./build/bin/rdma_sync_barrier_demo 2 0 tcp://127.0.0.1:8899 2 0 0 sync_all & # PE 0
 ./build/bin/rdma_sync_barrier_demo 2 1 tcp://127.0.0.1:8899 2 0 0 sync_all & # PE 1
 ```
 
-> 注：\<shmem-root-directory\> 为 SHMEM 项目的根目录。
+> 注：\<shmem-root-directory\> 为 SHMEM 项目的根目录，\<path_to_plugin.so\> 为根据网卡类型设置的插件库路径。
 
 - 跨机 2 卡执行命令
 
@@ -104,7 +59,7 @@ export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 
 ```bash
 export PROJECT_ROOT=<shmem-root-directory>
-export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅 Ascend950 平台需要
+export IBV_EXTEND_DRIVERS=<path_to_plugin.so> # 仅 Ascend950 平台需要根据网卡类型进行环境变量设置，详见环境变量说明
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 ./build/bin/rdma_sync_barrier_demo 2 0 tcp://ip1:8765 1 0 0 sync_all # PE 0
 ```
@@ -113,12 +68,12 @@ export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 
 ```bash
 export PROJECT_ROOT=<shmem-root-directory>
-export IBV_EXTEND_DRIVERS=<path_to_libxscale_nda.so> # 仅 Ascend950 平台需要
+export IBV_EXTEND_DRIVERS=<path_to_plugin.so> # 仅 Ascend950 平台需要根据网卡类型进行环境变量设置，详见环境变量说明
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 ./build/bin/rdma_sync_barrier_demo 2 1 tcp://ip1:8765 1 1 0 sync_all # PE 1
 ```
 
-> 注：\<shmem-root-directory\> 为 SHMEM 项目的根目录。
+> 注：\<shmem-root-directory\> 为 SHMEM 项目的根目录，\<path_to_plugin.so\> 为根据网卡类型设置的插件库路径。
 >
 > 如需在容器中运行跨机测试，启动容器时指定 `--net=host` 模式即可。
 
@@ -129,6 +84,7 @@ export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 
 ```bash
 export PROJECT_ROOT=<shmem-root-directory>
+export IBV_EXTEND_DRIVERS=<path_to_plugin.so> # 仅 Ascend950 平台需要根据网卡类型进行环境变量设置，详见环境变量说明
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 pids=()
 for pe in $(seq 0 7); do
@@ -142,6 +98,7 @@ for pid in ${pids[@]}; do wait $pid; done
 
 ```bash
 export PROJECT_ROOT=<shmem-root-directory>
+export IBV_EXTEND_DRIVERS=<path_to_plugin.so> # 仅 Ascend950 平台需要根据网卡类型进行环境变量设置，详见环境变量说明
 export LD_LIBRARY_PATH=${PROJECT_ROOT}/build/lib:$LD_LIBRARY_PATH
 pids=()
 for pe in $(seq 8 15); do

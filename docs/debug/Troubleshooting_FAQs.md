@@ -138,6 +138,54 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 注意: 同时配置时只读取`SHMEM_UID_SESSION_ID`
 
 ## RDMA相关问题
+### 同端口通信需开启端口桥
+#### Q: 1825 网卡单机多 NPU 共用同一物理端口，RDMA 通信失败
+#### A: 1825 网卡在单机多 NPU 场景下，若多个 NPU 共用同一物理端口，两个 NPU 间的 RDMA 流量会从该端口发出、经交换机后从同一端口返回。交换机默认丢弃此类**同源同宿报文**，导致通信失败。需在交换机对应接口开启**端口桥**（port bridge）功能。
+
+> 详细说明：[配置端口桥功能](https://support.huawei.com/hedex/hdx.do?docid=EDOC1100558302&id=ZH-CN_TASK_0000001176744393)
+
+**操作步骤：**
+
+1. 确认 NPU 所连交换机端口，首先需要了解物理连线，明确网卡各端口与 NPU 卡的对应关系（即哪些 NPU 共用同一网卡端口）。
+
+   **常用排布参考（8卡机型）：**
+
+   | NPU 卡 | 网卡设备 |
+   |--------|----------|
+   | 0、1   | hrn5_1   |
+   | 2、3   | hrn5_0   |
+   | 4、5   | hrn5_3   |
+   | 6、7   | hrn5_2   |
+
+   例如，若需要 NPU 6 和 NPU 7 之间通信，二者共用 `hrn5_2` 端口，需在交换机对应的 `hrn5_2` 端口上开启端口桥。
+
+   - 通过 `ibv_devinfo` 或 `hiroce3 gids` 查看网络设备（`net_dev` 列）：
+
+     ![](../images/net_dev-query.png)
+
+   - 通过 `ifconfig <net_dev>` 或 `ip link show <net_dev>` 查看对应接口的 MAC 地址：
+
+     ![](../images/mac-address-query.png)
+
+   - 根据该 MAC 地址，在交换机上查询对应端口号：
+
+     ![](../images/port-number-query.png)
+
+2. 登录交换机，进入系统视图：`system-view`
+3. 进入对应接口（以 100GE1/0/1 为例，按实际替换）：
+   ```
+   interface 100GE1/0/1
+   ```
+4. 开启端口桥：
+   ```
+   port bridge enable
+   ```
+5. 提交：`commit`
+6. 验证：`display current-configuration | include port bridge`，输出含 `port bridge enable` 即成功。
+7. 多个接口需同端口通信时，对每个接口重复 3-5。
+
+配置完成后，在使用相同网卡端口的 NPU 卡上运行 `rdma_demo` 即可验证通信是否正常。
+
 ### 通信丢包
 #### Q: 使能RDMA(RoCEv2)后，网络出现丢包现象
 #### A: 检查交换机和端侧的TC与SL配置是否正确，如果不一致会出现丢包现象。可以参考[环境变量说明](../api/env_vars_intro.md)对环境变量[HCCL_RDMA_TC](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0089.html)和[HCCL_RDMA_SL](https://www.hiascend.com/document/detail/zh/canncommercial/900/maintenref/envvar/envref_07_0090.html)进行设置。

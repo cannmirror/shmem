@@ -21,9 +21,12 @@
 // Decide Current RDMA Backend
 #include "rdma_backends/rdma_device_backend_in_die.hpp"
 #include "rdma_backends/rdma_device_backend_xscale.hpp"
+#include "rdma_backends/rdma_device_backend_hns_1825.hpp"
 
 #if defined(ACLSHMEMI_RDMA_K_BACKEND_XSCALE)
 #define ACLSHMEMI_K_RDMA_BACKEND (aclshmemi_rdma_backend_t::XSCALE)
+#elif defined(ACLSHMEMI_RDMA_K_BACKEND_HNS_1825)
+#define ACLSHMEMI_K_RDMA_BACKEND (aclshmemi_rdma_backend_t::HNS_1825)
 #else
 #define ACLSHMEMI_K_RDMA_BACKEND (aclshmemi_rdma_backend_t::IN_DIE)
 #endif

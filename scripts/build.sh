@@ -94,7 +94,7 @@ function print_usage()
     echo "  -use_cxx11_abi0            Use CXX11 ABI=0"
     echo "  -mssanitizer               Enable memory sanitizer"
     echo "  -soc_type <type>           Specify SOC type (e.g., Ascend950)"
-    echo "  -rdma_backend <backend>    Specify RDMA backend (XSCALE, only for Ascend950)"
+    echo "  -rdma_backend <backend>    Specify RDMA backend (XSCALE or HNS_1825, only for Ascend950)"
     echo "                             Requires -enable_rdma and -soc_type Ascend950"
 }
 
@@ -394,8 +394,8 @@ while [[ $# -gt 0 ]]; do
             fi
             shift
             RDMA_BACKEND="$1"
-            if [ "$RDMA_BACKEND" != "XSCALE" ]; then
-                echo "Error: Invalid RDMA_BACKEND value '$RDMA_BACKEND'. Must be 'XSCALE'."
+            if [ "$RDMA_BACKEND" != "XSCALE" ] && [ "$RDMA_BACKEND" != "HNS_1825" ]; then
+                echo "Error: Invalid RDMA_BACKEND value '$RDMA_BACKEND'. Must be 'XSCALE' or 'HNS_1825'."
                 print_usage
                 exit 1
             fi

@@ -44,7 +44,7 @@ fi
 CURRENT_DIR=$(pwd)
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
-VERSION="1.0.0"
+export VERSION="${VERSION:-1.0.0}"
 OUTPUT_DIR=$PROJECT_ROOT/install
 rm -rf $OUTPUT_DIR
 mkdir -p $OUTPUT_DIR
@@ -107,28 +107,119 @@ function fn_build()
     fi
 
     cmake $COMPILE_OPTIONS -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_CXX11_ABI=$USE_CXX11_ABI -DUSE_MSSANITIZER=$USE_MSSANITIZER -DSOC_TYPE=${SOC_TYPE} -DPYEXPAND_EXAMPLE=$PYEXPAND_EXAMPLE -DACLSHMEM_UDMA_SUPPORT=$enable_udma_support ..
-    make install -j17
+    make install -j$(nproc)
     cd -
 }
 
 function fn_whl_build()
 {
-    echo "Python extension enabled. Copying and packaging Python wheel..."
-    export SOC_TYPE=${SOC_TYPE}
-    if [ "$SOC_TYPE" = "Ascend950" ]; then
-        export ACLSHMEM_UDMA_SUPPORT=ON
-    fi
+    echo "Python extension enabled. Building multi-SOC wheel (910 + 950)..."
 
     cd "${PROJECT_ROOT}/src/python"
     rm -rf shmem.egg-info ${PROJECT_ROOT}/dist
 
     GIT_COMMIT=`git rev-parse HEAD` || true
     {
+        echo "${VERSION}"
         echo "commit_id: ${GIT_COMMIT}"
+        if [ "${BUILD_TYPE}" = "Debug" ]; then
+            echo "build_type: debug"
+        fi
     } > "${PROJECT_ROOT}/src/python/shmem/VERSION"
 
     cd "${PROJECT_ROOT}"
-    python3 setup.py bdist_wheel
+
+    py_ver=$(python3 -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+    arch=$(uname -m)
+    if [ "$arch" = "x86_64" ]; then
+        plat="linux_x86_64"
+    elif [ "$arch" = "aarch64" ]; then
+        plat="linux_aarch64"
+    else
+        plat="linux_${arch}"
+    fi
+    echo "Wheel tag: ${py_ver}-${py_ver}-${plat} (auto-detected)"
+
+    # Clean install directory
+    rm -rf "${PROJECT_ROOT}/install"
+
+    # ============================================================
+    # Build SOC 910 (default / Ascend910)
+    # ============================================================
+    echo "===== [1/3] Building backend: 910 ====="
+    # Ascend910B backend covers Ascend910 A2/A3 series.
+    [ -d build ] && rm -rf build
+    mkdir -p build && cd build
+    cmake ${COMPILE_OPTIONS} \
+        -DCMAKE_INSTALL_PREFIX=../install \
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DUSE_CXX11_ABI=${USE_CXX11_ABI} \
+        -DUSE_MSSANITIZER=${USE_MSSANITIZER} \
+        -DSOC_TYPE="Ascend910B" \
+        -DPYEXPAND_EXAMPLE=${PYEXPAND_EXAMPLE} \
+        -DACLSHMEM_UDMA_SUPPORT=OFF \
+        -DBUILD_PYTHON=ON \
+        .. || { echo "[ERROR] cmake failed for backend 910"; exit 1; }
+    make install -j$(nproc) || { echo "[ERROR] make install failed for backend 910"; exit 1; }
+    # Copy shared libraries from install/shmem/lib/ to wheel backend directory
+    mkdir -p ../install/shmem/backends/910
+    cp ../install/shmem/lib/*.so ../install/shmem/backends/910/ || { echo "[ERROR] Failed to copy 910 backend libraries"; exit 1; }
+    cd -
+    echo "===== Backend 910 built ====="
+
+    # ============================================================
+    # Build SOC 950 (Ascend950)
+    # ============================================================
+    echo "===== [2/3] Building backend: 950 ====="
+    [ -d build ] && rm -rf build
+
+    # nlohmann_json is required for Ascend950 UDMA
+    fn_build_nlohmann_json || { echo "[ERROR] Failed to build nlohmann_json dependency for backend 950"; exit 1; }
+
+    # _pyshmem.so is built only once in the 910 pass (BUILD_PYTHON=ON) and
+    # reused for 950.  It is a thin SOC-agnostic pybind11 wrapper around the
+    # uniform aclshmem_* C API surface.  At runtime, __init__.py preloads the
+    # SOC-specific libshmem.so from backends/<soc>/, so the 910-compiled
+    # _pyshmem.so resolves 950 symbols correctly on A5 hardware.
+    mkdir -p build && cd build
+    cmake ${COMPILE_OPTIONS} \
+        -DCMAKE_INSTALL_PREFIX=../install \
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DUSE_CXX11_ABI=${USE_CXX11_ABI} \
+        -DUSE_MSSANITIZER=${USE_MSSANITIZER} \
+        -DSOC_TYPE="Ascend950" \
+        -DPYEXPAND_EXAMPLE=${PYEXPAND_EXAMPLE} \
+        -DACLSHMEM_UDMA_SUPPORT=ON \
+        -DBUILD_PYTHON=OFF \
+        .. || { echo "[ERROR] cmake failed for backend 950"; exit 1; }
+    make install -j$(nproc) || { echo "[ERROR] make install failed for backend 950"; exit 1; }
+    # Copy shared libraries from install/shmem/lib/ to wheel backend directory
+    mkdir -p ../install/shmem/backends/950
+    cp ../install/shmem/lib/*.so ../install/shmem/backends/950/ || { echo "[ERROR] Failed to copy 950 backend libraries"; exit 1; }
+    cd -
+    echo "===== Backend 950 built ====="
+
+    # ============================================================
+    # Package wheel (skip cmake in setup.py via _SHMEM_PREBUILT)
+    # ============================================================
+    echo "===== [3/3] Packaging wheel ====="
+
+    # Assert backends exist before packaging
+    if [ ! -d "${PROJECT_ROOT}/install/shmem/backends/910" ]; then
+        echo "[ERROR] Backend 910 directory not found: ${PROJECT_ROOT}/install/shmem/backends/910"
+        exit 1
+    fi
+    if [ ! -d "${PROJECT_ROOT}/install/shmem/backends/950" ]; then
+        echo "[ERROR] Backend 950 directory not found: ${PROJECT_ROOT}/install/shmem/backends/950"
+        exit 1
+    fi
+
+    export _SHMEM_PREBUILT=1
+    trap 'unset _SHMEM_PREBUILT' EXIT
+    python3 setup.py bdist_wheel --plat-name "$plat" --python-tag "$py_ver"
+    trap - EXIT
+    unset _SHMEM_PREBUILT
+    echo "===== Wheel built ====="
 }
 
 function make_package()
@@ -300,7 +391,7 @@ function fn_gen_doc()
     sphinx-build -M html $PROJECT_ROOT/docs $sphinx_out_dir
 }
 
-set -e
+set -euo pipefail
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -uttests)

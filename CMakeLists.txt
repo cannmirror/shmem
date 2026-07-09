@@ -129,6 +129,13 @@ endif()
 
 message(STATUS "SOC_TYPE:${SOC_TYPE}")
 
+if(SOC_TYPE STREQUAL "Ascend950")
+    set(SHMEM_BACKEND_NAME "950")
+else()
+    set(SHMEM_BACKEND_NAME "910")
+endif()
+message(STATUS "SHMEM_BACKEND_NAME:${SHMEM_BACKEND_NAME}")
+
 if(IS_NEW_VERSION)
     set(CCE_AICORE_ARCH "")
     set(CCE_AICORE_ARCH_VEC "")

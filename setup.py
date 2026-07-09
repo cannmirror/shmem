@@ -16,7 +16,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_packages
 from setuptools.dist import Distribution
 from setuptools.command.build_py import build_py
 
@@ -27,6 +27,10 @@ current_version = os.getenv('VERSION', '1.0.0')
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
+
+    @property
+    def is_pure(self):
+        return False
 
 # ========================
 # Custom build_py: Integrate the C++ build process
@@ -40,8 +44,13 @@ class BuildCppLibs(build_py):
         super().run()
 
     def _build_cpp(self):
+        # Skip cmake build when backends are pre-built (multi-SOC mode)
+        if os.getenv("_SHMEM_PREBUILT", "") == "1":
+            print("_SHMEM_PREBUILT=1, skipping cmake build (using pre-built backends)")
+            return
+
         build_dir = Path("build")
-        install_dir = Path("install/shmem")
+        install_dir = Path("install")
 
         build_dir.mkdir(exist_ok=True)
 
@@ -76,23 +85,71 @@ class BuildCppLibs(build_py):
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"C++ build failed: {e}")
 
-        if not (install_dir / "lib").exists():
-            raise RuntimeError("C++ build succeeded but 'install/shmem/lib' not found!")
+        # CMake installs shared libraries to install/shmem/lib/.
+        # Copy them into the backend-specific directory expected by the
+        # package layout (install/shmem/backends/<name>/), matching the
+        # backend name convention from CMake.
+        if soc_type in ("", "Ascend910B"):
+            backend_name = "910"
+        elif soc_type == "Ascend950":
+            backend_name = "950"
+        else:
+            backend_name = "910"
+
+        backend_dir = Path("install/shmem/backends") / backend_name
+        backend_dir.mkdir(parents=True, exist_ok=True)
+
+        lib_dir = Path("install/shmem/lib")
+        if not lib_dir.exists():
+            raise RuntimeError("C++ build succeeded but 'install/shmem/lib' directory not found!")
+        for so_file in lib_dir.glob("*.so"):
+            shutil.copy(so_file, backend_dir)
+        print(f"Copied {backend_name} backend libraries from install/shmem/lib/ to {backend_dir}")
+
+        if not backend_dir.exists():
+            raise RuntimeError(
+                f"C++ build succeeded but backend directory not found: {backend_dir}"
+            )
 
     def _copy_libraries_to_package(self):
-        install_lib = Path("install/shmem") / "lib"
+        install_backends = Path("install/shmem") / "backends"
         package_src_dir = Path("src/python") / "shmem"
 
-        if not install_lib.exists():
-            print("Warning: install/shmem/lib not found, skipping copy")
+        if not install_backends.exists():
+            print("Warning: install/shmem/backends not found, skipping so copy")
             return
 
         package_src_dir.mkdir(parents=True, exist_ok=True)
 
-        for so_file in install_lib.glob("*.so"):
-            dst = package_src_dir / so_file.name
-            shutil.copy(so_file, dst)
-            print(f"Copied {so_file} -> {dst}")
+        dst_backends = package_src_dir / "backends"
+        if dst_backends.exists():
+            shutil.rmtree(dst_backends)
+        shutil.copytree(install_backends, dst_backends)
+        print(f"Copied backends from {install_backends} -> {dst_backends}")
+
+        for backend_dir in sorted(install_backends.iterdir()):
+            if backend_dir.is_dir():
+                so_list = list(backend_dir.glob("*.so"))
+                print(f"  Backend {backend_dir.name}: {len(so_list)} .so files")
+
+        src_include = Path("include")
+        dst_include = package_src_dir / "include"
+        if dst_include.exists():
+            shutil.rmtree(dst_include)
+        shutil.copytree(src_include, dst_include)
+        print(f"Copied {src_include} -> {dst_include}")
+
+        dst_src = package_src_dir / "src"
+        if dst_src.exists():
+            shutil.rmtree(dst_src)
+        dst_src.mkdir(parents=True, exist_ok=True)
+        # Only src/device is required (public headers cross-reference shmemi_device_cc.h
+        # and its transitive closure). src/device_simt and src/host_device are not
+        # referenced by any public header and are excluded from the wheel.
+        src_device = Path("src") / "device"
+        if src_device.exists() and src_device.is_dir():
+            shutil.copytree(src_device, dst_src / "device")
+        print(f"Copied src/device -> {dst_src}")
 
         version_file = Path("install") / "VERSION"
         if version_file.exists():
@@ -100,12 +157,12 @@ class BuildCppLibs(build_py):
 
 
 setup(
-    name="shmem",
+    name="cann-shmem",
     version=current_version,
     author="",
     author_email="",
-    description="python api for shmem",
-    packages=find_namespace_packages(where="src/python", exclude=("tests*",)),
+    description="CANN SHMEM - shared memory communication library for Ascend NPU",
+    packages=find_packages(where="src/python", exclude=("tests*",)),
     package_dir={"": "src/python"},
     license="Apache License Version 2.0",
     install_requires=["torch-npu"],
@@ -113,8 +170,17 @@ setup(
     package_data={
         "shmem": [
             "*.so",
-            "VERSION"
+            "VERSION",
+            "include/**/*.h",
+            "src/**/*.h",
+            "src/**/*.hpp",
+            "backends/**/*.so",
         ]
+    },
+    entry_points={
+        "console_scripts": [
+            "shmem-config=shmem.shmem_config:main",
+        ],
     },
     distclass=BinaryDistribution,
     cmdclass={"build_py": BuildCppLibs},

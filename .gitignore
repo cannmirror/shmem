@@ -63,6 +63,10 @@ ci/
 dist/
 package/
 src/python/shmem.egg-info/
+src/python/cann_shmem.egg-info/
 src/python/shmem/VERSION
+src/python/shmem/include/
+src/python/shmem/src/
+src/python/shmem/backends/
 
 .arts/

@@ -178,7 +178,7 @@ add_library(aclshmem_bootstrap_config_store SHARED)
 
 file(GLOB_RECURSE CONFIG_STORE_FILES ${PROJECT_SOURCE_DIR}/src/host/bootstrap/config_store/*.cpp)
 
-target_sources(aclshmem_bootstrap_config_store PRIVATE 
+target_sources(aclshmem_bootstrap_config_store PRIVATE
         ${CONFIG_STORE_FILES}
         host/bootstrap/shmemi_bootstrap_config_store.cpp
 )
@@ -198,7 +198,6 @@ set_target_properties(aclshmem_bootstrap_config_store PROPERTIES PREFIX "")
 target_link_libraries(aclshmem_bootstrap_config_store PRIVATE shmem_utils)
 install(TARGETS aclshmem_bootstrap_config_store
         LIBRARY DESTINATION lib)
-
 
 # 安装配置
 install(TARGETS shmem

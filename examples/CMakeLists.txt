@@ -102,7 +102,7 @@ endfunction()
 
 function(aclshmem_add_collective_example NAME)
     add_library(${NAME}_kernel SHARED ${NAME}_kernel.cpp)
-    target_compile_options(${NAME}_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH_VEC} ${SANITIZER_FLAGS})
+    target_compile_options(${NAME}_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
     target_include_directories(${NAME}_kernel PRIVATE
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/3rdparty/catlass/include
@@ -115,7 +115,7 @@ function(aclshmem_add_collective_example NAME)
         ${PROJECT_SOURCE_DIR}/src/
         $ENV{ASCEND_HOME_PATH}/tools/mssanitizer/include
     )
-    target_link_options(${NAME}_kernel PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH_VEC} ${SANITIZER_FLAGS})
+    target_link_options(${NAME}_kernel PRIVATE --cce-fatobj-link ${CCE_AICORE_ARCH} ${SANITIZER_FLAGS})
     find_library(UNIFIED_DLOG_LIB NAMES unified_dlog PATHS $ENV{ASCEND_HOME_PATH}/lib64)
     if(UNIFIED_DLOG_LIB)
         target_link_libraries(${NAME}_kernel PRIVATE unified_dlog)

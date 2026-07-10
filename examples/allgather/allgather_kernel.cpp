@@ -262,6 +262,7 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t fftsAddr, __gm__ T *input, _
 
     // Sync Ensure Corresponding Tasks Done.
     aclshmem_quiet();
+    AscendC::SyncAll();
 
     aclshmemx_signal_op(gva_sync_gm + flag_offset, magic, ACLSHMEM_SIGNAL_SET, my_rank);
     aclshmem_signal_wait_until((__gm__ int32_t *)aclshmem_ptr(gva_sync_gm, x) + flag_offset, ACLSHMEM_CMP_EQ, magic);
@@ -291,7 +292,6 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t fftsAddr, __gm__ T *input, _
     }
 
 #define TYPE_FUNC(fun) \
-    fun(int);          \
     fun(int32_t);      \
     fun(float16_t);    \
     fun(bfloat16_t)
@@ -302,9 +302,7 @@ template <class T>
 void allgather_demo(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input, uint8_t *output, uint8_t *gva,
                     int elements, int magic)
 {
-    if (std::is_same<T, int>::value) {
-        ShmemAllGather_int<<<block_dim, nullptr, stream>>>(fftsAddr, input, output, gva, elements, magic);
-    } else if (std::is_same<T, int32_t>::value) {
+    if (std::is_same<T, int32_t>::value) {
         ShmemAllGather_int32_t<<<block_dim, nullptr, stream>>>(fftsAddr, input, output, gva, elements, magic);
     } else if (std::is_same<T, fp16_t>::value) {
         ShmemAllGather_float16_t<<<block_dim, nullptr, stream>>>(fftsAddr, input, output, gva, elements, magic);
@@ -313,8 +311,8 @@ void allgather_demo(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t
     }
 }
 
-template void allgather_demo<int>(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input, uint8_t *output,
-                                  uint8_t *gva, int elements, int magic);
+template void allgather_demo<int32_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input, uint8_t *output,
+                                      uint8_t *gva, int elements, int magic);
 template void allgather_demo<fp16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input,
                                      uint8_t *output, uint8_t *gva, int elements, int magic);
 template void allgather_demo<bf16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, uint8_t *input,
@@ -330,8 +328,8 @@ void aclshmem_allgather(uint32_t block_dim, void *stream, uint64_t fftsAddr, voi
                     elements, magic);
 }
 
-template void aclshmem_allgather<int>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input, void *output,
-                                  void *gva, int elements, int magic);
+template void aclshmem_allgather<int32_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input, void *output,
+                                          void *gva, int elements, int magic);
 template void aclshmem_allgather<fp16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input,
                                      void *output, void *gva, int elements, int magic);
 template void aclshmem_allgather<bf16_t>(uint32_t block_dim, void *stream, uint64_t fftsAddr, void *input,

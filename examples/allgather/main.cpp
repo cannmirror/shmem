@@ -40,7 +40,7 @@ int g_npus = 8;
 const char *ipport = "tcp://127.0.0.1:8998";
 int f_pe = 0;
 int f_npu = 0;
-const char *data_type = "int";
+const char *data_type = "int32_t";
 int perf_times = 50;
 
 constexpr int64_t SYNC_FLAG_INTERVAL = 16;
@@ -189,9 +189,7 @@ int main(int argc, char *argv[])
     test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
 
-    if (std::string(data_type) == "int") {
-        status = test_aclshmem_all_gather<int>(pe_id, n_pes);
-    } else if (std::string(data_type) == "int32_t") {
+    if (std::string(data_type) == "int32_t") {
         status = test_aclshmem_all_gather<int32_t>(pe_id, n_pes);
     } else if (std::string(data_type) == "float16_t") {
         status = test_aclshmem_all_gather<fp16_t>(pe_id, n_pes);

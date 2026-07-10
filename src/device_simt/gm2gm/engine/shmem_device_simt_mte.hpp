@@ -10,9 +10,7 @@
 #ifndef SHMEM_DEVICE_SIMT_GM2GM_MTE_HPP
 #define SHMEM_DEVICE_SIMT_GM2GM_MTE_HPP
 
-#include "kernel_operator.h"
 #include "device/shmem_def.h"
-#include "ub2gm/mte/shmemi_device_mte.h"
 #include "shmemi_device_simt_common.h"
 #include "utils/shmemi_simt_kernel_debug.h"
 

@@ -12,16 +12,11 @@
 #ifndef SHMEM_DEVICE_SIMT_GM2GM_RMA_H
 #define SHMEM_DEVICE_SIMT_GM2GM_RMA_H
 
-#include "kernel_operator.h"
 #include "device_simt/gm2gm/engine/shmem_device_simt_mte.h"
-#include "device/gm2gm/engine/shmem_device_rdma.h"
-#include "device/gm2gm/shmem_device_mo.h"
-#include "host/shmem_host_def.h"
 #include "device/shmem_def.h"
 
 namespace simt
 {
-
 
 /**
  * @brief Standard RMA Types and Names
@@ -344,8 +339,6 @@ __simt_callee__ inline void aclshmemx_putmem_nbi_warp(__gm__ void *dst, __gm__ v
  *
  * @par Function Description
  * Asynchronous interface. Copy contiguous data on symmetric memory from the specified PE to address on the local PE.
- *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations to the
- *                 same PE are not supported. 
  *
  * @par Parameters
  * - **dst**         - [in] Pointer on local device of the destination data.

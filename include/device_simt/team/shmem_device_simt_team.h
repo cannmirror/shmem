@@ -12,7 +12,6 @@
 #ifndef SHMEM_DEVICE_SIMT_TEAM_H
 #define SHMEM_DEVICE_SIMT_TEAM_H
 
-#include "host_device/shmem_common_types.h"
 #include "team/shmem_device_simt_team.hpp"
 
 namespace simt

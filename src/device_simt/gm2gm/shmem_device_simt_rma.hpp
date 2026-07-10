@@ -10,13 +10,7 @@
 #ifndef SHMEM_DEVICE_SIMT_GM2GM_RMA_HPP
 #define SHMEM_DEVICE_SIMT_GM2GM_RMA_HPP
 
-#include "kernel_operator.h"
-#include "device/gm2gm/engine/shmem_device_rdma.h"
-#include "device/gm2gm/engine/shmem_device_sdma.h"
 #include "device/shmem_def.h"
-#include "gm2gm/engine/shmemi_device_rdma.h"
-#include "host/shmem_host_def.h"
-#include "host_device/shmem_common_macros.h"
 #include "simt_api/device_functions.h"
 #include "simt_api/asc_fp16.h"
 #include "simt_api/asc_bf16.h"

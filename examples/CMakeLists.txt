@@ -178,6 +178,7 @@ foreach(
     EXAMPLE
     simt_rma
     simt_rma_scalar
+    simt_rma_ub2gm
 )
     add_subdirectory(${EXAMPLE})
 endforeach()

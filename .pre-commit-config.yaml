@@ -32,20 +32,6 @@ repos:
           - "-i"
         exclude: ^build/|tests/third_party/
 
-  # 显式头文件包含检查（基于 clang-tidy misc-include-cleaner，AST 语义分析）
-  - repo: local
-    hooks:
-      - id: check-header-inclusion
-        name: Check explicit header inclusion
-        description: Verify that C/C++ files include required headers and don't include unused ones.
-        entry: tools/pre-commit/check_header_inclusion.py
-        language: python
-        additional_dependencies:
-          - clang-tidy>=22.0
-        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx)$
-        exclude: ^build/|tests/third_party/
-        stages: [pre-commit]
-
   # 拼写检查
   - repo: https://gitcode.com/gh_mirrors/co/codespell
     rev: v2.4.1

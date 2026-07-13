@@ -12,8 +12,10 @@
 #ifndef SHMEM_DEVICE_UDMA_H
 #define SHMEM_DEVICE_UDMA_H
 
+#include <stdint.h>
+
 #include "kernel_operator.h"
-#include "device/shmem_def.h"
+#include "host_device/shmem_common_types.h"
 
 /**
  * @brief Asynchronous interface. Copy contiguous data on symmetric memory from the specified
@@ -79,6 +81,15 @@ ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(
  * @tparam WQE_PIPE           Pipe used to publish the WQE to the SQ ring. See the get_nbi
  *                            overload for semantics.
  *
+ * @note A single UDMA put request transfers at most 256 MB
+ *       (256 * 1024 * 1024 bytes). @p elem_size is the number of T
+ *       elements, so the transfer size is @p elem_size * sizeof(T) bytes.
+ *       Split larger transfers into multiple put requests whose byte size
+ *       does not exceed 256 MB. After submitting one or more asynchronous
+ *       requests, call the matching completion/synchronization interface,
+ *       such as @ref aclshmemx_udma_quiet, before reading the destination
+ *       data or reusing buffers whose contents must remain stable.
+ *
  * @param dst                 [in] Pointer on Symmetric memory of the destination data.
  * @param src                 [in] Pointer on local device of the source data.
  * @param buf                 [in] Pointer on local UB. WQE staging scratch when
@@ -102,6 +113,15 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
  * @tparam T                  Element type of the transfer.
  * @tparam WQE_PIPE           Pipe used to publish the WQE to the SQ ring. See the get_nbi
  *                            overload for semantics.
+ *
+ * @note A single UDMA put request transfers at most 256 MB
+ *       (256 * 1024 * 1024 bytes). @p elem_size is the number of T
+ *       elements, so the transfer size is @p elem_size * sizeof(T) bytes.
+ *       Split larger transfers into multiple put requests whose byte size
+ *       does not exceed 256 MB. After submitting one or more asynchronous
+ *       requests, call the matching completion/synchronization interface,
+ *       such as @ref aclshmemx_udma_quiet, before reading the destination
+ *       data or reusing buffers whose contents must remain stable.
  *
  * @param dst                 [in] GlobalTensor on Symmetric memory of the destination data.
  * @param src                 [in] GlobalTensor on local device of the source data.
@@ -132,6 +152,16 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
  *
  * @tparam T                  Element type of the transfer.
  *
+ * @note A single UDMA put request transfers at most 256 MB
+ *       (256 * 1024 * 1024 bytes). @p elem_size is the number of T
+ *       elements, so the transfer size is @p elem_size * sizeof(T) bytes.
+ *       Split larger transfers into multiple put requests whose byte size
+ *       does not exceed 256 MB. After submitting one or more asynchronous
+ *       requests, call the matching completion/synchronization interface,
+ *       such as @ref aclshmemx_udma_quiet or the corresponding signal wait
+ *       protocol, before reading the destination data or reusing buffers
+ *       whose contents must remain stable.
+ *
  * @param dst                 [in] Pointer on Symmetric memory of the destination data.
  * @param src                 [in] Pointer on local device of the source data.
  * @param elem_size           [in] Number of elements in the dest and source arrays.
@@ -154,6 +184,16 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
  *
  * @tparam T                  Element type of the transfer.
  * @tparam WQE_PIPE           PIPE_MTE3 (default) or PIPE_S; other pipes are not supported.
+ *
+ * @note A single UDMA put request transfers at most 256 MB
+ *       (256 * 1024 * 1024 bytes). @p elem_size is the number of T
+ *       elements, so the transfer size is @p elem_size * sizeof(T) bytes.
+ *       Split larger transfers into multiple put requests whose byte size
+ *       does not exceed 256 MB. After submitting one or more asynchronous
+ *       requests, call the matching completion/synchronization interface,
+ *       such as @ref aclshmemx_udma_quiet or the corresponding signal wait
+ *       protocol, before reading the destination data or reusing buffers
+ *       whose contents must remain stable.
  *
  * @param dst                 [in] Pointer on Symmetric memory of the destination data.
  * @param src                 [in] Pointer on local device of the source data.
@@ -225,7 +265,6 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_add(__gm__ T* dst, T value, int32_
 template <typename T>
 ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T* dst, T cond, T value, int32_t pe);
 
-
 /**
  * @brief Synchronous interface. Fetch the contents of dst (remote symmetric address) on the specified PE pe
  * and return the contents. Supported types: int32, uint32, int64, uint64.
@@ -237,7 +276,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T* dst, T cond, T va
  * @return                  Return the contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T *dst, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T* dst, int32_t pe);
 
 /**
  * @brief Synchronous interface. Set value to dst (remote symmetric address) on the specified PE pe
@@ -250,7 +289,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T *dst, int32_t pe);
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Swap value to dst (remote symmetric address) on the specified PE pe
@@ -264,7 +303,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t p
  * @return                  Return the previous contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
@@ -277,7 +316,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe)
  * @return                  Return the previous contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T *dst, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T* dst, int32_t pe);
 
 /**
  * @brief Synchronous interface. Increment dst (remote symmetric address) on the specified PE pe by one
@@ -289,7 +328,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T *dst, int32_t pe);
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T *dst, int32_t pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T* dst, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
@@ -304,7 +343,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T *dst, int32_t pe);
  * @return                  Return the previous contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise AND operation on dst (remote symmetric address) on the
@@ -318,7 +357,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
@@ -333,7 +372,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t p
  * @return                  Return the previous contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise OR operation on dst (remote symmetric address) on the
@@ -347,7 +386,7 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
@@ -362,7 +401,7 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe
  * @return                  Return the previous contents of dst.
  */
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T* dst, T value, int32_t pe);
 
 /**
  * @brief Synchronous interface. Perform a bitwise XOR operation on dst (remote symmetric address) on the
@@ -376,8 +415,8 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_
  * @param pe                [in] PE number of the remote PE.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T *dst, T value, int32_t pe);
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T* dst, T value, int32_t pe);
 
-#include "gm2gm/engine/shmem_device_udma.hpp"
+#include "gm2gm/engine/shmem_device_udma.hpp" // IWYU pragma: keep
 
 #endif

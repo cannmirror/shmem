@@ -10,7 +10,7 @@ for i in {0..7}; do hccn_tool -i $i -net_health -g; done
 ```
 注意：7需要根据实际要查看的卡数修改。
 
-可用环境命令输出如下：  
+可用环境命令输出如下：
 ![](../../docs/images/rdma_env.png)
 
 #### Ascend950平台
@@ -41,7 +41,7 @@ Ascend950 平台运行前需设置 `IBV_EXTEND_DRIVERS` 环境变量，指向对
   ```bash
   export IBV_EXTEND_DRIVERS=<path_to_libhrn5-rdmav34.so>
   ```
-  > 注：\<path_to_libxscale_nda.so\>是libxscale_nda.so的路径，\<path_to_libhrn5-rdmav34.so\>是libhrn5-rdmav34.so的路径。
+  > 注：`libxscale_nda.so` 和 `libhrn5-rdmav34.so` 均为对应网卡的用户态 RDMA Verbs 提供者（provider）库，**由各自的网卡驱动安装包提供，并非 SHMEM 项目编译产物**。`libxscale_nda.so` 随云脉网卡驱动安装，`libhrn5-rdmav34.so` 随 1825 网卡驱动安装。安装网卡驱动后，可通过 `find / -name "libhrn5-rdmav34.so"` 或 `find / -name "libxscale_nda.so"` 查找库的实际路径，将该路径设置为 `IBV_EXTEND_DRIVERS` 的值。`IBV_EXTEND_DRIVERS` 是 libibverbs 的环境变量，用于加载不在默认搜索路径下的 Verbs provider 插件库。
 
 ## 使用方式
 ### 编译

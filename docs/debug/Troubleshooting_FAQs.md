@@ -15,7 +15,7 @@
 
 ![算子精度报错](./images/trouble-shooting/shmem_alloc-asymmetric-alloc-no-error.png)
 
-错误示例代码: 
+错误示例代码:
 
 以`example`目录下的`sdma`为例，以下为非对称共享内存分配的简单示例场景：
 
@@ -74,9 +74,9 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 
 ![图片](./images/trouble-shooting/local_mem_size_asymmetric_alloc.png)
 
-注意: 
+注意:
 1. 日志中显示的实际分配大小和local_mem_size大小有`6MB`的差异为shmem框架内部使用空间
-2. 此处`local_mem_size`大小为`2MB`对齐，若尝试分配其他大小如`1025 * 1024 * 1024`可能会出现不同的错误信息: 
+2. 此处`local_mem_size`大小为`2MB`对齐，若尝试分配其他大小如`1025 * 1024 * 1024`可能会出现不同的错误信息:
 
 ![图片](./images/trouble-shooting/local_mem_size_asymmetric_alloc_not_2mb.png)
 
@@ -85,15 +85,15 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 ## IP/PORT配置相关问题
 ### 绑定端口被占用
 #### Q: 尝试使用的ip/port已被占用，错误日志如图:
-1. 端口被占用错误日志: 
+1. 端口被占用错误日志:
 
 ![端口被占用](./images/trouble-shooting/port-being-used.PNG)
 
-2. ip不可用错误日志1: 
+2. ip不可用错误日志1:
 
 ![ip不可用1](./images/trouble-shooting/ip-unaccessible.PNG)
 
-3. ip不可用错误日志2: 
+3. ip不可用错误日志2:
 
 ![ip不可用2](./images/trouble-shooting/ip-unaccessible2.PNG)
 
@@ -116,18 +116,18 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 2. **单实例多次初始化场景**：确保每次初始化时使用不同的可用端口，或确保上一次初始化已完成 `finalize` 释放端口后再进行下一次初始化。
 
 ### 未通过环境变量配置ip/port，且使用自动搜索可用网口时失败
-#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时自动搜索可用网口（IPv4/IPv6均可，排除lo/docker/veth/br-/virbr/tun/tap等虚拟接口），查询失败时错误日志如下: 
+#### Q: `SHMEM_UID_SESSION_ID`和`SHMEM_UID_SOCK_IFNAME`均未配置时自动搜索可用网口（IPv4/IPv6均可，排除lo/docker/veth/br-/virbr/tun/tap等虚拟接口），查询失败时错误日志如下:
 
 ![session_id_sock_ifnam_not_set](./images/trouble-shooting/session_id_sock_ifnam_not_set.png)
 
 #### A: 应手动配置可用的`SHMEM_UID_SESSION_ID`或`SHMEM_UID_SOCK_IFNAME`
 配置示例:
-- SHMEM_UID_SESSION_ID: 
+- SHMEM_UID_SESSION_ID:
 
     `SHMEM_UID_SESSION_ID=127.0.0.1:1234`
 
     `SHMEM_UID_SESSION_ID=localhost:8888`
-- SHMEM_UID_SOCK_IFNAME: 
+- SHMEM_UID_SOCK_IFNAME:
 
     `SHMEM_UID_SOCK_IFNAME=[6666:6666:6666:6666:6666:6666:6666:6666]:886`
 
@@ -159,17 +159,37 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 
    例如，若需要 NPU 6 和 NPU 7 之间通信，二者共用 `hrn5_2` 端口，需在交换机对应的 `hrn5_2` 端口上开启端口桥。
 
-   - 通过 `ibv_devinfo` 或 `hiroce3 gids` 查看网络设备（`net_dev` 列）：
+   - 通过 `ibv_devinfo` 或 `hiroce5 gids` 查看网络设备（`net_dev` 列）：
+
+     ```bash
+     ibv_devinfo
+     # 或
+     hiroce5 gids
+     ```
 
      ![](../images/net_dev-query.png)
 
    - 通过 `ifconfig <net_dev>` 或 `ip link show <net_dev>` 查看对应接口的 MAC 地址：
 
+     ```bash
+     ifconfig <net_dev>
+     # 或
+     ip link show <net_dev>
+     ```
+
      ![](../images/mac-address-query.png)
 
    - 根据该 MAC 地址，在交换机上查询对应端口号：
 
+     ```
+     display mac-address | include <mac-address>
+     ```
+
      ![](../images/port-number-query.png)
+
+   > 注：上述命令中的 `<net_dev>` 需替换为上一步查询到的实际网络设备名（如 `enp3s0`），`<mac-address>` 需替换为上一步查询到的实际 MAC 地址（格式如 `aabb-ccdd-eeff`）。
+   >
+   > 注：若需查询 NPU 6、7（共用 `hrn5_2`，需端口桥）或 NPU 5、6（跨 `hrn5_3` 与 `hrn5_2`，无需端口桥）对应的交换机端口，需先在这两组 NPU 之间各进行一次 RDMA 通信（例如运行 `rdma_demo`），使交换机学到对应的 MAC 表项，否则 `display mac-address` 可能查不到对应记录。
 
 2. 登录交换机，进入系统视图：`system-view`
 3. 进入对应接口（以 100GE1/0/1 为例，按实际替换）：

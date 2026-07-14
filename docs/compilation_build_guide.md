@@ -129,13 +129,14 @@ bash scripts/run.sh
 ```sh
 -ranks          # 总rank数
 -frank          # 该服务器第一个rank
--ipport         # ip端口
+-ipport         # host:port（脚本自动拼接 tcp://）
 -fnpu           # 每个服务器起的第一个npu
 -gnpus          # 单机使用的卡数
 -test_filter    # gtest_filter
 
 # 例如
 bash scripts/run.sh -ranks 4 -fnpu 2 -gnpus 4 -test_filter ScalarP # 会在2-6卡
+bash scripts/run.sh -ranks 8 -ipport 127.0.0.1:8666 -test_filter Init
 
 ```
 ### install.sh

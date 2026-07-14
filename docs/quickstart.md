@@ -206,7 +206,8 @@ bash run.sh -pes 2 -type int
 
 ```sh
 # 8卡，ip:port 127.0.0.1:8666，运行所有*Init*用例
-bash scripts/run.sh -ranks 8 -ipport tcp://127.0.0.1:8666 -test_filter Init
+# 注意：-ipport 只传 host:port，脚本会自动拼接 tcp:// 前缀
+bash scripts/run.sh -ranks 8 -ipport 127.0.0.1:8666 -test_filter Init
 ```
 
 ### 5.3 debug 模式使用

@@ -30,6 +30,8 @@ dsl_version: "0.3"
 meta:
   op_name: "replace_me"
   op_kind: "transport"             # transport | collective | compute | fused_compute_comm
+  build_mode: "independent_project"   # independent_project（默认）| in_tree_example（须 Phase 0 用户明确要求）
+  op_root: "custom-ops/replace_me"   # custom-ops/<op_name>/（默认）| examples/<op_name>/
   target_soc: ["ascend910b"]
   scope: "intra_node"             # intra_node | inter_node | both
   torch_required: false           # Phase 0 用户确认；true 才执行 Phase 5.5
@@ -136,10 +138,10 @@ correctness:
   #   category: "functional"
 
 performance:
-  metric: ["e2e_latency_us", "kernel_latency_us", "steady_bus_bandwidth_GBps", "algo_bandwidth_GBps", "bus_bandwidth_GBps"]
+  metric: ["e2e_latency_us", "kernel_latency_us", "algo_bandwidth_GBps", "e2e_bus_bandwidth_GBps", "kernel_bus_bandwidth_GBps"]
   baseline: "replace_me"
   baseline_search: "replace_me"       # 已检查哪些 HCCL/aclnn 方案，为何不适用（无 baseline 时必填）
-  baseline_target: "replace_me"       # 四算子: platform-perf-spec；其他有 baseline: "current >= 80% baseline"；无 baseline: metric_only
+  baseline_target: "replace_me"       # 四算子: 有 baseline: "current >= 80% baseline"；无 baseline: metric_only
   target_cases: []
   min_scale: "replace_me"             # 集合通信 >= 256MB；计算/通算融合 hidden size >= 1000
   profiling_method: "replace_me"
@@ -178,7 +180,13 @@ performance:
 | tile/chunk/tail 是否支持并发且不靠单核兜底 | [pass/fail] | [说明] |
 | route/offset/prefix 计算是否避免明显 O(N²) 扫描 | [pass/fail] | [说明] |
 | 是否避免多余 GM scratch 写读，或说明无法避免原因 | [pass/fail] | [说明] |
+| 对于 reduce-scatter / allreduce RS 等多 source→同 destination 场景，累加路径是否使用 `SetAtomicAdd<T>()`（MTE 批量）而非串行 UB 累加（必须符合 `atomic-add-pattern.md §12` 优先级1；仅 MTE 不可用时允许降级为 SDMA fallback） | [pass/fail] | [说明] |
 | 高性能传输路径、并发分核或 overlap 是否属于本轮实现范围 | [pass/fail] | [说明] |
+| Capability Mapping compute 行是否引用了 `atomic-add-pattern.md` 评估累加方式（非仅列出 AscendC Add） | [pass/fail] | [说明] |
+| **拓扑与并发匹配**：设计的并发模型是否能发挥目标拓扑的全部链路并行度？（如 full-mesh 8 卡有 7 条独立 HCCS 链路，设计中是否让多链路**同时**活跃而非串行遍历 peer？） | [pass/fail] | [给出同时活跃链路数 vs 拓扑总链路数] |
+| **链路带宽利用**：每个通信 phase 中，单 PE 同时活跃链路数 × 单链路带宽是否接近拓扑理论聚合带宽？（差距 >50% 须解释原因） | [pass/fail] | [给出估算数据和推导] |
+| **分核与通信并行度**：AIV 分组是否支撑了并发目标？是否存在"分核了但 peer 维度仍是串行"的假并发？ | [pass/fail] | [说明每个 group 内 AIV 的通信是否真并行] |
+| **性能瓶颈预判**：根据上述分析，标注设计预期的性能瓶颈位置（链路串行 / peer 串行 / 分核不足 / 同步开销 / UB 容量等） | [pass/fail] | [列出瓶颈类型和位置] |
 
 ## 6. Compile/Test Contract
 
@@ -218,6 +226,6 @@ Oracle、tolerance、case matrix（含 stress/边界 case）已在 DSL `correctn
 - [ ] DSL `schedule` 的 core_partition、tiling、phases 可实现。
 - [ ] DSL `correctness.invariants` 每项有 test_method 和 case；`case_matrix` 含 stress/边界 case。
 - [ ] DSL `performance` 的 baseline_search、baseline_target、min_scale 已填写。
-- [ ] Design review（Section 5）已完成，未留下明显单核交付、O(N²) offset、多余 scratch 流量或无理由全局 barrier。
+- [ ] Design review（Section 5）**12 项**全部填写，无 FAIL；拓扑/带宽/分核专项检查已给出量化数据（同时活跃链路数、带宽估算、瓶颈位置）。
 - [ ] 实现边界清楚：`main.cpp` 只做单 PE 编排，复杂 Host 逻辑已归入独立 `.cpp/.h`，golden/checker 归入 Python。
 - [ ] compile/test contract 可执行，test contract 写明 Python 环境或依赖。

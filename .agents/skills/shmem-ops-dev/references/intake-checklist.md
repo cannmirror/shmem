@@ -75,7 +75,7 @@ CANN 题 **仅两个固定选项** + 依赖 Other：
 
 **AskQuestion 题干 MUST 写明**：
 
-> 若 CANN 不在上述两项，请选择 **Other**，并在输入框粘贴 `set_env.sh` 的**完整绝对路径**。  
+> 若 CANN 不在上述两项，请选择 **Other**，并在输入框粘贴 `set_env.sh` 的**完整绝对路径**。
 > 样例：`/home/<用户名>/CANN/8.5.0/ascend-toolkit/set_env.sh`
 
 Agent 收到 Other 内容后 **MUST** 校验为非空且路径存在（CANN set_env.sh），写入 `cann_set_env`，`cann_source_mode: user_custom`。
@@ -124,9 +124,9 @@ phase0_intake:
   docker_exec_required: true | false    # docker_container 非空时为 true
 ```
 
-**`torch_required: true`** → 编排器 **MUST 自动** Phase 5.5（全部算子 `torch_test_*.py` 8PE），不得等用户说「继续」。  
-**`performance_required: true`** → Phase 6 **MUST** 输出平台带宽表+时延表（[platform-perf-spec.md](../../shmem-ops-performance-eval/references/platform-perf-spec.md)）。  
-**`performance_auto_optim: true`**（且 `performance_required: true`）→ Phase 6 未达标后 **MUST 立即** 进入 Phase 6.5，**禁止**等用户说「继续」。  
+**`torch_required: true`** → 编排器 **MUST 自动** Phase 5.5（全部算子 `torch_test_*.py` 8PE），不得等用户说「继续」。
+**`performance_required: true`** → Phase 6 **MUST** 输出带宽表+时延表。
+**`performance_auto_optim: true`**（且 `performance_required: true`）→ Phase 6 未达标后 **MUST 立即** 进入 Phase 6.5，**禁止**等用户说「继续」。
 **`performance_auto_optim: false`** → Phase 6 未达标仅报告差距，**禁止**擅自改 kernel 进入 Phase 6.5。
 
 **`docker_container` 非空** → 全部 build/run/perf/Torch **MUST** `docker exec`（[docker-exec-contract.md](docker-exec-contract.md)）。

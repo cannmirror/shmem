@@ -1,8 +1,8 @@
 # 性能采集与对比（命令参考）
 
-> **适用范围**：下列 perf 封装位于 **`custom-ops/scripts/`（skill 生成交付物）**，不是 SHMEM upstream。规范以本节为准；磁盘文件由 Phase 2/6 生成或同步。  
-> **Skill 形态**：Markdown 代码段；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。  
-> **SHMEM 原生**：仅 §0 环境链（`install/set_env.sh` 等）来自 upstream。  
+> **适用范围**：下列 perf 封装位于 **`custom-ops/scripts/`（skill 生成交付物）**，不是 SHMEM upstream。规范以本节为准；磁盘文件由 Phase 2/6 生成或同步。
+> **Skill 形态**：Markdown 代码段；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。
+> **SHMEM 原生**：仅 §0 环境链（`install/set_env.sh` 等）来自 upstream。
 > **Hard Gate**：HCCL baseline 与 SHMEM perf **NEVER** 同 shell / 同 `docker exec` 混跑。
 
 环境见 [custom-ops-entrypoints.md §0](../../shmem-ops-compile-debug/references/custom-ops-entrypoints.md)。
@@ -16,16 +16,17 @@
 ```bash
 OP=<op_name>
 DEVICE_LIST=0,1,2,3,4,5,6,7
-PATTERN=uniform
 BASE_COUNT=8388608
 DTYPE=float16
-ITERS=30
+WARMUP=10
+MEASURE=40
+ITERS=$((WARMUP + MEASURE))  # 50 total
 
 mkdir -p "${SHMEM_REPO}/custom-ops/${OP}/data/perf"
-LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_${PATTERN}_${BASE_COUNT}_${DTYPE}.log"
+LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_${BASE_COUNT}_${DTYPE}.log"
 
 bash "${SHMEM_REPO}/custom-ops/${OP}/baseline/scripts/run_baseline.sh" \
-  "${DEVICE_LIST}" "${PATTERN}" "${BASE_COUNT}" "${DTYPE}" "${ITERS}" \
+  "${DEVICE_LIST}" "${BASE_COUNT}" "${DTYPE}" "${ITERS}" \
   2>&1 | tee "${LOG}"
 ```
 
@@ -38,10 +39,12 @@ OP=<op_name>
 DEVICE_LIST=0,1,2,3,4,5,6,7
 BASE_COUNT=8388608
 DTYPE=float16
-ITERS=30
+WARMUP=10
+MEASURE=40
+ITERS=$((WARMUP + MEASURE))  # 50 total
 
 mkdir -p "${SHMEM_REPO}/custom-ops/${OP}/data/perf"
-LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_uniform_${BASE_COUNT}_${DTYPE}.log"
+LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_${BASE_COUNT}_${DTYPE}.log"
 
 bash "${SHMEM_REPO}/custom-ops/${OP}/scripts/perf.sh" \
   "${DEVICE_LIST}" "${BASE_COUNT}" "${DTYPE}" "${ITERS}" \
@@ -55,8 +58,8 @@ OP=<op_name>
 BASE_COUNT=8388608
 DTYPE=float16
 
-SHMEM_LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_uniform_${BASE_COUNT}_${DTYPE}.log"
-BASE_LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_uniform_${BASE_COUNT}_${DTYPE}.log"
+SHMEM_LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_${BASE_COUNT}_${DTYPE}.log"
+BASE_LOG="${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_${BASE_COUNT}_${DTYPE}.log"
 
 python3 "${SHMEM_REPO}/custom-ops/scripts/lib/perf_compare.py" \
   --shmem-log "${SHMEM_LOG}" --baseline-log "${BASE_LOG}"
@@ -64,25 +67,11 @@ python3 "${SHMEM_REPO}/custom-ops/scripts/lib/perf_compare.py" \
 
 时延算子可用 `custom-ops/scripts/perf_compare_latency.py` 对比 `kernel_us` / `comm_only_us`。
 
----
-
-## 2. 平台区 sweep
-
-**MUST** 在 per-PE payload ≥ 64MB 且相邻点带宽变化 ≤5% 的平台区取 `steady_bus_bandwidth_GBps`。
-
-倍增 `base_count`：对每个 BASE 重复 §1 三阶段（A→B→C），**NEVER** 同 shell 混跑 HCCL 与 SHMEM。
-
-Phase 6.5 优化轮次可单点采集；round 结束再 sweep 确认平台区。
+> **S 档采集**：Round 0 和最终轮需额外采集 S 档。将 `BASE_COUNT` 替换为 S 档规模（按 [testcase-scale-standard.md](../../shmem-ops-testcase-gen/references/testcase-scale-standard.md)），其他流程与 L 档相同。中间优化轮次仅用 L 档。
 
 ---
 
-## 3. 四算子默认参数
-
-见 [platform-perf-spec.md](platform-perf-spec.md)。**8PE 不可用时**用 phase0 确认的 PE 数，并在报告中标注差异。
-
----
-
-## 4. 产物布局
+## 2. 产物布局
 
 ```
 custom-ops/
@@ -96,13 +85,13 @@ custom-ops/
 
 ---
 
-## 5. 达标口径
+## 3. 达标口径
 
-带宽：`SHMEM_steady_bus / HCCL_steady_bus`；时延：`HCCL / SHMEM`（comm_only 或 kernel_us）。  
-**最终目标 MUST 以 [platform-perf-spec.md](platform-perf-spec.md) 按算子为准**（非 perf_compare.py 内置 105% 默认值）。
+带宽：`SHMEM kernel_bus_bandwidth_GBps / HCCL kernel_bus_bandwidth_GBps`；时延：`HCCL / SHMEM`（comm_only 或 kernel_us）。
+达标线与判定规则见 [timing-and-metrics-standard.md](timing-and-metrics-standard.md)。
 
 ---
 
-## 6. Docker
+## 4. Docker
 
 每阶段独立 `docker exec`（见 [docker-exec-contract.md](../../shmem-ops-dev/references/docker-exec-contract.md)）。

@@ -1,6 +1,8 @@
 # Device 侧关键片段打点操作指南
 
-提供 SHMEMI_PROF 宏对（Device cycle 打点）及 `aclshmemx_get_prof`（Host 侧导出）的完整操作流程。
+提供 SHMEMI_PROF 宏对（Device cycle 打点）及 `aclshmemx_get_prof`（Host 侧导出，推荐）的完整操作流程。
+
+> **API 状态**：`aclshmemx_show_prof()` 为零参数 deprecated API；**MUST** 使用 `aclshmemx_get_prof(nullptr, true)` 替代（等价行为，两参数公开接口）。
 
 ---
 

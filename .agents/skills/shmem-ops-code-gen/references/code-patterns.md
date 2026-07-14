@@ -60,6 +60,15 @@ raw pointer 写法适合直接控制地址单位、偏移和 UB 预留位置：
 
 raw pointer 不能绕过 SHMEM 数据面。即使通过 `aclshmem_ptr` 或 engine-specific pointer 得到远端 symmetric 地址，跨 PE 搬运也必须调用 `aclshmem_*` typed/putmem/getmem/put_signal 或公开 `aclshmemx_*` MTE/SDMA/RDMA 接口。`DataCopy` 只用于本 PE 内本地 GM/UB 搬运，禁止直接读写远端 PE 地址。
 
+各引擎对非对称 GM 地址的支持不同，影响 kernel 是否需要 kernel 外搬运：
+
+| 引擎 | put_nbi 的 src 能是用户 GM | get_nbi 的 dst 能是用户 GM | 含义 |
+| --- | --- | --- | --- |
+| MTE | 能 | 能 | kernel 内直接用 `put_nbi(symm, input_gm, ...)`，无需 kernel 外搬运 |
+| SDMA | 能 | 能 | 同上 |
+| UDMA | 能 | 能 | 同上 |
+| RDMA | 不能 | 不能 | 双方数据都 MUST 在对称内存上，需要 Host 侧 `aclrtMemcpy` 先搬运 |
+
 ### 3.2 `AscendC::GlobalTensor`
 
 `GlobalTensor` 写法适合模板化接口和算子框架：
@@ -147,7 +156,7 @@ AllReduce 的关键规范是明确“谁拥有某个 chunk 的写权”。同一
 - **默认 single path**：一套 kernel 逻辑覆盖 S/L 档；UB 内 `while` 分块是内部细节，不是 `small`/`large` 两条路径
 - **禁止**未证明收益就维护 `*_small_data` / `*_big_data`、`*_small` / `*_large` 并行实现
 - **允许**仅因 `GVA_BUFF_MAX_SIZE` / symm 容量触发的**外层 tile 循环**（内存约束，不是 perf 分支）
-- size 分支须附 profiling：**≥5%** steady_bus 或时延收益才保留；否则合并并删除死代码
+- size 分支须附 profiling：**≥5%** bus_bandwidth_GBps 或时延收益才保留；否则合并并删除死代码
 
 ## 7. symmetric buffer 生命周期
 

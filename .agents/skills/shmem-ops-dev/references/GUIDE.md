@@ -11,9 +11,9 @@
 | 1 | [../SKILL.md](../SKILL.md) | 编排器 Phase 0–7 |
 | 2 | [askquestion-template.md](askquestion-template.md) | 五项 AskQuestion 固定模板 |
 | 3 | [agent-execution-contract.md](agent-execution-contract.md) | 禁止中断、Torch 自动、性能双表、统一实现 |
-| 4 | [docker-exec-contract.md](docker-exec-contract.md) | 用户指定 Docker 时全部命令进容器 |
-| 5 | [intake-checklist.md](intake-checklist.md) | 启动门禁与 `phase0_intake` 记录格式 |
-| 6 | [shmem-repo-resolution.md](shmem-repo-resolution.md) | `SHMEM_REPO` 定位；**§1.1 区分 SHMEM 原生 vs custom-ops 交付物** |
+| 4 | [shmem-repo-resolution.md](shmem-repo-resolution.md) | `SHMEM_REPO` 定位；**§1.1 区分 SHMEM 原生 vs custom-ops 交付物** |
+| 5 | [docker-exec-contract.md](docker-exec-contract.md) | 用户指定 Docker 时全部命令进容器 |
+| 6 | [intake-checklist.md](intake-checklist.md) | 启动门禁与 `phase0_intake` 记录格式 |
 
 ---
 
@@ -41,9 +41,8 @@
 | [../../shmem-ops-dev/references/shmem-repo-resolution.md](../../shmem-ops-dev/references/shmem-repo-resolution.md) | **SHMEM 原生 vs custom-ops 交付物**（§1.1） |
 | [../../shmem-ops-compile-debug/references/custom-ops-entrypoints.md](../../shmem-ops-compile-debug/references/custom-ops-entrypoints.md) | **custom-ops 生成交付** 编译/运行/matrix/Torch（md 代码段为准） |
 | [../../shmem-ops-compile-debug/references/env-setup.snippet.md](../../shmem-ops-compile-debug/references/env-setup.snippet.md) | 生成 `run.sh` 的运行时环境（内联函数） |
-| [../../shmem-ops-performance-eval/references/perf-workflow.md](../../shmem-ops-performance-eval/references/perf-workflow.md) | **custom-ops 生成** perf 三阶段 + sweep |
+| [../../shmem-ops-performance-eval/references/perf-workflow.md](../../shmem-ops-performance-eval/references/perf-workflow.md) | **custom-ops 生成** perf 三阶段 |
 | [../../shmem-ops-compile-debug/references/shmem-repo-docs-index.md](../../shmem-ops-compile-debug/references/shmem-repo-docs-index.md) | **SHMEM 原生** `docs/`、`include/`、`examples/` 索引 |
 | [../../shmem-ops-performance-eval/references/perf-chat-output-spec.md](../../shmem-ops-performance-eval/references/perf-chat-output-spec.md) | Phase 6/6.5 聊天自动输出双表 |
-| [../../shmem-ops-performance-eval/references/platform-perf-spec.md](../../shmem-ops-performance-eval/references/platform-perf-spec.md) | 平台四算子带宽/时延目标 |
 | [../../shmem-ops-code-gen/templates/fused-compute/GUIDE.md](../../shmem-ops-code-gen/templates/fused-compute/GUIDE.md) | 通算融合算子代码模板（Phase 3，`op_kind=fused_compute_comm`） |
 | [../../shmem-ops-performance-optim/references/compute-optimization.md](../../shmem-ops-performance-optim/references/compute-optimization.md) | Phase 6.5 Matmul/compute 调优 |

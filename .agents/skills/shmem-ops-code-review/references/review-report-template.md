@@ -86,7 +86,7 @@
 | e2e_latency_us | | | |
 | kernel_latency_us | | | |
 | algo_bandwidth_GBps | | | |
-| bus_bandwidth_GBps | | | |
+| kernel_bus_bandwidth_GBps | | | |
 
 （完整优化记录见 performance_report.md）
 

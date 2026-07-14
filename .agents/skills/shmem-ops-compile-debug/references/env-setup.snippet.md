@@ -1,8 +1,8 @@
 # SHMEM 算子运行时环境（内联参考）
 
-> **用途**：Agent 生成 custom-ops 算子 `scripts/run.sh` / `torch_test_*.py` 时的环境设置参考。  
-> **Skill 形态**：本节为 Markdown 代码段；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。  
-> **与磁盘文件**：`custom-ops/scripts/shmem_runtime_env.sh` 由工作流**生成**，内容 **MUST** 与本节一致；**不是** SHMEM upstream 文件。Fresh 会话以本节为准生成/更新。  
+> **用途**：Agent 生成 custom-ops 算子 `scripts/run.sh` / `torch_test_*.py` 时的环境设置参考。
+> **Skill 形态**：本节为 Markdown 代码段；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。
+> **与磁盘文件**：`custom-ops/scripts/shmem_runtime_env.sh` 由工作流**生成**，内容 **MUST** 与本节一致；**不是** SHMEM upstream 文件。Fresh 会话以本节为准生成/更新。
 > **SHMEM 原生**：`install/set_env.sh`、CANN `set_env.sh` 来自 upstream / 用户 Phase 0 确认路径。
 
 ## run.sh 推荐结构

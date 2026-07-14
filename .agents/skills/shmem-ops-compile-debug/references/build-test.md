@@ -1,6 +1,6 @@
 # SHMEM 构建、运行与测试
 
-> **仓内路径**：下文 `examples/`、`install/`、`scripts/` 等均指 `${SHMEM_REPO}/` 下路径。Read 前先 [定位 SHMEM_REPO](../../shmem-ops-dev/references/shmem-repo-resolution.md)。  
+> **仓内路径**：下文 `examples/`、`install/`、`scripts/` 等均指 `${SHMEM_REPO}/` 下路径。Read 前先 [定位 SHMEM_REPO](../../shmem-ops-dev/references/shmem-repo-resolution.md)。
 > **custom-ops 命令唯一参考**：[custom-ops-entrypoints.md](custom-ops-entrypoints.md)（Skill 内禁止引用独立 shell 脚本文件；命令以该文档代码段为准）。
 
 本文说明 SHMEM 算子两类构建方式：独立工程依赖已编译 SHMEM 库，以及算子作为 `shmem/examples` 内置 example 编译。`shmem-ops-code-gen` 只负责生成代码和测试入口；实际构建、运行和失败定位由 `shmem-ops-compile-debug` 执行。
@@ -138,22 +138,6 @@ endif()
 set(ASCEND_HOME_PATH $ENV{ASCEND_HOME_PATH})
 set(SHMEM_HOME_PATH $ENV{SHMEM_HOME_PATH})
 
-include_directories(
-  ${ASCEND_HOME_PATH}/compiler/tikcpp
-  ${ASCEND_HOME_PATH}/compiler/tikcpp/tikcfw
-  ${ASCEND_HOME_PATH}/include
-  ${ASCEND_HOME_PATH}/include/experiment/runtime
-  ${ASCEND_HOME_PATH}/include/experiment/msprof
-  ${SHMEM_HOME_PATH}/shmem/include
-)
-
-link_directories(
-  ${ASCEND_HOME_PATH}/lib64
-  ${SHMEM_HOME_PATH}/shmem/lib
-)
-
-link_libraries(runtime stdc++ ascendcl m tiling_api platform c_sec dl nnopbase pthread)
-
 add_executable(my_shmem_op
   src/main.cpp
   src/my_shmem_op_kernel.cpp
@@ -162,12 +146,24 @@ add_executable(my_shmem_op
   src/op_runtime.cpp          # 可选：资源和错误处理 helper
 )
 target_include_directories(my_shmem_op PRIVATE
+  ${ASCEND_HOME_PATH}/compiler/tikcpp
+  ${ASCEND_HOME_PATH}/compiler/tikcpp/tikcfw
+  ${ASCEND_HOME_PATH}/include
+  ${ASCEND_HOME_PATH}/include/experiment/runtime
+  ${ASCEND_HOME_PATH}/include/experiment/msprof
+  ${SHMEM_HOME_PATH}/shmem/include
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_options(my_shmem_op PRIVATE -O2 -std=c++17 -xc++)
 target_link_options(my_shmem_op PRIVATE --cce-fatobj-link)
-target_link_libraries(my_shmem_op PRIVATE shmem)
+target_link_directories(my_shmem_op PRIVATE
+  ${ASCEND_HOME_PATH}/lib64
+  ${SHMEM_HOME_PATH}/shmem/lib
+)
+target_link_libraries(my_shmem_op PRIVATE shmem ascendcl runtime stdc++ pthread)
 ```
+
+> ⚠️ **禁止全局命令**：`link_libraries()`、`include_directories()`、`link_directories()` 为全局命令，违反 code-gen P0 规则（见 code-style.md §10.1）。**MUST** 全部使用 target-scoped 形式（`target_link_libraries` / `target_include_directories` / `target_link_directories`）。
 
 若算子采用简单官方 example 根目录布局，也可以把 `main.cpp` 和 kernel 文件放在根目录；但生成算子若包含复杂 Host 计划逻辑，优先使用 `src/` 目录并在 target 中显式列出 helper 源文件，头文件也放在 `src/` 中。
 

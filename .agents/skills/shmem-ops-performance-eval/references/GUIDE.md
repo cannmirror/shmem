@@ -11,8 +11,7 @@
 | [timing-and-metrics-standard.md](timing-and-metrics-standard.md) | 时间打点标准、指标计算公式、Device 打点、计算指标、采集方法 | 步骤 2-4 性能采集和对比时 |
 | [profiling-tools.md](profiling-tools.md) | msprof、SHMEM cycle profiling 使用方法 | 步骤 2 性能采集时 |
 | [device-profiling-guide.md](device-profiling-guide.md) | SHMEMI_PROF 完整操作指南 | 步骤 2 Device 打点采集时 |
-| [perf-workflow.md](perf-workflow.md) | 性能三阶段采集 + sweep 命令代码段 | Phase 6 采集时 |
-| [platform-perf-spec.md](platform-perf-spec.md) | **平台四算子带宽/时延目标表** | Phase 6 平台区采集时 |
+| [perf-workflow.md](perf-workflow.md) | 性能三阶段采集命令代码段 | Phase 6 采集时 |
 | [skill-performance-review.md](skill-performance-review.md) | **维护者备忘**（历史修正；Phase 6 不必 Read） | 维护 skill 时 |
 | [../../shmem-ops-dev/references/shmem-repo-resolution.md](../../shmem-ops-dev/references/shmem-repo-resolution.md) | 定位 `SHMEM_REPO` | 读仓内 profiling 文档前 |
 

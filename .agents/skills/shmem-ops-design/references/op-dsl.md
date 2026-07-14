@@ -46,7 +46,7 @@
 | `schedule.tiling` | **分核之后设计**。写明每组核的 tile、chunk、tail 处理方式（可以是符号公式，但要能指导后续 tiling 实现） |
 | `schedule.phases` | **最后设计**。写 device 侧的大体执行流程，每个 phase 仅需 `name` 和 `action`（一句话中文描述该阶段做什么）；不需要写 input/output/dependency/sync 等微观细节 |
 | `correctness` | 写 oracle、dtype tolerance、关键 invariants；invariants 为结构体列表，每项含 `invariant`（**使用中文描述**）、`test_method`（rank pattern / CPU golden / file golden / intermediate check）、`case`（适用 case 范围）；`case_matrix` 统一存放功能 case 和 stress/边界 case（boundary shape、tail、非均衡分片、signal 复用等），每项标注 `category`（functional / stress）；无法构造 oracle 时先提问 |
-| `performance` | 写主指标、baseline、target cases 和优化轮数；`baseline_search` 记录已检查的 HCCL/aclnn 方案（无直接 baseline 时必填，禁止留空或写 “none”）；`baseline_target` 写达标阈值（四算子见 platform-perf-spec.md；其他有 baseline 时默认 `current >= 80% baseline`，无 baseline 时写 metric_only 指标目标，通信算子能计算带宽利用率时不低于 20%）；`min_scale` 写最小测试规模（集合通信 >= 256MB，计算/通算融合 hidden size >= 1000，无法满足时说明原因）；默认 `max_opt_rounds` 为 `5`，且不得超过 5 |
+| `performance` | 写主指标、baseline、target cases 和优化轮数；`baseline_search` 记录已检查的 HCCL/aclnn 方案（无直接 baseline 时必填，禁止留空或写 “none”）；`baseline_target` 写达标阈值（有 baseline 时默认 `current >= 80% baseline`，无 baseline 时写 metric_only 指标目标，通信算子能计算带宽利用率时不低于 20%）；`min_scale` 写最小测试规模（集合通信 >= 256MB，计算/通算融合 hidden size >= 1000，无法满足时说明原因）；默认 `max_opt_rounds` 为 `5`，且不得超过 5 |
 | `语言使用` | **描述性字段（semantics、schedule.phases.action、correctness.invariants 等）使用中文**；API 名称、数据类型、字段名、代码标识符使用英语 |
 
 ## 4. 缺失信息处理

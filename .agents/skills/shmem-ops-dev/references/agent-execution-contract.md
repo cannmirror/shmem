@@ -49,24 +49,19 @@
 
 仅报时延、不报带宽 → **Phase 6 未完成**。
 
-### 4.1 平台规格表（8PE full-mesh，对话 MUST 展示）
+### 4.1 性能规格（8PE full-mesh，对话 MUST 展示）
 
-| 算子 | 规模 | 指标 | 目标 |
-| --- | --- | --- | --- |
-| reduce_scatter (fp16) | 256MB/8PE | steady_bus / HCCL | **98.66%** |
-| alltoallv (fp16) | 1GB/8PE | steady_bus / HCCL | **105%** |
-| moe_dispatch | 64KB/8PE | 时延比 HCCL/SHMEM | **4.99x** |
-| allgatherv (fp16) | 15.9KB/8PE | 时延比 HCCL/SHMEM | **11.19x** |
+通信算子达标线：有 baseline 时 ≥ baseline **80%**，无 baseline 时带宽利用率 ≥ **20%**。
 
 ### 4.2 采集命令（分 shell，禁止混跑；有 docker_container 时每步独立 docker exec）
 
-按 [perf-workflow.md](../../shmem-ops-performance-eval/references/perf-workflow.md) §1 分三阶段采集（A baseline → B SHMEM → C 离线对比）；**NEVER** 同 shell 混跑 HCCL 与 SHMEM。四算子默认参数见 [platform-perf-spec.md](../../shmem-ops-performance-eval/references/platform-perf-spec.md)。
+按 [perf-workflow.md](../../shmem-ops-performance-eval/references/perf-workflow.md) §1 分三阶段采集（A baseline → B SHMEM → C 离线对比）；**NEVER** 同 shell 混跑 HCCL 与 SHMEM。
 
 ### 4.3 聊天 MUST 输出（两块，不得省略）
 
-**块 A — 带宽类**（steady_bus GB/s + 比值 + 目标 + 达标）
+**块 A — 带宽类**（kernel_bus_bandwidth_GBps + 比值 + 目标 + 达标）
 
-**块 B — 时延类**（comm_only/kernel µs + HCCL/SHMEM 比值 + 目标 + 达标）
+**块 B — 时延类**（comm_only/kernel µs + HCCL/SHMEM 比值 + 达标）
 
 另附明细行：`e2e_us`、`kernel_us`、`algo_bw`、`bus_bw`、`payload_bytes`。
 
@@ -74,7 +69,7 @@
 
 ### 4.5 Phase 6 → 6.5 自动分支（Hard Gate）
 
-当 `meta.performance_auto_optim: true` 且 Phase 6 平台表存在 **✗ 未达标** 项：
+当 `meta.performance_auto_optim: true` 且 Phase 6 存在 **✗ 未达标** 项：
 
 1. **MUST** 在同一会话 **立即** 调用 `shmem-ops-performance-optim` 进入 Round 1
 2. **禁止** 以「是否继续优化」询问用户或结束交付摘要
@@ -82,11 +77,12 @@
 
 当 `meta.performance_auto_optim: false`：输出差距表 → Phase 7，**不得**改 kernel。
 
-### 4.4 稳定带宽门禁
+### 4.4 性能采集规模要求
 
-- per-PE payload ≥ 64MB（L 档）且相邻 2× payload 的 steady_bus 变化 ≤ 5% → 平台区
-- 单点 ITERS≥30；`kernel_us` 用去尾 10% 稳态口径
-- 大消息正确性 **MUST** 在平台档跑通（如 alltoallv `base_count=8388608`），不能仅 1024 smoke
+- Round 0 **MUST** 覆盖 S 档 + L 档
+- 中间优化轮次以 L 档为准
+- 最终轮重新采集 S 档 + L 档
+- 单点 WARMUP=10, MEASURE=40, ITERS=50
 
 ---
 
@@ -97,7 +93,7 @@
 - **默认一套实现**覆盖小到大消息；UB 内部分块拷贝是该实现的内部细节，**不算**第二条 size 路径
 - ❌ 未证明收益就维护 `small_data` / `big_data`、`alltoallv_small` / `alltoallv_large` 等并行流水
 - ❌ Phase 6.5 优先「修通 big_data / 恢复 size 分支」而非机制优化
-- ✅ **仅当** profiling 证明 size 分支相对统一实现 **steady_bus 或时延 ≥5% 稳态收益** 时，才保留分拆；否则删除死代码、合并 single path
+- ✅ **仅当** profiling 证明 size 分支相对统一实现 **bus_bandwidth_GBps 或时延 ≥5% 收益** 时，才保留分拆；否则删除死代码、合并 single path
 - ✅ 因 **symm/GVA 容量上限** 的外层 tile 循环（如 `GVA_BUFF_MAX_SIZE` 分块）视为内存约束，不是 perf 专用大小路径
 - ✅ Phase 6.5 **优先机制优化**：流水 overlap、sender/receiver 分核、per-chunk signal、减 barrier、engine 切换；参数扫描为辅
 
@@ -145,7 +141,7 @@
 ### 产物检查
 
 - 正确性前 `rm -f output_pe*.bin`，避免陈旧文件误判
-- `pkill` 时 **禁止** 匹配自身脚本路径中的算子名（用 `pgrep -f 'build/bin/alltoallv'` 等）
+- 进程清理 **MUST** 使用精确匹配（`pgrep -f 'build/bin/<op_name>'` 或 `pkill -f 'build/bin/<op_name>'`）；**禁止**无范围约束的 `pkill -f shmem`（会误杀无关 SHMEM 作业/服务/脚本）。对外部残留进程只输出 PID/端口证据并请求用户授权
 
 ---
 

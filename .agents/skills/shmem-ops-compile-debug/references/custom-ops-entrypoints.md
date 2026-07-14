@@ -1,8 +1,8 @@
 # custom-ops 统一入口（命令参考）
 
-> **适用范围**：`custom-ops/` 是 **本 skill 工作流生成的交付树**，不是 SHMEM upstream 自带目录。  
-> **Skill 形态**：本节 Markdown 代码段为规范；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。  
-> **与磁盘文件的关系**：Phase 2–3 会生成 `custom-ops/scripts/*.sh` 等；**以本节为准**。若工作区已有文件，Read 核对一致后再执行，**禁止**假设 upstream 克隆必含 `custom-ops/`。  
+> **适用范围**：`custom-ops/` 是 **本 skill 工作流生成的交付树**，不是 SHMEM upstream 自带目录。
+> **Skill 形态**：本节 Markdown 代码段为规范；**禁止**在 `.agents/skills/` 下放置 skill 附属 `.sh`/`.py`。
+> **与磁盘文件的关系**：Phase 2–3 会生成 `custom-ops/scripts/*.sh` 等；**以本节为准**。若工作区已有文件，Read 核对一致后再执行，**禁止**假设 upstream 克隆必含 `custom-ops/`。
 > **SHMEM 原生依赖**（§0）：`install/set_env.sh`、`scripts/build.sh -examples` 等来自 upstream，见 [shmem-repo-resolution.md §1.1](../../shmem-ops-dev/references/shmem-repo-resolution.md)。
 
 Agent **MUST** 在容器内实际执行，不得只输出命令。

@@ -3,7 +3,7 @@
 性能采集需要明确的 baseline 作为对比基准。硬规则：
 
 - 有 HCCL/aclnn baseline 时，**MUST** 接入 baseline
-- 有 baseline 时，达标线 **MUST** 按算子取值：四算子批次见 [platform-perf-spec.md](platform-perf-spec.md)；其他有 baseline 算子默认 current ≥ baseline 的 **80%**
+- 有 baseline 时，达标线默认 current ≥ baseline 的 **80%**
 - 有 baseline 但未达标时，进入性能优化（最多 5 轮）
 - 无直接 baseline 时，**MUST** 记录搜索过程，并使用 metric_only 指标验收；通信算子能计算带宽利用率时 **NEVER** 低于 20%
 
@@ -79,7 +79,7 @@ aclrtSynchronizeStream(stream);
 float elapsed_ms;
 aclrtEventElapsedTime(&elapsed_ms, startEvent, endEvent);
 float avg_us = elapsed_ms * 1000.0f / iters;
-printf("[BASELINE_PERF] pe=%d e2e_us=%.2f kernel_us=%.2f algo_bandwidth_GBps=%.2f steady_bus_bandwidth_GBps=%.2f\n", my_pe, avg_us, avg_us, ...);
+printf("[BASELINE_PERF] pe=%d e2e_us=%.2f kernel_us=%.2f algo_bandwidth_GBps=%.2f e2e_bus_bandwidth_GBps=%.2f kernel_bus_bandwidth_GBps=%.2f\n", my_pe, avg_us, avg_us, ...);
 ```
 
 **CMake 集成**（baseline 的 CMakeLists.txt 和源码 **MUST** 放在 `baseline/` 目录下，**NEVER** 混入算子 `src/`）：
@@ -122,11 +122,13 @@ OP=alltoallv
 DEVICE_LIST=0,1,2,3,4,5,6,7
 BASE_COUNT=8388608
 DTYPE=float16
-ITERS=30
+WARMUP=10
+MEASURE=40
+ITERS=$((WARMUP + MEASURE))  # 50 total
 
 # 阶段 A（独立 shell）：baseline
 bash "${SHMEM_REPO}/custom-ops/${OP}/baseline/scripts/run_baseline.sh" \
-  "${DEVICE_LIST}" uniform "${BASE_COUNT}" "${DTYPE}" "${ITERS}"
+  "${DEVICE_LIST}" "${BASE_COUNT}" "${DTYPE}" "${ITERS}"
 
 # 阶段 B（新 shell，间隔 ≥30s）：SHMEM
 bash "${SHMEM_REPO}/custom-ops/${OP}/scripts/perf.sh" \
@@ -134,8 +136,8 @@ bash "${SHMEM_REPO}/custom-ops/${OP}/scripts/perf.sh" \
 
 # 阶段 C（离线）
 python3 "${SHMEM_REPO}/custom-ops/scripts/lib/perf_compare.py" \
-  --shmem-log "${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_uniform_${BASE_COUNT}_${DTYPE}.log" \
-  --baseline-log "${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_uniform_${BASE_COUNT}_${DTYPE}.log"
+  --shmem-log "${SHMEM_REPO}/custom-ops/${OP}/data/perf/shmem_${BASE_COUNT}_${DTYPE}.log" \
+  --baseline-log "${SHMEM_REPO}/custom-ops/${OP}/data/perf/baseline_${BASE_COUNT}_${DTYPE}.log"
 ```
 
 完整工作流见 [baseline-compare-workflow.md](baseline-compare-workflow.md)。
@@ -159,20 +161,16 @@ python3 "${SHMEM_REPO}/custom-ops/scripts/lib/perf_compare.py" \
 - 通信算子的带宽利用率低于 20%，或 wait/sync 占比显示明显瓶颈
 - 存在明显的空闲等待时间
 
-**示例**：
+**指标计算公式**（来自 [timing-and-metrics-standard.md](timing-and-metrics-standard.md)，此处仅引用，不作为独立实现标准）：
 
-```python
-logical_payload_bytes = n_pes * tokens_per_pe * hidden * 4
-latency_us = measure_latency()
-latency_s = latency_us / 1e6
-algo_bandwidth = logical_payload_bytes / latency_s / 1e9
-
-bus_factor = (n_pes - 1) / n_pes
-bus_bandwidth = algo_bandwidth * bus_factor
-
-peak_bandwidth = 28
-utilization = bus_bandwidth / peak_bandwidth * 100
+```text
+algo_bandwidth_GBps = logical_payload_bytes / latency_s / 1e9
+kernel_bus_bandwidth_GBps  = algo_bandwidth_GBps × bus_factor   # kernel 口径 — 达标主指标
+e2e_bus_bandwidth_GBps     = algo_bandwidth_GBps(e2e) × bus_factor  # e2e 口径 — 仅参考
+bandwidth_utilization_percent = kernel_bus_bandwidth_GBps / peak_bandwidth_GBps × 100
 ```
+
+> 实际性能采集 **MUST** 通过算子 `--perf` 输出 `[PERF]` 行获取指标值，**NEVER** 手工计算或使用 Python 脚本替代 C++ 性能测试程序。
 
 **记录格式**：
 
@@ -182,7 +180,7 @@ baseline:
   current_latency_us: 245.8
   logical_payload_bytes: 4.0 MB
   algo_bandwidth_GBps: 16.3
-  bus_bandwidth_GBps: 8.15
+  kernel_bus_bandwidth_GBps: 8.15
   peak_bandwidth_GBps: 300
   bandwidth_utilization_percent: 2.7
   bottleneck_analysis: 带宽利用率极低
@@ -222,7 +220,7 @@ baseline:
   measurement:
     latency_us: 210.5
     algo_bandwidth_GBps: 19.0
-    bus_bandwidth_GBps: 28.5
+    kernel_bus_bandwidth_GBps: 28.5
     peak_bandwidth_GBps: 28.0
     bandwidth_utilization_percent: 9.5
     effective_flops: 123000000000000.0

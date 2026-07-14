@@ -194,7 +194,7 @@ Phase 5 使用 `interim` 模式生成阶段性 `review-report.md`（性能章节
 
 适用场景：`meta.performance_required: true` 且正确性通过后，采集算子性能数据，接入 HCCL/aclnn baseline（C++ 可执行文件 + perf-workflow §1 阶段 C），在聊天与 `performance_report.md` 输出 **SHMEM vs baseline 对比表**，分析性能瓶颈。
 
-交付：`performance_report.md`（§3.5 对比表 + §7 结论），聊天 **MUST 自动输出** sweep 表与 steady_bus 对比（[perf-chat-output-spec.md](shmem-ops-performance-eval/references/perf-chat-output-spec.md)）。Phase 6.5 每轮 MUST 输出 Δ% 变化表。
+交付：`performance_report.md`（§3.5 对比表 + §7 结论），聊天 **MUST 自动输出** S 档 + L 档性能对比表（[perf-chat-output-spec.md](shmem-ops-performance-eval/references/perf-chat-output-spec.md)）。Phase 6.5 每轮 MUST 输出 Δ% 变化表。
 
 ### shmem-ops-performance-optim — 性能优化（Phase 6.5，条件性）
 
@@ -323,8 +323,7 @@ Phase 5 使用 `interim` 模式生成阶段性 `review-report.md`（性能章节
 │   │   ├── performance-eval-guide.md      ←   采集流程 / contract 字段 / 结果表格式
 │   │   ├── baseline-selection.md          ←   baseline 选择策略 / HCCL-aclnn 清单
 │   │   ├── baseline-compare-workflow.md   ←   baseline 接入 / 离线对比 / 聊天对比表
-│   │   ├── perf-workflow.md               ←   性能三阶段采集 + sweep 命令代码段
-│   │   ├── platform-perf-spec.md          ←   平台四算子目标表
+│   │   ├── perf-workflow.md               ←   性能三阶段采集命令代码段
 │   │   ├── perf-chat-output-spec.md       ←   聊天自动输出 / 优化轮次 Δ% 表
 │   │   ├── timing-and-metrics-standard.md ←   时间打点 / 双指标方案 / 计算公式
 │   │   ├── profiling-tools.md             ←   msprof / SHMEM cycle profiling

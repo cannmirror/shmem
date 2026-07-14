@@ -1,6 +1,6 @@
 # SHMEM 日志调试
 
-> **仓内参考文档**：先定位 `SHMEM_REPO`（[shmem-repo-resolution.md](../../shmem-ops-dev/references/shmem-repo-resolution.md)），再 Read `${SHMEM_REPO}/docs/debug/log_debug.md`  
+> **仓内参考文档**：先定位 `SHMEM_REPO`（[shmem-repo-resolution.md](../../shmem-ops-dev/references/shmem-repo-resolution.md)），再 Read `${SHMEM_REPO}/docs/debug/log_debug.md`
 > 本文件为技能内摘要；排障时可对照仓内文档与最新日志。
 
 完整 SHMEM 文档索引见 [shmem-repo-docs-index.md](shmem-repo-docs-index.md)。

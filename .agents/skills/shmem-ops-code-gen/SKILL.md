@@ -21,6 +21,7 @@ description: "根据 design.md 生成 SHMEM 算子代码、目录结构、CMake 
 | [references/atomic-add-pattern.md](references/atomic-add-pattern.md) | `SetAtomicAdd<T>()` 累加：安全顺序、边界、风险。实现 reduce/累加时必读 |
 | [references/code-style.md](references/code-style.md) | C/C++ 代码规范 |
 | [references/readme-spec.md](references/readme-spec.md) | README.md 格式规范 |
+| [../shmem-ops-compile-debug/references/custom-ops-entrypoints.md](../shmem-ops-compile-debug/references/custom-ops-entrypoints.md) | custom-ops 编译/运行/matrix/Torch 入口命令；README 运行入口 **MUST** 以此为准 |
 | [../shmem-ops-compile-debug/references/shmem-repo-docs-index.md](../shmem-ops-compile-debug/references/shmem-repo-docs-index.md) | 仓内 `docs/`（**只读**）、`install/shmem/include/`、examples 参考 |
 | [../shmem-ops-dev/references/shmem-repo-resolution.md](../shmem-ops-dev/references/shmem-repo-resolution.md) | 定位 `SHMEM_REPO`（**读仓内文件前**） |
 
@@ -102,7 +103,7 @@ description: "根据 design.md 生成 SHMEM 算子代码、目录结构、CMake 
 | `transport` / `collective` / `compute` / 纯 put/get/exchange | `templates/communication` |
 | `fused_compute_comm`（Matmul/GEMM + 跨 PE 通信，AIC/AIV CoC） | `templates/fused-compute` |
 
-> **`compute`**：单 PE 或 Device 内本地计算、无跨 PE 通信语义时仍用 `templates/communication`（通常仅 Host + 空/轻量 kernel）；**禁止**因存在 `local_compute` 字段就路由到 fused-compute。  
+> **`compute`**：单 PE 或 Device 内本地计算、无跨 PE 通信语义时仍用 `templates/communication`（通常仅 Host + 空/轻量 kernel）；**禁止**因存在 `local_compute` 字段就路由到 fused-compute。
 > **`fused_compute_comm`**：必须同时含 Cube matmul（CATLASS BlockMmad）与 SHMEM 跨 PE 通信（CommBlockEpilogue），见 [core-allocation.md §4](../shmem-ops-design/references/core-allocation.md)。
 
 选定模板后，**仅读取当前生成步骤对应的模板文件**（见上表）。纯通信按 [templates/communication/GUIDE.md](templates/communication/GUIDE.md) 分步读取子模板；通算融合从 [templates/fused-compute/GUIDE.md](templates/fused-compute/GUIDE.md) 按章节标题提取 fenced code block，写入目标路径，替换 `<op_name>`/`<OpName>`/`<OP_NAME>` 占位符。
@@ -146,6 +147,8 @@ description: "根据 design.md 生成 SHMEM 算子代码、目录结构、CMake 
 6. **scheduler**（communication：kernel.cpp；fusion：fused-compute kernel 章节）：phase、tile/chunk/tail、core partition、overlap
 7. **README.md**（按 references/readme-spec.md）
 
+> **性能打点代码（Phase 3 跳过）**：模板中的 `--perf` 模式（`templates-cmake-main.md` perf 代码段）、`SHMEMI_PROF_START/END` 宏（`templates-kernel.md` perf 代码段）、`scripts/perf.sh` **MUST 在 Phase 3 跳过**。这些代码段仅当 Phase 6 dev 显式调用 code-gen 添加性能打点时写入。Phase 3 生成的是纯 correctness 代码（perf_times 默认 0，无 SHMEMI_PROF）。
+
 ### 关键约束
 
 - **算子必须在 Device 执行**，禁止 Host RMA 作为主通信路径
@@ -163,12 +166,12 @@ main.cpp 的 `--perf` 模式必须输出双指标延迟和带宽（严格按照 
 
 | 指标 | 说明 | 公式 |
 | --- | --- | --- |
-| `e2e_us` | 端到端延迟（含输入到对称堆的拷贝 + barrier + kernel） | 从输入到对称堆的拷贝前到 stream sync 后 |
-| `kernel_us` | 纯 kernel 延迟 | 从 kernel launch 前到 stream sync 后 |
+| `e2e_us` | 端到端延迟：做法 A 下 ≈kernel_us（搬运在 kernel 内）；做法 B 下含 aclrtMemcpy + barrier + kernel | 做法 A：kernel launch 前到 stream sync 后；做法 B：aclrtMemcpy 前到 stream sync 后 |
+| `kernel_us` | kernel 执行时间 | kernel launch 前到 stream sync 后 |
 | `algo_bandwidth_GBps` | 算法带宽（基于 e2e_us，参考） | `logical_payload_bytes / (e2e_us * 1e-6) / 1e9` |
-| `bus_bandwidth_GBps` | 总线带宽（e2e 参考） | `algo_bandwidth * bus_factor` |
-| `steady_bus_bandwidth_GBps` | **达标主指标**（kernel 口径） | `logical_payload_bytes / (kernel_us * 1e-6) / 1e9 * bus_factor` |
-| `bandwidth_utilization_pct` | 带宽利用率（基于 e2e bus，参考） | `bus_bandwidth / peak_bandwidth * 100`（peak_bandwidth 按通信模式确定，见下文） |
+| `e2e_bus_bandwidth_GBps` | 总线带宽（e2e 参考） | `algo_bandwidth * bus_factor`（bus_factor 见 [timing-and-metrics-standard.md §4.3](../shmem-ops-performance-eval/references/timing-and-metrics-standard.md)） |
+| `kernel_bus_bandwidth_GBps` | **达标主指标**（kernel 口径） | `logical_payload_bytes / (kernel_us * 1e-6) / 1e9 * bus_factor` |
+| `bandwidth_utilization_pct` | 带宽利用率（基于 kernel_bus_bandwidth_GBps） | `kernel_bus_bandwidth_GBps / peak_bandwidth * 100`（peak_bandwidth 按通信模式确定，见下文） |
 
 `bus_factor` 按算子语义确定（不区分拓扑，NCCL 惯例的通信量标准化系数）：AllReduce: `2*(n-1)/n`，ReduceScatter/AllGather: `(n-1)/n`，AllToAll/Shuffle: `(n-1)/n`，Broadcast/P2P: 1。
 
@@ -177,11 +180,11 @@ main.cpp 的 `--perf` 模式必须输出双指标延迟和带宽（严格按照 
 - 集合通信（AllReduce/AllGather 等）：聚合带宽，如 910B3 8 卡 full-mesh 为 7 × 28 = 196 GB/s
 
 perf 循环结构要求：
-- **e2e 循环**：每轮包含输入到对称堆的拷贝 + barrier + kernel launch，模拟真实调用模式
-- **kernel-only 循环**：输入到对称堆的拷贝已完成，只测 kernel launch，用于内部优化定位
-- **禁止跳过输入到对称堆的拷贝**：真实使用场景中 input 来自用户 Device GM buffer，性能测试 **MUST** 包含完整的 `input(GM) → 输入到对称堆的拷贝（MTE / SDMA / aclrtMemcpy 等均可） → symmetric memory → kernel` 流程。输入到对称堆的拷贝 **MUST** 计入 `e2e_latency_us`，不得在性能循环前预拷贝一次使 e2e 口径缩水
+- **e2e 循环**：每轮覆盖从用户 input(GM) 到结果 output(GM) 的全部数据搬运。做法 A（MTE/SDMA/UDMA kernel 内放置）下 e2e 循环 = kernel launch 循环，搬运在 kernel 内自然完成；做法 B（RDMA）下需包含 aclrtMemcpy + barrier + kernel launch。数据放置方式详见 [timing-and-metrics-standard.md §1.2](../shmem-ops-performance-eval/references/timing-and-metrics-standard.md)
+- **kernel-only 循环**：起点始终为 kernel launch，**禁止**在 kernel-only 循环前预做数据放置
+- **e2e 计时口径**：做法 A 下 e2e_us≈kernel_us 是正常的（搬运在 kernel 内），代码中 **MUST** 有注释说明引擎选择（如 `// MTE put_nbi src=local GM, no Host-side memcpy needed`）；做法 B 下 e2e_us **MUST** > kernel_us，差值等于 kernel 外搬运时间。**禁止**为制造 e2e > kernel 假象而在做法 A 路径上加无意义的 kernel 外搬运；**禁止**在性能循环前预做搬运使 e2e 口径缩水
 
-注意：`algo_bandwidth` 不乘 2，统一按 input size 计算（NCCL `algBw` 惯例）。`logical_payload_bytes` 必须在输出中注明口径（单 PE 还是全局）。**Phase 6 达标与 Round 对比 MUST 用 `[PERF]` 行的 `steady_bus_bandwidth_GBps`**，不得用 e2e 带宽。
+注意：`algo_bandwidth` 不乘 2，统一按 input size 计算（NCCL `algBw` 惯例）。`logical_payload_bytes` 必须在输出中注明口径（单 PE 还是全局）。**Phase 6 达标与 Round 对比 MUST 用 `[PERF]` 行的 `kernel_bus_bandwidth_GBps`**，不得用 e2e 带宽。
 
 如果算子包含 `SHMEMI_PROF_START/END` 打点，`--perf` 模式还应调用 `aclshmemx_get_prof(nullptr, true)` 输出 Device 帧数据。
 
@@ -189,7 +192,12 @@ perf 循环结构要求：
 
 ## 步骤 5：编译验证
 
-调用 `shmem-ops-compile-debug`，传入 compile contract。持续修复直到编译通过或确认阻塞。
+1. 调用 `shmem-ops-compile-debug`，传入 compile contract，由 compile-debug 执行构建并诊断失败
+2. compile-debug 返回诊断结果后：
+   - compile / link / launch 失败 → **本 skill 修复代码**（compile-debug 只诊断不改代码），修复后重新调用 compile-debug
+   - correctness 失败 → 先判断是代码问题还是 Phase 2 测试脚本不匹配（如 gen_data 布局、check_result 容差）；代码问题由本 skill 修复，脚本问题委托 `shmem-ops-testcase-gen` 修正
+   - runtime / environment 失败 → compile-debug 自行修复环境后重试
+3. 该循环持续直到编译通过且 smoke case 运行通过，或确认为环境阻塞 / 设计缺陷
 
 ---
 
@@ -232,19 +240,49 @@ op_name/
 
 ---
 
-## 检查点
+## MUST检查（全部通过方可通过本阶段，禁止以"先跑通再补"跳过任一项）
 
-- [ ] 目录结构符合规范：`docs/` 承载所有阶段产出的 `.md`、`src/` 含全部算子 `.cpp/.h`、`baseline/` 含全部 baseline 源码和编译配置、`scripts/` 含全部测试脚本
-- [ ] CMake 生成，target 命名与 op_name 一致
-- [ ] 代码遵循 design.md 的 phase/transport/sync/partition
-- [ ] 默认 unified single path；无 profiling ≥5% 收益证据则不引入 size 分支（见 code-patterns.md §6.4）
-- [ ] main.cpp 不含复杂逻辑
-- [ ] main.cpp `--perf` 模式输出双指标延迟（e2e_us、kernel_us）、algo/bus 带宽及 **`steady_bus_bandwidth_GBps`**
-- [ ] e2e_latency_us 口径包含输入到对称堆的拷贝（未预拷贝缩水）
-- [ ] kernel 包含 `SHMEMI_PROF_START/END` 打点，覆盖主要耗时 phase（copy_in/remote_put_get/signal_wait/local_compute/finalize）
-- [ ] README.md 覆盖编译、运行、校验入口
-- [ ] 编译成功（或记录环境阻塞）
-- [ ] 记录所有生成/修改的文件
+### P0（阻断级——任一 FAIL 则禁止进入 Phase 4）
+
+- [ ] **目录结构**：`docs/` 承载所有阶段产出的 `.md`、`src/` 含全部算子 `.cpp/.h`、`scripts/` 含全部测试脚本；`baseline/` 含全部 baseline 源码和编译配置（**Phase 6 由 dev 调用 code-gen 按需生成，Phase 3 不检查此项；`metric_only` 或 `performance_required: false` 时标记 N/A**）
+- [ ] **CMake**：target 命名与 op_name 一致；使用 target-scoped include/link/compile options；禁止全局 `link_libraries()`（见 code-style.md §10.1）
+- [ ] **代码遵循 design.md**：phase/transport/sync/partition 全部与 DSL `schedule` 一致
+- [ ] **默认 unified single path**：无 profiling ≥5% 收益证据则不引入 size 分支（见 code-patterns.md §6.4 / implementation-boundary.md）
+- [ ] **GM累加方式**：远端数据累加到 output 时，**MUST** 按 `atomic-add-pattern.md §12` 决策优先级表选择累加方式；reduce-scatter/allreduce RS 阶段 **MUST** 使用 `SetAtomicAdd<T>()`（MTE 批量）+ `mte_get_nbi`（优先级 1），**禁止**以串行 UB 累加（优先级 4/5）作为交付路径
+- [ ] **性能指标计算**：整个计算链路 **MUST** 正确——(1) `logical_payload_bytes` = `elements × sizeof(dtype)`（单 PE 语义数据量）；(2) `algo_bandwidth_GBps` = `logical_payload / (e2e_us × 1e-6) / 1e9`（基于 e2e_us，不乘2）；(3) `bus_factor` 从 [timing-and-metrics-standard.md §4.3](../shmem-ops-performance-eval/references/timing-and-metrics-standard.md) 唯一参照表取值；**禁止**使用 `n_pes-1` 或其他错误值；(4) `e2e_bus_bandwidth_GBps` = `algo_bandwidth × bus_factor`（e2e 口径，仅参考）；(5) `kernel_bus_bandwidth_GBps` = `logical_payload / (kernel_us × 1e-6) / 1e9 × bus_factor`（kernel 口径，达标主指标）；(6) `bandwidth_utilization_pct` = `kernel_bus_bandwidth_GBps / peak_bandwidth × 100`。perf 输出 **MUST** 包含 `e2e_us`、`kernel_us`、`algo_bandwidth_GBps`、`e2e_bus_bandwidth_GBps`、`kernel_bus_bandwidth_GBps`、`bandwidth_utilization_pct`；`algo_bandwidth` **禁止**基于 kernel_us 计算；**禁止**不同字段输出相同值或同名字段表示不同口径
+- [ ] **License 头**：所有 `.cpp`、`.h`、`.py`、`.sh` 文件 **MUST** 包含 CANN Open Software License 头（见 code-style.md §7.2）；交付不可省略
+- [ ] **e2e 计时口径**：做法 A（MTE/SDMA/UDMA kernel 内放置）下 e2e_us≈kernel_us 正常，代码中 **MUST** 有注释说明引擎选择；做法 B（RDMA 或显式 Host 侧搬运）下 e2e_us **MUST** > kernel_us，kernel 外搬运 **MUST** 在 e2e 循环内。**禁止**为制造 e2e>kernel 假象而在做法 A 路径上加无意义的 kernel 外搬运
+- [ ] **跨 PE 传输**：**MUST** 使用 `aclshmem_*` / `aclshmemx_*` 数据面接口；**禁止** DataCopy 直接写远端地址
+- [ ] **有状态 API 返回值检查**：有返回值的 ACL/SHMEM/RT 调用 **MUST** 检查返回值（如 `aclshmem_put_nbi`、`aclshmem_get_nbi`、`aclshmem_signal_wait_until`、`aclrtMalloc` 等）。**禁止**静默忽略返回值（见 code-style.md §1.4）
+- [ ] **void 同步 API 对称性**：`aclshmem_barrier_all()`、`aclshmem_finalize()` 等返回 `void` 的同步 API **MUST** 检查：所有 PE 对称调用（无分支遗漏）、barrier 后无 data race、finalize 前数据已可见。**禁止**检查不存在的返回值
+- [ ] **SHMEM 接口约束**：算子代码中的 SHMEM 调用 **MUST** 只使用对外 API（`aclshmem_*` / `aclshmemx_*` 开头）。若使用了 `aclshmemi_*` 内部接口：(1) 有公开等价 API 时 **MUST** 改为公开 API；(2) 无公开等价 API 时 **MUST** 在 Capability Mapping / gap analysis 中登记，写明无替代方案和风险评估（见 internal-api-boundary.md）
+
+### P1（严重级——任一 FAIL 必须先修复再进入 Phase 4）
+
+- [ ] **错误处理用宏**：**MUST** 使用 `ACL_CHECK` / `ACL_CHECK_WITH_RET` / `CHECK_SHMEM` 等宏进行错误检查，**禁止**裸写 `if (status != ACL_ERROR_NONE)` 模式（见 code-style.md §1.1 / §1.2）
+- [ ] **README.md 中文 + 结构合规**：**MUST** 使用中文撰写；**MUST** 遵循 readme-spec.md 完整结构——含算子介绍、环境要求、目录结构、参数说明、编译项目、运行算子、验证结果、性能采集、注意事项等 section（见 shmem-ops-dev 原则#0；readme-spec.md §2）
+- [ ] **无硬编码路径**：脚本/文档/CMake 中 **MUST NOT** 硬编码用户机器路径（如 `/home/<user>/...`），**MUST** 使用环境变量或相对路径（见 code-style.md §10.1）
+- [ ] **同步 API**：phase 同步 **MUST** 优先使用 `aclshmem_barrier_all()` 或 `aclshmem_barrier(team)`；**禁止**无理由使用 `aclshmemx_barrier_all_vec()` 替代（仅对齐既有 legacy example 时可保留，见 code-style.md §6.2）
+- [ ] **signal/wait 配对**：每个 signal 有对应 wait，magic/epoch 策略一致（见 code-review-checklist.md §同步正确性）
+- [ ] **symmetric 分配顺序**：所有 PE 的 `aclshmem_malloc` 调用顺序和大小完全一致（见 code-review-checklist.md §内存与Buffer）
+- [ ] **main.cpp 不含复杂逻辑**：route/payload/tiling/packing/golden/checker 逻辑 **禁止** 在 `main.cpp` 中；复杂 Host 逻辑 **MUST** 拆到独立 `.cpp/.h`（见 code-style.md §5.2）
+- [ ] **编译成功**：或记录环境阻塞原因
+- [ ] **记录所有生成/修改的文件**
+
+### P2（建议级——MUST在交付前修复）
+
+- [ ] **code-style.md §12 代码审查清单**：逐项对照完整清单（~32项），每项 **MUST** 标记通过/不适用/FAIL；**禁止**笼统声称"已检查"而不逐项记录。覆盖范围包括但不限于：License 头、include guard、缩进 4 空格、指针左对齐 `int *ptr`、`UNUSED_PARAM` 标记、UB/event 命名常量、资源释放顺序、注释解释"为什么"、命名风格一致性、`main.cpp` 边界等（详见 code-style.md §12）
+
+**P0 全部 PASS 且 P1 全部 PASS → 进入 Phase 4；否则 MUST 修复后重新检查。**
+
+### 条件性需求：性能打点代码（Phase 6 按需生成）
+
+以下需求 **仅当** `meta.performance_required: true` 且 dev 在 Phase 6 显式调用 code-gen 添加性能打点时才生效。**Phase 3 不检查、不生成**。
+
+- [ ] **SHMEMI_PROF 分 phase frame**：kernel 中 **MUST** 使用 `SHMEMI_PROF_START(frame_id)` / `SHMEMI_PROF_END(frame_id)`，至少 5 个独立 `frame_id` 覆盖 copy_in / remote_put_get / signal_or_barrier_wait / local_compute / finalize（见 timing-and-metrics-standard.md §7）
+- [ ] **Host 侧 show_prof**：stream sync 后 **MUST** 调用 `aclshmemx_get_prof(nullptr, true)` 导出 Device frame 数据（见 timing-and-metrics-standard.md §7）
+- [ ] **--perf 模式**：main.cpp **MUST** 包含 `--perf` flag + warmup + timing loop + `[PERF]` 输出逻辑（见 templates-cmake-main.md perf 代码段）
+- [ ] **perf.sh**：`scripts/perf.sh` **MUST** 存在且可执行（实现见 perf-workflow.md）
 
 ---
 
@@ -259,10 +297,26 @@ op_name/
 - ❌ 一次性读取全部 communication 模板文件（必须按步骤只读当前子文件）
 - ❌ design.md 门禁有 FAIL 项仍继续生成代码（"先跑通再补设计"是最常见的违规路径）
 - ❌ GM 标量循环累加作为性能路径交付（按 atomic-add-pattern.md §12 决策表选择正确方式）
+- ❌ reduce-scatter/allreduce RS 阶段使用串行 UB 累加（get→UB→Add）替代 `SetAtomicAdd<T>()` + `mte_get_nbi` 批量并行模式（见 atomic-add-pattern.md §5.1 / §12 优先级1）
+- ❌ bus_factor 取值错误（**MUST** 从 `timing-and-metrics-standard.md §4.3` 唯一参照表取值，如 AllReduce 为 `2*(n-1)/n`，**禁止**用 `n-1`）
+- ❌ License 头缺失即作为交付
+- ❌ 错误处理裸写 `if (status != ACL_ERROR_NONE)` 而不使用 ACL_CHECK / CHECK_SHMEM 宏
+- ❌ README.md 非中文或不遵循 readme-spec.md 结构
+- ❌ 脚本/文档硬编码用户机器路径
+- ❌ `algo_bandwidth_GBps` 基于 kernel_us 计算（应基于 e2e_us）
+- ❌ Phase 3 生成 SHMEMI_PROF / --perf 打点代码（性能打点由 Phase 6 按需添加，code-gen 模板中 perf 代码段仅当 dev 显式调用时才写入）
+- ❌ SHMEMI_PROF 只用单个 frame_id 包裹整个 kernel
+- ❌ Host 侧不调用 `aclshmemx_get_prof(nullptr, true)`
+- ❌ 无理由使用 `aclshmemx_barrier_all_vec()` 替代 `aclshmem_barrier_all()`
+- ❌ `(void)cast` 替代 `UNUSED_PARAM(x)`
+- ❌ UB buffer 偏移量散落裸 magic value
+- ❌ `aclshmem_barrier_all()` / `aclshmem_finalize()` 不对称调用（某 PE 跳过 barrier/finalize，导致死锁或资源泄漏）
+- ❌ 算子代码中无正当理由调用 `aclshmemi_*` 内部接口（除非无公开等价 API 且已在 gap analysis 中登记）
 - ❌ 修改 SHMEM 核心库却无 gap analysis 授权
-- ❌ 将输入到对称堆的拷贝排除在 e2e 性能循环外（性能循环前预拷贝使 e2e 口径缩水）
+- ❌ 将数据搬运排除在 e2e 性能循环外（性能循环前预搬运使 e2e 口径缩水）；或在做法 A 上加无意义搬运制造 e2e>kernel 假象
 - ❌ `.md` 文档散放在算子根目录（必须归入 `docs/`）
 - ❌ `.cpp/.h` 源文件散放在算子根目录（必须归入 `src/`）
 - ❌ baseline 源码放在 `src/` 下或算子根目录（必须归入 `baseline/src/`，编译 target 必须在 `baseline/CMakeLists.txt`）
+- ❌ Phase 3 自行生成 baseline 代码（baseline 在 Phase 6 确定后才由 dev 调用 code-gen 按需生成）
 - ❌ 用户未要求 in-tree 时将算子生成到 `examples/`（默认 `custom-ops/<op_name>/`）
 - ❌ 通算融合算子在 AIV 上用标量/向量点乘替代 AIC + CATLASS 高性能计算（即使以"正确性验证"为由也不允许——须使用 CATLASS BlockMmad + CommBlockEpilogue 的 AIC/AIV 分工模式）

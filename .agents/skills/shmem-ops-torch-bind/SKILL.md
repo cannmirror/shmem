@@ -24,7 +24,7 @@ custom-ops 布局详见 [references/GUIDE.md](references/GUIDE.md) 与 [referenc
 
 | 文件 | 阅读时机 | 用途 |
 | --- | --- | --- |
-| [shmem-repo-resolution.md](../shmem-ops-dev/references/shmem-repo-resolution.md) | **读仓内 docs/examples 前** | 定位 `SHMEM_REPO` / `SKILLS_ROOT`；禁止 skill 相对路径链到仓 |
+| [../shmem-ops-dev/references/shmem-repo-resolution.md](../shmem-ops-dev/references/shmem-repo-resolution.md) | **读仓内 docs/examples 前** | 定位 `SHMEM_REPO` / `SKILLS_ROOT`；禁止 skill 相对路径链到仓 |
 | `${SHMEM_REPO}/examples/torch_binding/src/torch_bindings.cpp` | **始终**（先定位 `SHMEM_REPO`） | Torch CustomClassHolder 完整参考实现（Manager / KVShuffle / AllGather） |
 | `${SHMEM_REPO}/examples/torch_binding/include/torch_register.h` | **始终** | `REGISTER_SHMEM_OPS_CLASS` 宏定义和注册模式 |
 | `${SHMEM_REPO}/examples/torch_binding/include/shmem_torch_kernel.h` | **始终** | kernel 函数声明模板 |
@@ -349,7 +349,7 @@ python scripts/torch_test_<op_name>.py
 python scripts/torch_test_<op_name>.py --pes 2
 ```
 
-### 检查点
+### MUST检查
 
 - [ ] `torch_bind_<op_name>.cpp` 包含 CustomClassHolder 子类和 `REGISTER_SHMEM_OPS_CLASS` 注册
 - [ ] `compute()` 包含 TORCH_CHECK（dtype、device、shape）

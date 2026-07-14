@@ -37,9 +37,10 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
+        # iput/iget are valid SHMEM strided RMA terms, not misspellings of "input".
         args: [
             "-L",
-            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,CLOS",
+            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,CLOS,iput,iget",
             "--skip",
             "*.py,*.cpp,*.hpp,*.c,*.h,tools/pre-commit/typos.toml",
           ]

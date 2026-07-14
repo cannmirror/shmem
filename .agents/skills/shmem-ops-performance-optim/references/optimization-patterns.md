@@ -63,7 +63,7 @@ while (!all_done) {
 | 优化 | 远端 **直接** `mte_put(sendbuf+displ, remote_symm+put_off, pe=dst)`；仅 `dst==my_rank` 时 staging 到 `symm_off` |
 | 同步 | send 半核 `quiet` 后 **全体** `aclshmem_barrier_all()`，再 recv 半核 get |
 | SDMA | ≥2MB 可试 SDMA put/get；**MUST** 先 MTE 路径大档 PASS，再启用 SDMA |
-| 验证 | 平台档 uniform `base_count=8388608` 正确性 + `perf-workflow.md + platform-perf-spec.md` 带宽表 |
+| 验证 | uniform `base_count=8388608` 正确性 + `perf-workflow.md` 带宽表 |
 
 ❌ 错误：对每个 dst 先 Copy 到 `symm_off` 再 Copy `symm_off` 到远端 `put_off`（双倍流量）
 

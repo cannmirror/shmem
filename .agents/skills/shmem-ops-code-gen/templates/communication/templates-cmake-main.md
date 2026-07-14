@@ -262,16 +262,16 @@ int main(int argc, char *argv[])
         double algo_bw = payload_bytes / (e2e_us * 1e-6) / 1e9;
         double bus_bw  = algo_bw * bus_factor;
         double steady_algo_bw = payload_bytes / (kernel_us * 1e-6) / 1e9;
-        double steady_bus_bw  = steady_algo_bw * bus_factor;
+        double kernel_bus_bw  = steady_algo_bw * bus_factor;
         double peak_bw = 196.0;  // ==== 定制：按通信模式和拓扑调整（P2P: 28, 集合 8卡 full-mesh: 196）====
-        double util_pct = bus_bw / peak_bw * 100.0;
+        double util_pct = kernel_bus_bw / peak_bw * 100.0;
 
         if (pe_id == 0) {
             std::cout << "[PERF] e2e_us=" << e2e_us
                       << " kernel_us=" << kernel_us
                       << " algo_bandwidth_GBps=" << algo_bw
-                      << " bus_bandwidth_GBps=" << bus_bw
-                      << " steady_bus_bandwidth_GBps=" << steady_bus_bw
+                      << " e2e_bus_bandwidth_GBps=" << bus_bw
+                      << " kernel_bus_bandwidth_GBps=" << kernel_bus_bw
                       << " bandwidth_utilization_pct=" << util_pct
                       << " payload_bytes=" << payload_bytes
                       << " bus_factor=" << bus_factor

@@ -116,7 +116,7 @@ case matrix 执行报告输出到 `docs/case_matrix_report.md`。
 
 ---
 
-## 检查点
+## MUST检查
 
 - [ ] case matrix 覆盖 XS/S/M/L 四档规模（见 testcase-scale-standard.md）
 - [ ] case matrix 覆盖所有类别（functional + boundary + stress + performance）

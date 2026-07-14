@@ -85,14 +85,9 @@ description: "编译、运行和调试 SHMEM 算子。关键词：编译、compi
 
 ---
 
-## 步骤 4：运行与正确性测试
+## 步骤 4：Smoke 运行
 
-运行顺序：
-1. 2 PE 小数据 smoke case
-2. `design.md` 指定的主 dtype/shape
-3. tail/chunk 边界 case
-4. 多轮 repeats
-5. gap analysis 要求的特殊 case
+**仅执行 2-PE 小数据 smoke case**，验证 init / malloc / launch / finalize 能跑通。全量 case matrix 执行完全交给 `shmem-ops-correctness-eval`，compile-debug 不再重复跑主 dtype/shape、tail/chunk、repeats、gap case。
 
 ---
 
@@ -102,18 +97,23 @@ description: "编译、运行和调试 SHMEM 算子。关键词：编译、compi
 
 | 类型 | 典型信号 | 处理 |
 | --- | --- | --- |
-| compile | 头文件缺失、模板实例化失败、Device/Host API 用错 | 修 CMake/编译选项或代码 |
-| link | `undefined reference`、找不到 `.so` | 修链接库、`LD_LIBRARY_PATH` |
-| launch | kernel launch 参数非法、FFTS 配置错 | 修 Host 参数、launch wrapper |
-| runtime | init/bootstrap/ACL/SHMEM 返回错误 | 修环境、PE 参数、初始化配置 |
+| compile | 头文件缺失、模板实例化失败、Device/Host API 用错 | 回 `shmem-ops-code-gen` 修代码或 CMake |
+| link | `undefined reference`、找不到 `.so` | 回 `shmem-ops-code-gen` 修 CMakeLists.txt 或链接配置 |
+| launch | kernel launch 参数非法、FFTS 配置错 | 回 `shmem-ops-code-gen` 修 Host 参数、launch wrapper |
+| runtime | init/bootstrap/ACL/SHMEM 返回错误 | 修环境、PE 参数、初始化配置（本 skill 自修） |
 | runtime | 输出 bin 全 0、golden 对比 FAIL，但进程打印 SUCCESS | **先查 shmem 日志**（端口占用、`Memory Heap Not Initialized`），见 [debug.md](references/debug.md) §4.1 |
 | correctness | 程序运行但输出错误 | 回 `shmem-ops-code-gen` 修代码；若 contract 错回 design |
 | environment | 设备/依赖/权限不可用 | 询问用户补齐；仍不可用时标记阻塞 |
 
-**修复策略**：持续修复直到正确性通过，或确认为以下不可继续的阻塞：
-- 环境阻塞（用户无法补齐）
-- 设计缺陷（需回 `shmem-ops-design` 修订）
-- 需修改 SHMEM 核心库但无 gap analysis 授权
+**修复策略**：
+
+- 本 skill **只负责编译执行与失败诊断**，**禁止**自行修改算子代码（`.cpp`/`.h`/`CMakeLists.txt`）
+- compile / link / launch / correctness 类失败 → 将诊断结果（错误信息、定位、建议）回传给 `shmem-ops-code-gen`，由 code-gen 完成代码修复后重新调用本 skill
+- runtime / environment 类失败 → 本 skill 自行修复（环境变量、PE 参数、端口等，不涉及算子代码）
+- 循环直到正确性通过，或确认为以下不可继续的阻塞：
+  - 环境阻塞（用户无法补齐）
+  - 设计缺陷（需回 `shmem-ops-design` 修订）
+  - 需修改 SHMEM 核心库但无 gap analysis 授权
 
 ---
 
@@ -131,7 +131,7 @@ description: "编译、运行和调试 SHMEM 算子。关键词：编译、compi
 
 ---
 
-## 检查点
+## MUST检查
 
 - [ ] 构建模式已判断（in_tree_example / independent_project）
 - [ ] 环境预检查通过（CANN、Python、SHMEM）

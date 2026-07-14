@@ -1,6 +1,6 @@
 # SHMEM 仓库文档与 API 索引（算子开发参考）
 
-生成、调试、优化 custom-ops 算子时，**SHMEM API/官方文档** 以本表 **SHMEM 仓原生** 路径为准（`docs/`、`install/shmem/include/`、`examples/`）。  
+生成、调试、优化 custom-ops 算子时，**SHMEM API/官方文档** 以本表 **SHMEM 仓原生** 路径为准（`docs/`、`install/shmem/include/`、`examples/`）。
 **custom-ops/** 为 skill 生成交付物，**不在**本表；其规范见 [custom-ops-entrypoints.md](custom-ops-entrypoints.md)、[env-setup.snippet.md](env-setup.snippet.md)。
 
 > **`docs/` 只读**：仓内 `docs/` 为官方文档，Agent **不得修改**；仅 Read 引用。技能侧补充写在 skill 树内（如本目录 `log-debug.md`）。

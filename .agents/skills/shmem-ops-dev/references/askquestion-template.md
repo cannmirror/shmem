@@ -3,7 +3,7 @@
 新窗口 Agent **禁止**自行编造 Phase 0 表单。调用 `AskQuestion` 时 **MUST** 与本文件一致（仅可将 `<用户名>` 等占位符替换为检测到的实际值）。
 
 > **触发方式**：用户 **主动 @ 指定** `.agents/skills/shmem-ops-dev/SKILL.md`（或对话中明确引用该 skill）时生效；**须在对话中引用后才会加载**，不会在未引用时自动注入。
-> **Agent 收到 @ 指定后 MUST**：① Read 本 skill 的 `SKILL.md` → ② Read 本文件 → ③ **verbatim** 调用 `AskQuestion`（禁止自行改 CANN 为第三个固定「自定义」按钮）。  
+> **Agent 收到 @ 指定后 MUST**：① Read 本 skill 的 `SKILL.md` → ② Read 本文件 → ③ **verbatim** 调用 `AskQuestion`（禁止自行改 CANN 为第三个固定「自定义」按钮）。
 > 若只读 `SKILL.md` 摘要、未读本模板，表单会与预期不一致。
 
 ---
@@ -103,5 +103,3 @@ Phase 0 启动确认（SHMEM 算子开发）
 | `perf=yes/no`           | `performance_required: true/false`            |
 | `perf_auto_optim=yes`   | `performance_auto_optim: true`（须 `performance_required:true`，否则强制 `false`） |
 | `perf_auto_optim=no`    | `performance_auto_optim: false`               |
-
-

@@ -12,13 +12,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 #include <vector>
-#include <iomanip>
 #include <getopt.h>
 #include "utils.h"
 #include "perftest_common_types.h"
 #include "mte_perftest_common.h"
+
+constexpr int UB_ALIGN_SIZE = 64;
 
 #define CHECK_ACL_GOTO(call, ret_var, label)                        \
     do {                                                            \
@@ -69,11 +69,9 @@ static const char* fuc_test_type;
 int f_npu = 0;
 aclshmemx_uniqueid_t default_flag_uid;
 
-static aclshmem_prof_pe_t* out_profs;
-
 extern "C" void launch_rdma_perf_kernel(
-    uint32_t block_dim, void* stream, uint8_t* dst_gva, uint8_t* src_gva, int elements, int32_t frame_id, int test_mode,
-    int data_type, int ub_size_kb, int64_t prof_pe_val, int loop_count, int metric, int batch, int sync_id);
+    uint32_t block_dim, void* stream, uint8_t* dst_gva, uint8_t* src_gva, int elements, int test_mode, int data_type,
+    int ub_size_b, int loop_count, int metric, int batch, int sync_id, uint8_t* timing_out_gva);
 
 static perftest::rdma_mode_t get_rdma_mode(const char* test_type_str)
 {
@@ -125,7 +123,7 @@ static perftest::perf_metric_t get_perf_metric(const char* metric_str)
 template <typename T>
 int test_rdma_perf_test_impl(
     int pe_id, int n_pes, uint64_t local_mem_size, int min_exponent, int max_exponent, int loop_count,
-    perftest::rdma_mode_t test_mode, perftest::perf_data_type_t data_type_enum, int prof_pe, int ub_size_kb,
+    perftest::rdma_mode_t test_mode, perftest::perf_data_type_t data_type_enum, int ub_size_b,
     perftest::perf_metric_t metric, int batch, int sync_id, std::vector<std::vector<std::string>>& csv_data)
 {
     static const char* kFunc = "test_rdma_perf_test_impl";
@@ -135,12 +133,11 @@ int test_rdma_perf_test_impl(
     aclrtStream stream = nullptr;
     void* dst_ptr = nullptr;
     void* src_ptr = nullptr;
+    void* timing_out_ptr = nullptr;
     bool acl_initialized = false;
     bool device_set = false;
     bool stream_created = false;
     bool shmem_initialized = false;
-    bool prof_finalized = false;
-    int frame_id = 0;
     int ret = 0;
 
     CHECK_ACL_GOTO(aclInit(nullptr), ret, cleanup);
@@ -159,7 +156,7 @@ int test_rdma_perf_test_impl(
 
     for (int exponent = min_exponent; exponent <= max_exponent; exponent++) {
         size_t datasize = static_cast<size_t>(1) << exponent;
-        std::cout << "pe: " << pe_id << " size: " << datasize << " frame_id: " << frame_id << std::endl;
+        std::cout << "pe: " << pe_id << " size: " << datasize << std::endl;
 
         dst_ptr = aclshmem_malloc(datasize);
         src_ptr = aclshmem_malloc(datasize);
@@ -172,6 +169,20 @@ int test_rdma_perf_test_impl(
             std::cerr << "[ERROR] [" << kFunc << "] aclshmem_malloc failed for src_ptr, size=" << datasize << std::endl;
             ret = -1;
             goto cleanup;
+        }
+
+        timing_out_ptr = aclshmem_malloc(sizeof(int64_t) * 2);
+        if (timing_out_ptr == nullptr) {
+            std::cerr << "[ERROR] [" << kFunc << "] aclshmem_malloc failed for timing_out_ptr" << std::endl;
+            ret = -1;
+            goto cleanup;
+        }
+        {
+            std::vector<int64_t> zero(2, 0);
+            CHECK_ACL_GOTO(
+                aclrtMemcpy(
+                    timing_out_ptr, sizeof(int64_t) * 2, zero.data(), sizeof(int64_t) * 2, ACL_MEMCPY_HOST_TO_DEVICE),
+                ret, cleanup);
         }
 
         int trans_size = datasize / sizeof(T);
@@ -188,10 +199,77 @@ int test_rdma_perf_test_impl(
             aclrtMemcpy(dst_ptr, datasize, dst_input.data(), datasize, ACL_MEMCPY_HOST_TO_DEVICE), ret, cleanup);
 
         launch_rdma_perf_kernel(
-            block_dim, stream, (uint8_t*)dst_ptr, (uint8_t*)src_ptr, trans_size, frame_id, static_cast<int>(test_mode),
-            static_cast<int>(data_type_enum), ub_size_kb, prof_pe, loop_count, static_cast<int>(metric), batch,
-            sync_id);
+            block_dim, stream, (uint8_t*)dst_ptr, (uint8_t*)src_ptr, trans_size, static_cast<int>(test_mode),
+            static_cast<int>(data_type_enum), ub_size_b, loop_count, static_cast<int>(metric), batch, sync_id,
+            (uint8_t*)timing_out_ptr);
         CHECK_ACL_GOTO(aclrtSynchronizeStream(stream), ret, cleanup);
+
+        bool is_put_get_mode =
+            (test_mode == perftest::TEST_MODE_RDMA_PUT || test_mode == perftest::TEST_MODE_RDMA_BI_PUT ||
+             test_mode == perftest::TEST_MODE_RDMA_GET || test_mode == perftest::TEST_MODE_RDMA_BI_GET);
+        if (is_put_get_mode) {
+            // Read back timing output: [0]=PE0_time(forward), [1]=PE1_time(reverse)
+            // After cross-PE exchange in kernel, both PEs have both values.
+            std::vector<int64_t> timing_host(2, 0);
+            CHECK_ACL_GOTO(
+                aclrtMemcpy(
+                    timing_host.data(), sizeof(int64_t) * 2, timing_out_ptr, sizeof(int64_t) * 2,
+                    ACL_MEMCPY_DEVICE_TO_HOST),
+                ret, cleanup);
+
+            bool is_bidir =
+                (test_mode == perftest::TEST_MODE_RDMA_BI_PUT || test_mode == perftest::TEST_MODE_RDMA_BI_GET);
+
+            // CSV: compute BW from timing_out
+            const char* soc_name = aclrtGetSocName();
+            int64_t cycle2us = 50;
+            if (soc_name != nullptr && std::string(soc_name).find("Ascend950") != std::string::npos) {
+                cycle2us = 1000;
+            }
+            double per_iter_us0 = (loop_count > 0) ? static_cast<double>(timing_host[0]) / cycle2us / loop_count : 0.0;
+            double per_iter_us1 = (loop_count > 0) ? static_cast<double>(timing_host[1]) / cycle2us / loop_count : 0.0;
+
+            double bw_gb = 0.0, bw_gib = 0.0, per_iter_us = 0.0;
+            if (is_bidir) {
+                if (metric == perftest::PERF_METRIC_LAT) {
+                    per_iter_us = (per_iter_us0 + per_iter_us1) / 2;
+                    std::cout << "[LAT] PE" << pe_id << " forward(PE0→PE1)=" << per_iter_us0 << " us"
+                              << " reverse(PE1→PE0)=" << per_iter_us1 << " us"
+                              << " avg=" << per_iter_us << " us" << std::endl;
+                } else {
+                    double bps0 = (per_iter_us0 > 0) ? datasize / per_iter_us0 * 1000000.0 : 0.0;
+                    double bps1 = (per_iter_us1 > 0) ? datasize / per_iter_us1 * 1000000.0 : 0.0;
+                    double bw_gb_0 = bps0 / 1000.0 / 1000.0 / 1000.0;
+                    double bw_gb_1 = bps1 / 1000.0 / 1000.0 / 1000.0;
+                    bw_gb = bw_gb_0 + bw_gb_1;
+                    double bw_gib_0 = bps0 / 1024.0 / 1024.0 / 1024.0;
+                    double bw_gib_1 = bps1 / 1024.0 / 1024.0 / 1024.0;
+                    bw_gib = bw_gib_0 + bw_gib_1;
+                    std::cout << "[BW] PE" << pe_id << " forward(PE0→PE1)=" << bw_gb_0 << " GB/s"
+                              << " reverse(PE1→PE0)=" << bw_gb_1 << " GB/s"
+                              << " total=" << bw_gb << " GB/s" << std::endl;
+                    per_iter_us = per_iter_us0 + per_iter_us1;
+                }
+            } else {
+                if (metric == perftest::PERF_METRIC_LAT) {
+                    per_iter_us = (pe_id == 0) ? per_iter_us0 : per_iter_us1;
+                    std::cout << "[LAT] PE" << pe_id << ": " << per_iter_us << " us" << std::endl;
+                } else {
+                    per_iter_us = (pe_id == 0) ? per_iter_us0 : per_iter_us1;
+                    double bps = (per_iter_us > 0) ? datasize / per_iter_us * 1000000.0 : 0.0;
+                    bw_gb = bps / 1000.0 / 1000.0 / 1000.0;
+                    bw_gib = bps / 1024.0 / 1024.0 / 1024.0;
+                    std::cout << "[BW] PE" << pe_id << ": " << bw_gb << " GB/s" << std::endl;
+                }
+            }
+
+            std::vector<std::string> row = {
+                uint64_to_string(datasize),           int_to_string(g_npus),   "1",
+                double_to_string(ub_size_b / 1024.0), double_to_string(bw_gb), double_to_string(bw_gib),
+                double_to_string(per_iter_us),
+            };
+            csv_data.push_back(row);
+        }
 
         bool verify_success = true;
         auto compare_values = [&](T* p1, T* p2, size_t count, const char* l1, const char* l2) -> bool {
@@ -215,15 +293,15 @@ int test_rdma_perf_test_impl(
         int peer_pe = (pe_id + 1) % n_pes;
         if (test_mode == perftest::TEST_MODE_RDMA_PUT) {
             std::cout << "\n[Verification] put: checking..." << std::endl;
-            if (pe_id != prof_pe) {
-                T expected_val = static_cast<T>(prof_pe + 10);
+            if (pe_id != 0) {
+                T expected_val = static_cast<T>(10);
                 if (!compare_values(dst_host.data(), &expected_val, 1, "dst[0]", "peer_src[0]")) {
                     verify_success = false;
                 }
             }
         } else if (test_mode == perftest::TEST_MODE_RDMA_GET) {
             std::cout << "\n[Verification] get: checking..." << std::endl;
-            if (pe_id == prof_pe) {
+            if (pe_id == 0) {
                 T expected_val = static_cast<T>(peer_pe + 10);
                 if (!compare_values(dst_host.data(), &expected_val, 1, "dst[0]", "peer_src[0]")) {
                     verify_success = false;
@@ -249,36 +327,16 @@ int test_rdma_perf_test_impl(
             std::cout << "[Verification] FAILED" << std::endl;
         }
 
-        aclshmemx_get_prof(&out_profs, false);
-        if (out_profs == nullptr) {
-            std::cerr << "[WARN] [" << kFunc << "] aclshmemx_get_prof returned null out_profs, skip csv collection"
-                      << std::endl;
-        } else {
-            collect_prof_data_to_csv_v2(
-                out_profs, frame_id, datasize, 1, g_npus, ub_size_kb, loop_count, metric == perftest::PERF_METRIC_BW,
-                csv_data);
-        }
-
         aclshmem_free(dst_ptr);
         dst_ptr = nullptr;
         aclshmem_free(src_ptr);
         src_ptr = nullptr;
+        aclshmem_free(timing_out_ptr);
+        timing_out_ptr = nullptr;
         CHECK_ACL_GOTO(aclrtSynchronizeStream(stream), ret, cleanup);
-
-        frame_id++;
-        if (frame_id >= ACLSHMEM_CYCLE_PROF_FRAME_CNT) {
-            std::cerr << "warning: frame_id reached limit " << ACLSHMEM_CYCLE_PROF_FRAME_CNT << std::endl;
-            break;
-        }
     }
-    aclshmemx_get_prof(nullptr, true);
-    prof_finalized = true;
 
 cleanup:
-    if (shmem_initialized && !prof_finalized) {
-        aclshmemx_get_prof(nullptr, true);
-        prof_finalized = true;
-    }
     if (dst_ptr != nullptr) {
         aclshmem_free(dst_ptr);
         dst_ptr = nullptr;
@@ -286,6 +344,10 @@ cleanup:
     if (src_ptr != nullptr) {
         aclshmem_free(src_ptr);
         src_ptr = nullptr;
+    }
+    if (timing_out_ptr != nullptr) {
+        aclshmem_free(timing_out_ptr);
+        timing_out_ptr = nullptr;
     }
     if (shmem_initialized) {
         CHECK_SHMEM_CLEANUP(aclshmem_finalize(), ret);
@@ -315,7 +377,7 @@ int main(int argc, char* argv[])
     int min_exponent = 3;
     int max_exponent = 17;
     int loop_count = 1000;
-    int ub_size_kb = 64;
+    int ub_size_b = 64;
     const char* metric_str = "bw";
     int batch = 0;
     int sync_id = 0;
@@ -384,7 +446,7 @@ int main(int argc, char* argv[])
                 } else if (strcmp(long_options[option_index].name, "loop-count") == 0)
                     loop_count = std::atoi(optarg);
                 else if (strcmp(long_options[option_index].name, "ub-size") == 0)
-                    ub_size_kb = std::atoi(optarg);
+                    ub_size_b = std::atoi(optarg);
                 else if (strcmp(long_options[option_index].name, "metric") == 0)
                     metric_str = optarg;
                 else if (strcmp(long_options[option_index].name, "batch") == 0)
@@ -426,10 +488,6 @@ int main(int argc, char* argv[])
         std::cerr << "Error: --metric must be 'bw' or 'lat' (got '" << metric_str << "')" << std::endl;
         return 1;
     }
-    if (metric == perftest::PERF_METRIC_LAT && strcmp(test_type, "put") != 0) {
-        std::cerr << "Error: --metric lat is only supported with -t put (got '" << test_type << "')" << std::endl;
-        return 1;
-    }
 
     if (strcmp(test_type, "put_signal") == 0) {
         std::cerr << "Error: test type 'put_signal' is not supported by rdma_perftest "
@@ -465,9 +523,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    ub_size_b = ((ub_size_b + UB_ALIGN_SIZE - 1) / UB_ALIGN_SIZE) * UB_ALIGN_SIZE;
+
     std::cout << "[INFO] rdma_perftest start, pe=" << pe_id << ", t=" << test_type << ", d=" << fuc_data_type
-              << ", exp=" << min_exponent << "-" << max_exponent << ", loop=" << loop_count << ", ub=" << ub_size_kb
-              << "KB, metric=" << metric_str << ", batch=" << batch << ", sync_id=" << sync_id << ", qp=" << qp_num
+              << ", exp=" << min_exponent << "-" << max_exponent << ", loop=" << loop_count << ", ub=" << ub_size_b
+              << "B, metric=" << metric_str << ", batch=" << batch << ", sync_id=" << sync_id << ", qp=" << qp_num
               << std::endl;
 
     fuc_test_type = test_type;
@@ -501,29 +561,24 @@ int main(int argc, char* argv[])
         local_mem_size = gb_needed * ONE_GB;
     }
 
-    const char* prof_pe_env = std::getenv("SHMEM_CYCLE_PROF_PE");
-    int prof_pe = (prof_pe_env != nullptr) ? std::atoi(prof_pe_env) : 0;
-    if (prof_pe < 0 || prof_pe >= n_pes) {
-        std::cerr << "Error: prof_pe (SHMEM_CYCLE_PROF_PE) must be in range [0, " << n_pes << ") (got " << prof_pe
-                  << ")" << std::endl;
-        return 1;
-    }
-
     std::vector<std::vector<std::string>> csv_data = {
-        {"DataSize/B", "Npus", "Blocks", "UBsize/KB", "Bandwidth/GB/s(1000)", "Bandwidth/GiB/s(1024)", "CoreMaxTime/us",
-         "SingleCoreTime/us"}};
+        {"DataSize/B", "Npus", "Blocks", "UBsize/KB", "Bandwidth/GB/s", "Bandwidth/GiB/s", "CoreMaxTime/us"}};
 
     int status = 0;
-#define RDMA_TEST_IMPL_OP(type)                                                                                   \
-    status = test_rdma_perf_test_impl<type>(                                                                      \
-        pe_id, n_pes, local_mem_size, min_exponent, max_exponent, loop_count, test_mode, data_type_enum, prof_pe, \
-        ub_size_kb, metric, batch, sync_id, csv_data)
+#define RDMA_TEST_IMPL_OP(type)                                                                                     \
+    status = test_rdma_perf_test_impl<type>(                                                                        \
+        pe_id, n_pes, local_mem_size, min_exponent, max_exponent, loop_count, test_mode, data_type_enum, ub_size_b, \
+        metric, batch, sync_id, csv_data)
     DISPATCH_BY_TYPE(fuc_data_type, RDMA_TEST_IMPL_OP);
 #undef RDMA_TEST_IMPL_OP
 
-    if (pe_id == prof_pe) {
+    if (status != 0) {
+        std::cerr << "[FAILED] rdma_perftest failed in pe " << pe_id << std::endl;
+        return status;
+    }
+    if (pe_id == 0) {
         std::string csv_filename = "output/rdma_" + std::string(metric_str) + "_" + std::string(fuc_test_type) + "_" +
-                                   std::string(fuc_data_type) + "_" + int_to_string(prof_pe) + ".csv";
+                                   std::string(fuc_data_type) + "_0.csv";
         write_csv(csv_filename, csv_data);
     }
 

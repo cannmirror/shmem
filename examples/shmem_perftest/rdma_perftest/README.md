@@ -8,9 +8,9 @@
 
 针对以下 RDMA 数据传输操作的性能：
 
-1. **单向 Put** (`put`)：仅 `SHMEM_CYCLE_PROF_PE` 指定的 PE 调用 RDMA put 接口，将数据传输到对端 PE。
+1. **单向 Put** (`put`)：仅 PE0 调用 RDMA put 接口，将数据传输到对端 PE。
 2. **双向 Put** (`bi_put`)：两个 PE 同时调用 put，互相传输数据。
-3. **单向 Get** (`get`)：仅 prof PE 调用 RDMA get 接口，从对端 PE 拉取数据。
+3. **单向 Get** (`get`)：仅 PE0 调用 RDMA get 接口，从对端 PE 拉取数据。
 4. **双向 Get** (`bi_get`)：两个 PE 同时调用 get，互相拉取数据。
 
 ## 与 `mte_perftest`、`udma_perftest` 的差异
@@ -20,7 +20,7 @@
 | 引擎 | 默认 MTE | 显式 `ACLSHMEM_DATA_OP_UDMA` | RDMA 引擎 |
 | 多核并发 | 同 peer 多核 (默认 32 核切分数据) | **强制单核** (`block_dim=1`)：UDMA 不允许同 peer 多核并发 | **强制单核** (`block_dim=1`)：RDMA 不允许同 peer 多核并发 |
 | `-b/--block-size`、`--block-range` | 控制核数 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 |
-| UB 缓冲 | MTE 必需，影响传输 | UDMA 内部不消耗 UB，仅形式上保留 `--ub-size` 入参 | RDMA 必须，大小至少为 64B，默认为 64B |
+| UB 缓冲 | MTE 必需，影响传输 | UDMA 必须，用于低阶接口 UB 入参 | RDMA 必须，大小至少为 64B，默认为 64B，自动 64B 对齐 |
 | 测试模式 | put / bi_put / get / bi_get | put / bi_put / get / bi_get / **put_signal** | put / bi_put / get / bi_get |
 | SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort | **Ascend950（需指定 `XSCALE` 或 `HNS_1825` 后端）或 Ascend910B/C** |
 | CSV 文件名 | `<test>_<dtype>_<pe>.csv` | `udma_<test>_<dtype>_<pe>.csv` | `rdma_<test>_<dtype>_<pe>.csv` |
@@ -53,8 +53,9 @@ bash run.sh [选项]
 | `--exponent <exponent>` | `-e <exponent>` | 数据量幂数 (2^exponent 字节) | - |
 | `--exponent-range <min> <max>` | - | 数据量幂数范围 | 3 17 |
 | `--loop-count <count>` | - | 循环次数 | 1000 |
-| `--ub-size <size>` | - | UB size (KB)；RDMA 需要至少 64B 的 UB 空间 | 64 |
+| `--ub-size <size>` | - | UB size (B)；自动 64B 对齐；至少 64B | 64 |
 | `--batch <count>` | - | 单 QP 上每次调用 quiet 之前连续提交的 NBI 个数 (0 表示全异步) | 0 |
+| `--metric <bw\|lat>` | - | 性能指标: `bw`=带宽, `lat`=接口延迟 | `bw` |
 | `--sync-id <id>` | - | 显式传给 Put、Get、Quiet 的同步 ID | 0 |
 | `-q/--qp <num>` | - | QP 的个数，当前版本仅支持单 QP | 1 |
 | `-pes <size>` | - | PE 数量 (目前强制为 2) | 2 |
@@ -73,43 +74,51 @@ bash run.sh [选项]
 ### 使用示例
 
 ```bash
-# 单向 PUT，float，幂数 8-20
+# 单向 PUT，float，幂数 8-20 带宽测试 (默认 metric=bw)
 ./run.sh -t put -d float --exponent-range 8 20 --loop-count 1000
 
 # 双向 GET，int32
 ./run.sh -t bi_get -d int32 --exponent-range 8 20 --loop-count 1000
-
-# 四种模式 × float
-./run.sh -t all -d float --exponent-range 8 20 --loop-count 1000
-
-# 单一模式 × 全部数据类型
-./run.sh -t put -d all --exponent-range 8 20
 
 # 单向 PUT, 所有 NBI 执行过后确认一次
 ./run.sh -t put -d float --exponent-range 8 20 --loop-count 1000 --batch 0
 
 # 单向 PUT, 每 128 个 NBI 确认一次
 ./run.sh -t put -d float --exponent-range 8 20 --loop-count 1000 --batch 128
+
+# 单向 PUT 延迟测试
+./run.sh -t put -d float --exponent-range 8 20 --loop-count 1000 --metric lat
+
+# 双向 PUT
+./run.sh -t bi_put -d float --exponent-range 8 20 --loop-count 1000
 ```
 
 ## CSV 输出
 
-CSV 列与 MTE 版完全一致，便于复用 `examples/utils/perf_data_process.py` 出图：
+CSV 格式如图：
 
 ```
-DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, CoreMaxTime/us, SingleCoreTime/us
+DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, Bandwidth/GiB/s, CoreMaxTime/us
 ```
 
-`Blocks` 列恒为 1。文件名前缀为 `rdma_`：`output/rdma_<test_type>_<dtype>_<pe>.csv`。
+`Blocks` 列恒为 1。文件名前缀为 `rdma_<metric>_`：`output/rdma_<metric>_<test_type>_<dtype>_<pe>.csv`。
 
 ## 输出示例
 
 ```
-[INFO] rdma_perftest start, pe=0, t=put, d=float, exp=10-10, loop=100, ub=16KB
-pe: 0 size: 1024 frame_id: 0
-[Verification] put: checking...
-[Verification] SUCCESS
-[SUCCESS] rdma_perftest done in pe 0
+测试类型: bi_get
+数据类型: float
+幂数范围: 11-20
+循环次数: 1000
+UB size(B): 64
+Batch size: 0
+Sync ID: 0
+QP num: 1
+Metric: lat
+PE_SIZE: 2, GNPU_NUM: 2
+FIRST_NPU: 0
+[INFO] rdma_perftest start, pe=0, t=bi_get, d=float, exp=11-20, loop=1000, ub=64B, metric=lat, batch=1000, sync_id=0, qp=1
+[INFO] rdma_perftest start, pe=1, t=bi_get, d=float, exp=11-20, loop=1000, ub=64B, metric=lat, batch=1000, sync_id=0, qp=1
 ```
 
 ## 已知约束

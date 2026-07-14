@@ -30,12 +30,13 @@ MIN_EXPONENT="3"
 MAX_EXPONENT="17"
 # 默认循环次数
 LOOP_COUNT="1000"
-# 默认UB size(KB) - RDMA需要至少64B的UB空间
+# 默认UB size(B) - RDMA需要至少64B的UB空间
 UB_SIZE="64"
 # RDMA特有参数
 BATCH="0"
 SYNC_ID="0"
 QP_NUM="1"
+METRIC="bw"
 # 默认RANK配置 - RDMA目前强制PE数量为2
 PE_SIZE="2"
 IPPORT="tcp://127.0.0.1:8768"
@@ -66,6 +67,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         -q|--qp)
             if [ -n "$2" ]; then QP_NUM="$2"; shift 2; else echo "Error: -q requires a value."; exit 1; fi
+            ;;
+        --metric)
+            if [ -n "$2" ]; then METRIC="$2"; shift 2; else echo "Error: --metric requires a value."; exit 1; fi
             ;;
         -b|--block-size)
             if [ -n "$2" ]; then
@@ -128,10 +132,11 @@ while [[ $# -gt 0 ]]; do
             echo "  -e|--exponent <exponent>        数据量幂数"
             echo "  --exponent-range <min> <max>    数据量幂数范围"
             echo "  --loop-count <count>            循环次数 (默认 1000)"
-            echo "  --ub-size <size>                UB size(KB), RDMA 需要至少 64B 的 UB 空间 (默认 64)"
+            echo "  --ub-size <size>                UB size(B), 64B~64KB, 自动 64B 对齐 (默认 64)"
             echo "  --batch <count>                 单 QP 上每次调用 quiet 之前连续提交的 NBI 个数 (默认 1)"
             echo "  --sync-id <id>                  显式传给 Put、Get、Quiet 的同步 ID (默认 0)"
             echo "  -q|--qp <num>                   QP 的个数，当前版本仅支持单 QP (默认 1)"
+            echo "  --metric <bw|lat>              性能指标: bw=带宽, lat=接口延迟 (默认 bw)"
             echo "  -pes <size>                     PE 数量 (目前强制为 2)"
             echo "  -ipport <ip:port>               通信地址"
             echo "  -gnpus <num>                    NPU 数量"
@@ -192,6 +197,13 @@ if [[ ! " $VALID_ANALYSE_MODES " =~ " $ANALYSE_MODE " ]]; then
     exit 1
 fi
 
+# 验证metric参数
+VALID_METRICS="bw lat"
+if [[ ! " $VALID_METRICS " =~ " $METRIC " ]]; then
+    echo "错误: metric 必须是 'bw' 或 'lat' (got '$METRIC')"
+    exit 1
+fi
+
 # 验证数值参数
 validate_non_negative_int "MIN_EXPONENT" "$MIN_EXPONENT"
 validate_non_negative_int "MAX_EXPONENT" "$MAX_EXPONENT"
@@ -225,8 +237,8 @@ if [[ "$PE_SIZE" != "2" ]]; then
     PE_SIZE="2"
 fi
 
-if [[ "$UB_SIZE" -lt "1" ]]; then
-    echo "错误: UB size 必须至少为 1KB (64B)"
+if [[ "$UB_SIZE" -lt "64" || "$UB_SIZE" -gt "65536" ]]; then
+    echo "错误: UB size 必须在 64B~65536B(64KB)之间"
     exit 1
 fi
 
@@ -234,14 +246,13 @@ echo "测试类型: $TEST_TYPE"
 echo "数据类型: $DATA_TYPE"
 echo "幂数范围: $MIN_EXPONENT-$MAX_EXPONENT"
 echo "循环次数: $LOOP_COUNT"
-echo "UB size(KB): $UB_SIZE"
+echo "UB size(B): $UB_SIZE"
 echo "Batch size: $BATCH"
 echo "Sync ID: $SYNC_ID"
 echo "QP num: $QP_NUM"
+echo "Metric: $METRIC"
 echo "PE_SIZE: $PE_SIZE, GNPU_NUM: $GNPU_NUM"
 echo "FIRST_NPU: $FIRST_NPU"
-
-export SHMEM_CYCLE_PROF_PE=${SHMEM_CYCLE_PROF_PE:-0}
 
 ALL_TEST_TYPES=("put" "bi_put" "get" "bi_get")
 ALL_DATATYPES=("float" "int8" "int16" "int32" "int64" "uint8" "uint16" "uint32" "uint64" "char")
@@ -249,14 +260,21 @@ ALL_DATATYPES=("float" "int8" "int16" "int32" "int64" "uint8" "uint16" "uint32" 
 run_test() {
     local test_type="$1"
     local data_type="$2"
+    local -a pids=()
     for (( idx =0; idx < ${GNPU_NUM}; idx = idx + 1 )); do
         ${EXEC_BIN} --pes "$PE_SIZE" --pe-id "$idx" --ipport "$IPPORT" --gnpus "$GNPU_NUM" \
             --fnpu "$FIRST_NPU" -t "$test_type" -d "$data_type" \
             --exponent-range "$MIN_EXPONENT" "$MAX_EXPONENT" --loop-count "$LOOP_COUNT" \
             --ub-size "$UB_SIZE" --batch "$BATCH" --sync-id "$SYNC_ID" \
-            --qp "$QP_NUM" &
+            --metric "$METRIC" --qp "$QP_NUM" &
+        pids+=($!)
     done
-    wait
+    local failed=0
+    local exit_code=0
+    for pid in "${pids[@]}"; do
+        wait "$pid" || failed=1
+    done
+    return $failed
 }
 
 if [[ "$TEST_TYPE" == "all" && "$DATA_TYPE" == "all" ]]; then

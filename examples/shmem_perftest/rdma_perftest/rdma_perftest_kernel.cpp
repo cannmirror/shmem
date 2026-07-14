@@ -11,30 +11,32 @@
 #ifndef _RDMAPERF_KERNEL_RDMA_PERFTEST_
 #define _RDMAPERF_KERNEL_RDMA_PERFTEST_
 
-#include <cstring>
 #include "kernel_operator.h"
 #include "shmem.h"
-#include "utils/prof/shmemi_prof.h"
 #include "perftest_common_types.h"
 
 template <typename T>
 __aicore__ inline void rdma_perf_test_put_impl(
-    GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::rdma_mode_t test_mode, int ub_size_kb,
-    int64_t prof_pe_val, int loop_count, int metric, int batch, uint32_t sync_id)
+    GM_ADDR dst_gva, GM_ADDR src_gva, int elements, perftest::rdma_mode_t test_mode, int ub_size_b, int loop_count,
+    int metric, int batch, uint32_t sync_id, GM_ADDR timing_out_gva)
 {
     int64_t pe = aclshmem_my_pe();
     int peer_pe = (pe + 1) % aclshmem_n_pes();
+    __gm__ int64_t* timing_out = reinterpret_cast<__gm__ int64_t*>(timing_out_gva);
 
-    bool is_unilateral = (test_mode == perftest::TEST_MODE_RDMA_PUT);
-    if (is_unilateral && pe != prof_pe_val) {
+    bool is_bidir = (test_mode == perftest::TEST_MODE_RDMA_BI_PUT);
+    if (!is_bidir && pe != 0) {
+        if (timing_out != nullptr) {
+            timing_out[1] = 0;
+        }
         aclshmemx_barrier_all_vec();
         return;
     }
 
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, ub_size_kb * 1024);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(ub_size_kb * 1024, 0);
+    pipe.InitBuffer(buf, ub_size_b);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(ub_size_b, 0);
     __ubuf__ T* ub_ptr = reinterpret_cast<__ubuf__ T*>(ubLocal.GetPhyAddr());
 
     __gm__ T* dst_gm = reinterpret_cast<__gm__ T*>(dst_gva);
@@ -46,32 +48,45 @@ __aicore__ inline void rdma_perf_test_put_impl(
     AscendC::PipeBarrier<PIPE_ALL>();
 
     if (metric == static_cast<int>(perftest::PERF_METRIC_LAT)) {
-        // Latency: time loop_count put_nbi submits in a single window, quiet outside.
-        // SHMEMI_PROF_START/END has its own pipe_barrier overhead, so we keep ONE pair
-        // around the whole batch and divide by loop_count instead of timing each iter.
+        // Latency: time loop_count nbi submits in a single window, quiet outside.
         for (int i = 0; i < warmup; ++i) {
             aclshmemx_roce_put_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
         }
         aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
-        SHMEMI_PROF_START(frame_id);
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t api_time_start = AscendC::GetSystemCycle();
         for (int i = 0; i < loop_test; ++i) {
             aclshmemx_roce_put_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
         }
-        SHMEMI_PROF_END(frame_id);
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t api_time_end = AscendC::GetSystemCycle();
         aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
+        if (timing_out != nullptr) {
+            int64_t api_total_time = api_time_end - api_time_start;
+            if (pe == 0) {
+                timing_out[0] = api_total_time;
+            } else {
+                timing_out[1] = api_total_time;
+            }
+            dcci_cachelines(reinterpret_cast<__gm__ uint8_t*>(timing_out), sizeof(uint64_t) * 2);
+            if (is_bidir) {
+                aclshmemx_roce_barrier_all();
+                __gm__ T* slot = reinterpret_cast<__gm__ T*>(&timing_out[pe]);
+                aclshmemx_roce_put_nbi(slot, slot, ub_ptr, sizeof(int64_t) / sizeof(T), peer_pe, sync_id);
+                aclshmemx_roce_barrier_all();
+            }
+        }
+
     } else {
         // Bandwidth: submit NBIs in groups of `batch_size`, quiet at each group boundary.
-        // Nested loop avoids a per-iter `%` inside the timed window:
-        //   - batch_size == loop_test (default) -> 1 group, 1 trailing quiet (full async);
-        //   - batch_size == 1 -> loop_test groups of 1 (synchronous);
-        //   - mid sizes split into full_groups + remainder, with one extra quiet for the tail.
         for (int i = 0; i < warmup; ++i) {
             aclshmemx_roce_put_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
         }
         aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
         int full_groups = loop_test / batch_size;
         int remainder = loop_test - full_groups * batch_size;
-        SHMEMI_PROF_START(frame_id);
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t waiting_time_start = AscendC::GetSystemCycle();
         for (int g = 0; g < full_groups; ++g) {
             for (int j = 0; j < batch_size; ++j) {
                 aclshmemx_roce_put_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
@@ -84,29 +99,51 @@ __aicore__ inline void rdma_perf_test_put_impl(
         if (remainder > 0) {
             aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
         }
-        SHMEMI_PROF_END(frame_id);
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t waiting_time_end = AscendC::GetSystemCycle();
+
+        // Output: PE0 → timing_out[0], PE1 → timing_out[1]
+        if (timing_out != nullptr) {
+            int64_t waiting_total_time = waiting_time_end - waiting_time_start;
+            if (pe == 0) {
+                timing_out[0] = waiting_total_time;
+            } else {
+                timing_out[1] = waiting_total_time;
+            }
+            dcci_cachelines(reinterpret_cast<__gm__ uint8_t*>(timing_out), sizeof(uint64_t) * 2);
+            if (is_bidir) {
+                aclshmemx_roce_barrier_all();
+                __gm__ T* slot = reinterpret_cast<__gm__ T*>(&timing_out[pe]);
+                aclshmemx_roce_put_nbi(slot, slot, ub_ptr, sizeof(int64_t) / sizeof(T), peer_pe, sync_id);
+                aclshmemx_roce_barrier_all();
+            }
+        }
     }
     aclshmemx_barrier_all_vec();
 }
 
 template <typename T>
 __aicore__ inline void rdma_perf_test_get_impl(
-    GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::rdma_mode_t test_mode, int ub_size_kb,
-    int64_t prof_pe_val, int loop_count, int batch, uint32_t sync_id)
+    GM_ADDR dst_gva, GM_ADDR src_gva, int elements, perftest::rdma_mode_t test_mode, int ub_size_b, int loop_count,
+    int metric, int batch, uint32_t sync_id, GM_ADDR timing_out_gva)
 {
     int64_t pe = aclshmem_my_pe();
     int peer_pe = (pe + 1) % aclshmem_n_pes();
+    __gm__ int64_t* timing_out = reinterpret_cast<__gm__ int64_t*>(timing_out_gva);
 
-    bool is_unilateral = (test_mode == perftest::TEST_MODE_RDMA_GET);
-    if (is_unilateral && pe != prof_pe_val) {
+    bool is_bidir = (test_mode == perftest::TEST_MODE_RDMA_BI_GET);
+    if (!is_bidir && pe != 0) {
+        if (timing_out != nullptr) {
+            timing_out[1] = 0;
+        }
         aclshmemx_barrier_all_vec();
         return;
     }
 
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, ub_size_kb * 1024);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(ub_size_kb * 1024, 0);
+    pipe.InitBuffer(buf, ub_size_b);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(ub_size_b, 0);
     __ubuf__ T* ub_ptr = reinterpret_cast<__ubuf__ T*>(ubLocal.GetPhyAddr());
 
     __gm__ T* dst_gm = reinterpret_cast<__gm__ T*>(dst_gva);
@@ -116,44 +153,96 @@ __aicore__ inline void rdma_perf_test_get_impl(
     int loop_test = loop_count;
     int batch_size = (batch <= 0 || batch > loop_test) ? loop_test : batch;
     AscendC::PipeBarrier<PIPE_ALL>();
-    for (int i = 0; i < warmup; ++i) {
-        aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
-    }
-    aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
-    int full_groups = loop_test / batch_size;
-    int remainder = loop_test - full_groups * batch_size;
-    SHMEMI_PROF_START(frame_id);
-    for (int g = 0; g < full_groups; ++g) {
-        for (int j = 0; j < batch_size; ++j) {
+
+    if (metric == static_cast<int>(perftest::PERF_METRIC_LAT)) {
+        // Latency: time loop_count get_nbi submits in a single window, quiet outside.
+        for (int i = 0; i < warmup; ++i) {
             aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
         }
         aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
-    }
-    for (int j = 0; j < remainder; ++j) {
-        aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
-    }
-    if (remainder > 0) {
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t api_time_start = AscendC::GetSystemCycle();
+        for (int i = 0; i < loop_test; ++i) {
+            aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
+        }
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t api_time_end = AscendC::GetSystemCycle();
         aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
+        if (timing_out != nullptr) {
+            int64_t api_total_time = api_time_end - api_time_start;
+            if (pe == 0) {
+                timing_out[0] = api_total_time;
+            } else {
+                timing_out[1] = api_total_time;
+            }
+            dcci_cachelines(reinterpret_cast<__gm__ uint8_t*>(timing_out), sizeof(uint64_t) * 2);
+            if (is_bidir) {
+                aclshmemx_roce_barrier_all();
+                __gm__ T* slot = reinterpret_cast<__gm__ T*>(&timing_out[pe]);
+                aclshmemx_roce_put_nbi(slot, slot, ub_ptr, sizeof(int64_t) / sizeof(T), peer_pe, sync_id);
+                aclshmemx_roce_barrier_all();
+            }
+        }
+
+    } else {
+        // Bandwidth: submit NBIs in groups of `batch_size`, quiet at each group boundary.
+        for (int i = 0; i < warmup; ++i) {
+            aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
+        }
+        aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
+        int full_groups = loop_test / batch_size;
+        int remainder = loop_test - full_groups * batch_size;
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t get_time_start = AscendC::GetSystemCycle();
+        for (int g = 0; g < full_groups; ++g) {
+            for (int j = 0; j < batch_size; ++j) {
+                aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
+            }
+            aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
+        }
+        for (int j = 0; j < remainder; ++j) {
+            aclshmemx_roce_get_nbi(dst_gm, src_gm, ub_ptr, static_cast<uint32_t>(elements), peer_pe, sync_id);
+        }
+        if (remainder > 0) {
+            aclshmemx_roce_quiet(peer_pe, ub_ptr, sync_id);
+        }
+        AscendC::PipeBarrier<PIPE_ALL>();
+        int64_t get_time_end = AscendC::GetSystemCycle();
+
+        // Output: PE0 → timing_out[0], PE1 → timing_out[1]
+        if (timing_out != nullptr) {
+            int64_t get_total_time = get_time_end - get_time_start;
+            if (pe == 0) {
+                timing_out[0] = get_total_time;
+            } else {
+                timing_out[1] = get_total_time;
+            }
+            dcci_cachelines(reinterpret_cast<__gm__ uint8_t*>(timing_out), sizeof(uint64_t) * 2);
+            if (is_bidir) {
+                aclshmemx_roce_barrier_all();
+                __gm__ T* slot = reinterpret_cast<__gm__ T*>(&timing_out[pe]);
+                aclshmemx_roce_put_nbi(slot, slot, ub_ptr, sizeof(int64_t) / sizeof(T), peer_pe, sync_id);
+                aclshmemx_roce_barrier_all();
+            }
+        }
     }
-    SHMEMI_PROF_END(frame_id);
     aclshmemx_barrier_all_vec();
 }
 
 #define DEFINE_RDMA_PERF_KERNEL_FOR_TYPE(type_name, cpp_type)                                                      \
     extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_perf_test_##type_name##_put(          \
-        GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::rdma_mode_t test_mode,         \
-        int ub_size_kb, int64_t prof_pe_val, int loop_count, int metric, int batch, uint32_t sync_id)              \
+        GM_ADDR dst_gva, GM_ADDR src_gva, int elements, perftest::rdma_mode_t test_mode, int ub_size_b,            \
+        int loop_count, int metric, int batch, uint32_t sync_id, GM_ADDR timing_out_gva)                           \
     {                                                                                                              \
         rdma_perf_test_put_impl<cpp_type>(                                                                         \
-            dst_gva, src_gva, elements, frame_id, test_mode, ub_size_kb, prof_pe_val, loop_count, metric, batch,   \
-            sync_id);                                                                                              \
+            dst_gva, src_gva, elements, test_mode, ub_size_b, loop_count, metric, batch, sync_id, timing_out_gva); \
     }                                                                                                              \
     extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_perf_test_##type_name##_get(          \
-        GM_ADDR dst_gva, GM_ADDR src_gva, int elements, int32_t frame_id, perftest::rdma_mode_t test_mode,         \
-        int ub_size_kb, int64_t prof_pe_val, int loop_count, int batch, uint32_t sync_id)                          \
+        GM_ADDR dst_gva, GM_ADDR src_gva, int elements, perftest::rdma_mode_t test_mode, int ub_size_b,            \
+        int loop_count, int metric, int batch, uint32_t sync_id, GM_ADDR timing_out_gva)                           \
     {                                                                                                              \
         rdma_perf_test_get_impl<cpp_type>(                                                                         \
-            dst_gva, src_gva, elements, frame_id, test_mode, ub_size_kb, prof_pe_val, loop_count, batch, sync_id); \
+            dst_gva, src_gva, elements, test_mode, ub_size_b, loop_count, metric, batch, sync_id, timing_out_gva); \
     }
 
 DEFINE_RDMA_PERF_KERNEL_FOR_TYPE(float, float)
@@ -169,11 +258,11 @@ DEFINE_RDMA_PERF_KERNEL_FOR_TYPE(char, char)
 
 #define DISPATCH_RDMA_PERF_PUT(type_name, cpp_type)                   \
     rdma_perf_test_##type_name##_put<<<block_dim, nullptr, stream>>>( \
-        dst_gva, src_gva, elements, frame_id, t_mode, ub_size_kb, prof_pe_val, loop_count, metric, batch, sync_id)
+        dst_gva, src_gva, elements, t_mode, ub_size_b, loop_count, metric, batch, sync_id, timing_out_gva)
 
 #define DISPATCH_RDMA_PERF_GET(type_name, cpp_type)                   \
     rdma_perf_test_##type_name##_get<<<block_dim, nullptr, stream>>>( \
-        dst_gva, src_gva, elements, frame_id, t_mode, ub_size_kb, prof_pe_val, loop_count, batch, sync_id)
+        dst_gva, src_gva, elements, t_mode, ub_size_b, loop_count, metric, batch, sync_id, timing_out_gva)
 
 #define DISPATCH_RDMA_PERF_FOR_ALL_TYPES(MACRO) \
     switch (d_type) {                           \
@@ -213,8 +302,8 @@ DEFINE_RDMA_PERF_KERNEL_FOR_TYPE(char, char)
     }
 
 extern "C" void launch_rdma_perf_kernel(
-    uint32_t block_dim, void* stream, uint8_t* dst_gva, uint8_t* src_gva, int elements, int32_t frame_id, int test_mode,
-    int data_type, int ub_size_kb, int64_t prof_pe_val, int loop_count, int metric, int batch, int sync_id)
+    uint32_t block_dim, void* stream, uint8_t* dst_gva, uint8_t* src_gva, int elements, int test_mode, int data_type,
+    int ub_size_b, int loop_count, int metric, int batch, int sync_id, uint8_t* timing_out_gva)
 {
     perftest::rdma_mode_t t_mode = static_cast<perftest::rdma_mode_t>(test_mode);
     perftest::perf_data_type_t d_type = static_cast<perftest::perf_data_type_t>(data_type);

@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-code-gen
-description: "根据 design.md 生成 SHMEM 算子代码、目录结构、CMake 和 README。关键词：代码生成、code-gen、实现、kernel、main.cpp。"
+description: "根据 design.md 生成基于 SHMEM 的算子代码、CMake、README 和目录结构。关键词：基于SHMEM代码生成、算子实现、code-gen、kernel、CMake。"
 ---
 
 # SHMEM 算子代码生成

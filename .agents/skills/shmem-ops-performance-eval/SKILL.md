@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-performance-eval
-description: "SHMEM 算子性能采集、baseline 对比、聊天自动输出和瓶颈分析。关键词：性能采集、performance、baseline、bandwidth、自动输出、优化轮次。"
+description: "基于 SHMEM 的算子性能采集、baseline 对比、瓶颈分析和性能报告生成。关键词：基于SHMEM性能评估、性能采集、performance、baseline、bandwidth、性能报告。"
 ---
 
 # SHMEM 算子性能采集

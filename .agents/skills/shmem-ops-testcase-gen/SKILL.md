@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-testcase-gen
-description: "生成 SHMEM 算子正确性测试计划、case matrix、golden/checker 和测试脚本。关键词：测试用例、case matrix、golden、checker、gen_data、check_result。"
+description: "为基于 SHMEM 的算子生成正确性测试计划、case matrix、golden/checker 和测试脚本。关键词：基于SHMEM测试用例、case matrix、golden、checker、gen_data、check_result。"
 ---
 
 # SHMEM 算子测试用例生成

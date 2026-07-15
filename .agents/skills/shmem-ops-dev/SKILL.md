@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-dev
-description: "SHMEM 通信算子与通算融合算子端到端开发编排器。用户 @ 指定本 skill 后：先 Read askquestion-template.md，再 verbatim AskQuestion 五项（零跳过）。关键词：shmem、.agents/skills、Phase 0 intake、通算融合。"
+description: "基于 SHMEM 的通信算子与通算融合算子端到端开发编排器，串联需求→设计→代码→编译→验证→性能全流程。关键词：基于SHMEM算子开发、端到端开发、算子开发、编排、工作流、通信算子、通算融合。"
 ---
 
 # SHMEM 算子端到端开发编排

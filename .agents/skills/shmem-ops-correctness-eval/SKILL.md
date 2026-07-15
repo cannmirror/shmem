@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-correctness-eval
-description: "执行 SHMEM 算子正确性契约验证并生成报告。关键词：正确性验证、correctness、测试执行、精度验证。"
+description: "执行基于 SHMEM 的算子正确性契约验证并生成报告。关键词：基于SHMEM正确性验证、correctness、测试执行、精度验证。"
 ---
 
 # SHMEM 算子正确性验证

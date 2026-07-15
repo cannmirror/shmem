@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-code-review
-description: "SHMEM 算子实现与设计一致性走读，生成 review-report.md。关键词：code review、design review、一致性检查、走读、交付报告。"
+description: "基于 SHMEM 的算子实现与设计一致性走读，生成 review-report.md。关键词：基于SHMEM代码走读、code review、design review、一致性检查、走读。"
 ---
 
 # SHMEM 算子实现与设计一致性走读

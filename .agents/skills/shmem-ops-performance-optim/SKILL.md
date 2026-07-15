@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-performance-optim
-description: "SHMEM 算子性能优化迭代（Phase 6.5，须 performance_auto_optim:true 且未达标）；固定 5 轮机制优化；每轮 MUST 聊天自动输出 Δ%。关键词：性能优化、optimization、自动输出。"
+description: "基于 SHMEM 的算子性能优化迭代，固定 5 轮机制优化，每轮输出 Δ% 对比。关键词：基于SHMEM性能优化、调优、optimization、机制优化、性能调优。"
 ---
 
 # SHMEM 算子性能优化

@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-design
-description: "设计 SHMEM 通信算子和通算融合算子。将需求转化为 design.md。关键词：设计、design、DSL、capability mapping、gap analysis、contract。"
+description: "基于 SHMEM 设计通信算子与通算融合算子，将需求转化为 design.md。关键词：基于SHMEM算子设计、算子设计、设计文档、design、Canonical DSL、capability mapping。"
 ---
 
 # SHMEM 算子设计

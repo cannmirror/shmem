@@ -81,12 +81,12 @@
 
 ### 性能关键指标
 
-| 指标 | Baseline | Final | Δ% |
-| --- | --- | --- | --- |
-| e2e_latency_us | | | |
-| kernel_latency_us | | | |
-| algo_bandwidth_GBps | | | |
-| kernel_bus_bandwidth_GBps | | | |
+| 指标 | SHMEM 最终 | <baseline> | SHMEM/基线 | 达标 |
+| --- | --- | --- | --- | --- |
+| e2e_latency_us | | | | — |
+| kernel_latency_us | | | | — |
+| algo_bandwidth_GBps | | | | — |
+| kernel_bus_bandwidth_GBps | | | | PASS/FAIL |
 
 （完整优化记录见 performance_report.md）
 

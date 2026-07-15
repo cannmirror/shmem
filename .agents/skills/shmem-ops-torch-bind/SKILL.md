@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-torch-bind
-description: "将 SHMEM 算子封装为 PyTorch CustomClass，生成 Python 测试脚本并验证正确性。关键词：torch、PyTorch、CustomClass、torch_binding、python_extension、接入 torch。"
+description: "将基于 SHMEM 的算子封装为 PyTorch CustomClass，生成 Python 测试脚本并验证。关键词：基于SHMEM的Torch接入、torch、PyTorch、CustomClass、torch_binding。"
 ---
 
 # SHMEM 算子 Torch 接入与验证

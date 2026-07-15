@@ -1,6 +1,6 @@
 ---
 name: shmem-ops-compile-debug
-description: "编译、运行和调试 SHMEM 算子。关键词：编译、compile、debug、build、运行、link、失败定位。"
+description: "编译、运行和调试基于 SHMEM 的算子。关键词：基于SHMEM编译调试、compile、debug、build、运行、失败定位。"
 ---
 
 # SHMEM 编译运行与调试

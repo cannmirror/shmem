@@ -110,17 +110,27 @@ Phase 6 结论：达标 → Phase 7
 
 ## 4. Phase 6.5 结束 / Phase 7 交付
 
-**MUST** 额外输出最终对比（S 档 + L 档）：
+**MUST** 额外输出最终对比（S 档 + L 档）。对比基准始终为**外部基线**（HCCL/aclnn/metric_only），**NEVER** 以 SHMEM Round 0 作为 §6 Baseline 列。
 
 ```text
-### 最终性能（baseline vs Round0 vs 最优轮）
+### 最终性能（SHMEM 最终 vs <baseline>）
 
-| 规模 | 指标 | HCCL baseline | Round 0 | 最优 Round | Δ% (最优 vs R0) | Δ% (最优 vs baseline) |
-|------|------|---------------|---------|------------|-----------------|------------------------|
-| S 档 | kernel_bus_bandwidth_GBps | ... | ... | ... | ... | ... |
-| L 档 | kernel_bus_bandwidth_GBps | ... | ... | ... | ... | ... |
+| 规模 | 指标 | SHMEM 最终 | <baseline> | SHMEM/基线 | 达标 |
+|------|------|-----------|------------|-----------|------|
+| S 档 | kernel_bus_bandwidth_GBps | ... | ... | ...% | PASS/FAIL |
+| L 档 | kernel_bus_bandwidth_GBps | ... | ... | ...% | PASS/FAIL |
 
+SHMEM 最终 = 最优轮 keep 配置复采数据；未进入 Phase 6.5 时 = Round 0 SHMEM 数据。
 整体结论：达标 / 未达标；主要瓶颈；推荐配置
+```
+
+若经过 Phase 6.5 优化，额外追加内部提升摘要：
+
+```text
+### 优化内部提升（Round 0 → 最优轮）
+| 规模 | Round 0 | 最优轮 | Δ% |
+|------|---------|--------|-----|
+| L 档 kernel_bus_bandwidth_GBps | ... | ... | +X% |
 ```
 
 ---

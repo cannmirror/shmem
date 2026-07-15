@@ -161,36 +161,39 @@
 
 ## 6. 最终对比
 
+> SHMEM 最终列 = Phase 6.5 最优轮 keep 配置复采数据；未进入 Phase 6.5 时 = Round 0 SHMEM 数据。
+> 外部基线列 = HCCL / aclnn / metric_only（与 §2 baseline type 一致）。
+> 始终以**外部基线**为对比基准，**NEVER** 将 SHMEM Round 0 作为 §6 的 Baseline 列。
+
 ### 6.1 L 档对比
 
-| 指标 | Baseline | Final | Δ% |
-| --- | --- | --- | --- |
-| kernel_bus_bandwidth_GBps | | | |
-| e2e_latency_us | | | |
-| kernel_latency_us | | | |
-| algo_bandwidth_GBps | | | |
-| e2e_bus_bandwidth_GBps | | | |
-| bandwidth_utilization_pct | | | |
-| compute_utilization_pct | | | |
+| 指标 | SHMEM 最终 | <baseline> | SHMEM/基线 | 达标 |
+| --- | --- | --- | --- | --- |
+| kernel_bus_bandwidth_GBps | | | | PASS/FAIL |
+| e2e_latency_us | | | | — |
+| kernel_latency_us | | | | — |
+| algo_bandwidth_GBps | | | | — |
+| e2e_bus_bandwidth_GBps | | | | — |
+| bandwidth_utilization_pct | | | | — |
+| compute_utilization_pct | | | | — |
 
-> compute_utilization_pct 行仅通算融合算子填写；纯通信标 N/A
+> `<baseline>` 列名替换为实际基线名称（如 `HCCL`、`aclnn`、`metric_only`）。
+> 达标线：有外部基线时默认 `kernel_bus_bandwidth_GBps ≥ 80% × 基线`；无外部基线时 `bandwidth_utilization_pct ≥ 20%`。
+> compute_utilization_pct 行仅通算融合算子填写；纯通信标 N/A。
 
 ### 6.2 S 档对比（8PE）
 
-> baseline 列由 Round 0 直接写入；final 列由最终轮（Phase 6.5 最后一轮或 Phase 7）采集后填入。
-> 未进入 Phase 6.5 时，final 列标注"同 baseline（未优化）"，Δ% 为 0%。
+| 指标 | SHMEM 最终 | <baseline> | SHMEM/基线 | 达标 |
+| --- | --- | --- | --- | --- |
+| kernel_bus_bandwidth_GBps | | | | PASS/FAIL |
+| e2e_latency_us | | | | — |
+| kernel_latency_us | | | | — |
+| algo_bandwidth_GBps | | | | — |
+| e2e_bus_bandwidth_GBps | | | | — |
+| bandwidth_utilization_pct | | | | — |
+| compute_utilization_pct | | | | — |
 
-| 指标 | Baseline | Final | Δ% |
-| --- | --- | --- | --- |
-| kernel_bus_bandwidth_GBps | | | |
-| e2e_latency_us | | | |
-| kernel_latency_us | | | |
-| algo_bandwidth_GBps | | | |
-| e2e_bus_bandwidth_GBps | | | |
-| bandwidth_utilization_pct | | | |
-| compute_utilization_pct | | | |
-
-> compute_utilization_pct 行仅通算融合算子填写；纯通信标 N/A
+> 格式与 §6.1 一致。compute_utilization_pct 行仅通算融合算子填写；纯通信标 N/A。
 
 ---
 

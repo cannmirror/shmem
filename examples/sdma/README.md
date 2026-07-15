@@ -2,9 +2,11 @@
 > **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 
 ## 环境要求和准备
-SDMA功能在9.0.0及以上版本（尝鲜版）新增支持。需要下载并安装以下cann和ops软件包：
-- toolkit包（[CANN master obp镜像网站](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/)）
-- ops-legacy包（根据硬件平台下载对应版本：[A2 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-x86_64.run)/[A2 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-aarch64.run)/[A3 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-x86_64.run)/[A3 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-aarch64.run)）
+SDMA put/get接口需要CANN 9.0.0-beta.2及以上版本支持，可用于read/write数据搬运。请参考[CANN版本说明](../../docs/quickstart.md#431-cann-版本说明)下载并安装对应版本的toolkit包；使能SDMA时，还需要按硬件平台安装对应的ops-legacy包。
+
+## 支持设备
+
+SDMA put/get接口当前支持在Atlas 200I A2/A3、Atlas 300T A2/A3等A2/A3平台使用read/write数据搬运能力。Ascend950及以上平台暂不支持通过SDMA put/get接口使用read/write数据搬运能力。
 
 ## example使用方式：
 1.在`shmem/`目录编译软件包并安装：
@@ -64,7 +66,9 @@ ACLSHMEM_DEVICE void aclshmemx_sdma_get_nbi(__gm__ T *dst, __gm__ T *src, __ubuf
 
 ## 注意事项
 `aclshmemx_sdma_put_nbi`和`aclshmemx_sdma_get_nbi`都是非阻塞接口，调用后立即返回，不等待数据传输完成。用户使用时，可通过以下两种方式确保数据传输完成：
-1. 所有调用`aclshmemx_sdma_put/get_nbi`的核，在sdma任务结束后，算子内调用`aclshmemx_sdma_quiet`接口，等待所有SDMA操作完成。  
+1. 所有调用`aclshmemx_sdma_put/get_nbi`的核，在sdma任务结束后，算子内调用`aclshmemx_sdma_quiet`接口，等待所有SDMA操作完成。
+
 适用场景：算子内后续操作依赖sdma任务完成，例如后续算子需要使用sdma传输好的数据。
-2. 所有调用`aclshmemx_sdma_put/get_nbi`的核，在sdma任务结束后，算子内调用`aclshmemx_sdma_notify_record`接口，然后在host侧调用`aclrtWaitAndResetNotify`接口，等待指定的同步ID完成（详细用法可查看[NotifyWait机制使用说明](../notifywait/README.md)）。  
+2. 所有调用`aclshmemx_sdma_put/get_nbi`的核，在sdma任务结束后，算子内调用`aclshmemx_sdma_notify_record`接口，然后在host侧调用`aclrtWaitAndResetNotify`接口，等待指定的同步ID完成（详细用法可查看[NotifyWait机制使用说明](../notifywait/README.md)）。
+
 适用场景：其它stream上的kernel需要等待sdma任务完成后才能继续执行。

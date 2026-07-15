@@ -35,8 +35,8 @@ struct stars_channel_flag_info_t {
 struct stars_channel_info_t {
     uint32_t sq_head;
     uint32_t sq_tail;
-    uint64_t sq_base;        // SQ缓冲区基地址
-    uint64_t sq_reg_base;    // SQ寄存器基地址
+    uint64_t sq_base;     // SQ缓冲区基地址
+    uint64_t sq_reg_base; // SQ寄存器基地址
     uint32_t sq_depth;
     uint32_t sq_id;
     uint32_t cq_id;
@@ -123,11 +123,82 @@ struct stars_notify_sqe_t {
 };
 
 enum class ACLSHMEMCMOTYPE : uint32_t {
-    CMO_TYPE_PREFETCH = 6,  // Load data from memory into l2 cache
-    CMO_TYPE_WRITEBACK,     // Flush modified data from l2 cache to main memory while retaining a copy in cache
-    CMO_TYPE_INVALID,       // Discard the data block in l2 cache, making it invalid
-    CMO_TYPE_FLUSH,         // Forcefully write data from l2 cache to main memory and remove it from cache
+    CMO_TYPE_PREFETCH = 6, // Load data from memory into l2 cache
+    CMO_TYPE_WRITEBACK,    // Flush modified data from l2 cache to main memory while retaining a copy in cache
+    CMO_TYPE_INVALID,      // Discard the data block in l2 cache, making it invalid
+    CMO_TYPE_FLUSH,        // Forcefully write data from l2 cache to main memory and remove it from cache
     CMO_TYPE_MAX,
+};
+
+// STARS SQE layout is selected at compile time by __NPU_ARCH__.
+// Ascend950 (dav-3510) uses STARS v2 layout and SQ tail doorbell offset 0.
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+constexpr bool ACLSHMEM_STARS_V2_LAYOUT = true;
+constexpr uint32_t ACLSHMEM_STARS_SQ_TAIL_OFFSET = 0x0;
+#else
+constexpr bool ACLSHMEM_STARS_V2_LAYOUT = false;
+constexpr uint32_t ACLSHMEM_STARS_SQ_TAIL_OFFSET = 0x8;
+#endif
+
+struct stars_v2_sqe_header_t {
+    uint8_t type : 6;
+    uint8_t l1_lock : 1;
+    uint8_t l1_unlock : 1;
+    uint8_t ie : 1;
+    uint8_t pre_p : 1;
+    uint8_t post_p : 1;
+    uint8_t wr_cqe : 1;
+    uint8_t ptr_mode : 1;
+    uint8_t rtt_mode : 1;
+    uint8_t head_update : 1;
+    uint8_t reserved : 1;
+    uint16_t block_dim;
+    uint16_t rt_streamid;
+    uint16_t task_id;
+};
+
+struct stars_v2_sdma_cmo_sqe_t {
+    stars_v2_sqe_header_t header;
+    /********8 ~ 15 bytes**********/
+    uint32_t res3;
+    uint16_t res4;
+    uint8_t kernel_credit;
+    uint8_t ptr_mode : 1;
+    uint8_t res5 : 7;
+    /********16 ~ 19 bytes**********/
+    uint32_t opcode : 8;
+    uint32_t sssv : 1;
+    uint32_t dssv : 1;
+    uint32_t sns : 1;
+    uint32_t dns : 1;
+    uint32_t sro : 1;
+    uint32_t dro : 1;
+    uint32_t stride : 2;
+    uint32_t ie2 : 1;
+    uint32_t comp_en : 1;
+    uint32_t res6 : 14;
+    /********20 ~ 23 bytes**********/
+    uint16_t sqe_id;
+    uint8_t mpam_partid;
+    uint8_t mpamns : 1;
+    uint8_t pmg : 2;
+    uint8_t qos : 4;
+    uint8_t res7 : 1;
+    /********24 ~ 31 bytes**********/
+    uint16_t src_streamid;
+    uint16_t src_sub_streamid;
+    uint16_t dst_streamid;
+    uint16_t dst_sub_streamid;
+    /********32 ~ 47 bytes**********/
+    uint32_t src_addr_low;
+    uint32_t src_addr_high;
+    uint32_t dst_addr_low;
+    uint32_t dst_addr_high;
+    /********48 ~ 63 bytes**********/
+    uint32_t length;
+    uint32_t src_stride_len;
+    uint32_t dst_stride_len;
+    uint32_t stride_num;
 };
 
 struct stars_sdma_cmo_sqe_t {
@@ -190,22 +261,23 @@ struct stars_sdma_cmo_sqe_t {
     /********64 bytes**********/
 };
 
-ACLSHMEM_DEVICE void aclshmemi_stars_submit_notify_record(AscendC::LocalTensor<uint32_t> &tmp_local,
-                                                        AscendC::TEventID sync_id);
+ACLSHMEM_DEVICE void aclshmemi_stars_submit_notify_record(
+    AscendC::LocalTensor<uint32_t>& tmp_local, AscendC::TEventID sync_id);
 
-ACLSHMEM_DEVICE void aclshmemi_sdma_submit_data_sqes(__gm__ stars_channel_info_t *batch_write_channel_info,
-                                                     __gm__ uint8_t *send_buffer, __gm__ uint8_t *recv_buffer,
-                                                     const sdma_config_t &config, uint32_t *sq_tail);
+ACLSHMEM_DEVICE void aclshmemi_sdma_submit_data_sqes(
+    __gm__ stars_channel_info_t* batch_write_channel_info, __gm__ uint8_t* send_buffer, __gm__ uint8_t* recv_buffer,
+    const sdma_config_t& config, uint32_t* sq_tail);
 
-ACLSHMEM_DEVICE void aclshmemi_cmo_submit_data_sqes(__gm__ stars_channel_info_t *batch_write_channel_info,
-                                                    __gm__ uint8_t *src, uint32_t size, ACLSHMEMCMOTYPE cmo_type, uint32_t *sq_tail);
+ACLSHMEM_DEVICE void aclshmemi_cmo_submit_data_sqes(
+    __gm__ stars_channel_info_t* batch_write_channel_info, __gm__ uint8_t* src, uint32_t size, ACLSHMEMCMOTYPE cmo_type,
+    uint32_t* sq_tail);
 
-ACLSHMEM_DEVICE void aclshmemi_sdma_submit_flag_sqes(__gm__ stars_channel_info_t *batch_write_channel_info,
-                                                     const workspace_layout_t &layout, 
-                                                     AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_sdma_submit_flag_sqes(
+    __gm__ stars_channel_info_t* batch_write_channel_info, const workspace_layout_t& layout,
+    AscendC::LocalTensor<uint32_t>& tmp_local, uint32_t sync_id);
 
-ACLSHMEM_DEVICE void aclshmemi_sdma_poll_for_completion(const workspace_layout_t &layout, 
-                                                        AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_sdma_poll_for_completion(
+    const workspace_layout_t& layout, AscendC::LocalTensor<uint32_t>& tmp_local, uint32_t sync_id);
 
 /**
  * @brief AIV direct STARS helper function for post send, prepare SQE and ring doorbell.
@@ -216,9 +288,9 @@ ACLSHMEM_DEVICE void aclshmemi_sdma_poll_for_completion(const workspace_layout_t
  * @param tmp_local                 [in] temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                   [in] ID used to sync pipeline.
  */
-ACLSHMEM_DEVICE void aclshmemi_sdma_post_send(__gm__ uint8_t *recv_buffer, __gm__ uint8_t *send_buffer,
-                                              uint64_t message_len, AscendC::LocalTensor<uint32_t> &tmp_local,
-                                              uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_sdma_post_send(
+    __gm__ uint8_t* recv_buffer, __gm__ uint8_t* send_buffer, uint64_t message_len,
+    AscendC::LocalTensor<uint32_t>& tmp_local, uint32_t sync_id);
 
 /**
  * @brief AIV direct STARS helper function for cache manager operation, prepare SQE and ring doorbell.
@@ -229,10 +301,9 @@ ACLSHMEM_DEVICE void aclshmemi_sdma_post_send(__gm__ uint8_t *recv_buffer, __gm_
  * @param tmp_local                 [in] Temporary UB local tensor of uint32_t used as workspace
  * @param sync_id                   [in] ID used to sync pipeline.
  */
-ACLSHMEM_DEVICE void aclshmemi_cmo_async(__gm__ uint8_t* src,
-                                uint32_t size,
-                                ACLSHMEMCMOTYPE cmo_type, 
-                                AscendC::LocalTensor<uint32_t> &tmp_local, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_cmo_async(
+    __gm__ uint8_t* src, uint32_t size, ACLSHMEMCMOTYPE cmo_type, AscendC::LocalTensor<uint32_t>& tmp_local,
+    uint32_t sync_id);
 
 /**
  * @brief Calculate the base address of batch write channel info from device state.

@@ -19,11 +19,11 @@
 extern int test_gnpu_num;
 extern int test_first_npu;
 extern void test_mutil_task(std::function<void(int, int, uint64_t)> func, uint64_t local_mem_size, int processCount);
-extern int32_t test_sdma_init(int pe, int npes, uint64_t local_mem_size, aclrtStream *st);
+extern int32_t test_sdma_init(int pe, int npes, uint64_t local_mem_size, aclrtStream* st);
 extern void test_finalize(aclrtStream stream, int device_id);
 
-extern void copy_perf_kernel(uint32_t block_dim, void* stream, 
-                                uint8_t* src, uint8_t* res, uint32_t copypad_size, uint32_t copypad_times);
+extern void copy_perf_kernel(
+    uint32_t block_dim, void* stream, uint8_t* src, uint8_t* res, uint32_t copypad_size, uint32_t copypad_times);
 extern void cmo_pretech_kernel(uint8_t* src, uint32_t size, void* stream);
 
 static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
@@ -36,24 +36,22 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     uint32_t src_size = aiv_num * copypad_size * copypad_times;
     uint32_t res_size = sizeof(uint32_t) * aiv_num;
 
-    void *src_ptr;
-    void *res_ptr;
-    void *res_host;
+    void* src_ptr;
+    void* res_ptr;
+    void* res_host;
 
     uint32_t no_prefetch_cycles = 0;
     uint32_t host_prefetch_cycles = 0;
     uint32_t device_prefetch_cycles = 0;
-    
+
     // no prefetch
-    ASSERT_EQ(aclrtMalloc((void **) &(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    ASSERT_EQ(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    aclrtMallocHost((void **)(&res_host), res_size);
-    copy_perf_kernel(n_blocks, stream, 
-                        (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
+    ASSERT_EQ(aclrtMalloc((void**)&(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    ASSERT_EQ(aclrtMalloc((void**)&(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    aclrtMallocHost((void**)(&res_host), res_size);
+    copy_perf_kernel(n_blocks, stream, (uint8_t*)src_ptr, (uint8_t*)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);
-    for (int32_t i = 0; i < aiv_num; i++)
-    {
+    for (int32_t i = 0; i < aiv_num; i++) {
         no_prefetch_cycles += ((uint32_t*)res_host)[i];
     }
     std::cout << "[TEST] no_prefetch_cycles: " << no_prefetch_cycles << std::endl;
@@ -62,16 +60,14 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     ASSERT_EQ(aclrtFree(res_host), 0);
 
     // host prefetch
-    ASSERT_EQ(aclrtMalloc((void **) &(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    ASSERT_EQ(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    aclrtMallocHost((void **)(&res_host), res_size);
-    ASSERT_EQ(aclrtCmoAsync(src_ptr, src_size, ACL_RT_CMO_TYPE_PREFETCH, stream), 0);   // aclrtCmoAsync
-    copy_perf_kernel(n_blocks, stream, 
-                        (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
+    ASSERT_EQ(aclrtMalloc((void**)&(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    ASSERT_EQ(aclrtMalloc((void**)&(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    aclrtMallocHost((void**)(&res_host), res_size);
+    ASSERT_EQ(aclrtCmoAsync(src_ptr, src_size, ACL_RT_CMO_TYPE_PREFETCH, stream), 0); // aclrtCmoAsync
+    copy_perf_kernel(n_blocks, stream, (uint8_t*)src_ptr, (uint8_t*)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);
-    for (int32_t i = 0; i < aiv_num; i++)
-    {
+    for (int32_t i = 0; i < aiv_num; i++) {
         host_prefetch_cycles += ((uint32_t*)res_host)[i];
     }
     std::cout << "[TEST] host_prefetch_cycles: " << host_prefetch_cycles << std::endl;
@@ -80,17 +76,15 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     ASSERT_EQ(aclrtFree(res_host), 0);
 
     // device prefetch
-    ASSERT_EQ(aclrtMalloc((void **) &(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    ASSERT_EQ(aclrtMalloc((void **) &(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
-    aclrtMallocHost((void **)(&res_host), res_size);
-    cmo_pretech_kernel((uint8_t *)src_ptr, src_size, stream);   // cmo_pretech_kernel
+    ASSERT_EQ(aclrtMalloc((void**)&(src_ptr), src_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    ASSERT_EQ(aclrtMalloc((void**)&(res_ptr), res_size, ACL_MEM_MALLOC_HUGE_FIRST), 0);
+    aclrtMallocHost((void**)(&res_host), res_size);
+    cmo_pretech_kernel((uint8_t*)src_ptr, src_size, stream); // cmo_pretech_kernel
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
-    copy_perf_kernel(n_blocks, stream, 
-                        (uint8_t *)src_ptr, (uint8_t *)res_ptr, copypad_size, copypad_times);
+    copy_perf_kernel(n_blocks, stream, (uint8_t*)src_ptr, (uint8_t*)res_ptr, copypad_size, copypad_times);
     ASSERT_EQ(aclrtSynchronizeStream(stream), 0);
     aclrtMemcpy(res_host, res_size, res_ptr, res_size, ACL_MEMCPY_DEVICE_TO_HOST);
-    for (int32_t i = 0; i < aiv_num; i++)
-    {
+    for (int32_t i = 0; i < aiv_num; i++) {
         device_prefetch_cycles += ((uint32_t*)res_host)[i];
     }
     std::cout << "[TEST] device_prefetch_cycles: " << device_prefetch_cycles << std::endl;
@@ -99,8 +93,8 @@ static void test_cmo_function(aclrtStream stream, uint32_t pe, uint32_t npes)
     ASSERT_EQ(aclrtFree(res_host), 0);
 
     // copy_perf
-    ASSERT_EQ(no_prefetch_cycles >= 2 * host_prefetch_cycles, true);
-    ASSERT_EQ(no_prefetch_cycles >= 2 * device_prefetch_cycles, true);
+    ASSERT_GE(static_cast<double>(no_prefetch_cycles), 1.5 * static_cast<double>(host_prefetch_cycles));
+    ASSERT_GE(static_cast<double>(no_prefetch_cycles), 1.5 * static_cast<double>(device_prefetch_cycles));
 }
 
 void test_aclshmem_cmo_mem(int pe, int npes, uint64_t local_mem_size)

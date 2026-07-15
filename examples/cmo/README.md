@@ -1,10 +1,8 @@
 # CMO (Cache Maintenance Operation) 功能演示与读性能测试示例
 
-> **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
-
 ## 功能简介
 
-本示例演示了如何使用Shmem的CMO（Cache Maintenance Operation）接口来优化GM（Global Memory）内存访问性能。该CMO接口提供L2缓存管理操作，可以通过预取（Prefetch）将数据从GM提前加载到L2缓存中，从而减少数据访问延迟，提升整体计算性能。
+本示例演示了如何使用Shmem的CMO（Cache Maintenance Operation）接口来优化GM（Global Memory）内存访问性能。该CMO接口提供L2缓存管理操作，可以通过预取（Prefetch）将数据从GM提前加载到L2缓存中，从而减少数据访问延迟，提升整体计算性能。当前实现支持现有A2/A3平台以及Ascend950。
 
 ### L2缓存背景知识
 
@@ -44,7 +42,6 @@ void aclshmemx_cmo_nbi(__gm__ T *src, uint32_t elem_size, ACLSHMEMCMOTYPE cmo_ty
   - `buf`：临时UB缓冲区地址
   - `ub_size`：UB缓冲区大小（至少64字节，64字节对齐）
   - `sync_id`：同步ID
-- **特点**：基于SDMA引擎实现，支持核级细粒度控制
 
 ##### CMO操作类型
 
@@ -72,35 +69,58 @@ ACLSHMEM_DEVICE void aclshmemx_sdma_quiet(AscendC::LocalTensor<T> &buf, uint32_t
 ## 环境要求
 
 ### 硬件要求
-- 昇腾AI处理器（Atlas 200I A2/A3、Atlas 300T A2/A3等）
+- 昇腾AI处理器（Atlas 200I A2/A3、Atlas 300T A2/A3、Ascend950等）
 - 架构兼容：aarch64、x86
 
 ### 软件依赖
-参考[SHMEM软件依赖](https://gitcode.com/cann/shmem#%E8%BD%AF%E4%BB%B6%E4%BE%9D%E8%B5%96)，配置支持SDMA功能的相关CANN版本。
+参考仓内[CANN版本说明](../../docs/quickstart.md#43-cann)和[编译与构建](../../docs/compilation_build_guide.md)，配置支持CMO功能的CANN版本。
+
+| 平台 | CMO功能CANN版本要求 | toolkit包 | ops-legacy包 |
+| --- | --- | --- | --- |
+| A2/A3 | CANN 9.0.0-beta.2及以上 | 9.0.0-beta.2及以上 toolkit包：[社区版资源](https://www.hiascend.com/developer/download/community/result?module=cann&cann=9.0.0-beta.2) | 使能SDMA需下载社区版[ops包](https://www.hiascend.com/developer/download/community/result?module=cann&cann=9.0.0-beta.2) |
+| Ascend950 | CANN 9.1.0及以上 | 9.1.0尝鲜版 toolkit 包：[x86_64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260610120325172/Ascend-cann-toolkit_9.1.0_linux-x86_64.run) / [aarch64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260610120325172/Ascend-cann-toolkit_9.1.0_linux-aarch64.run) | ops-legacy包：[950 x86_64](https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/package/master/20260612/x86_64/cann-950-ops-legacy_9.1.0_linux-x86_64.run) / [950 aarch64](https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/package/master/20260612/aarch64/cann-950-ops-legacy_9.1.0_linux-aarch64.run) |
+
+toolkit包和ops-legacy包需要安装到同一目录：
+
+```bash
+# 自定义CANN安装目录，可按实际环境修改
+export INSTALL_PATH=/home/user/ascend
+chmod +x Ascend-cann-toolkit_{cann_version}_linux-$(uname -m).run
+chmod +x cann-{soc_name}-ops-legacy_{cann_version}_linux-$(uname -m).run
+./Ascend-cann-toolkit_{cann_version}_linux-$(uname -m).run --install --install-path=${INSTALL_PATH}
+./cann-{soc_name}-ops-legacy_{cann_version}_linux-$(uname -m).run --install-path=${INSTALL_PATH}
+source ${INSTALL_PATH}/ascend-toolkit/set_env.sh
+```
 
 ### 功能依赖说明
 
-**重要**：本示例中的Device侧CMO接口`aclshmemx_cmo_nbi`依赖SDMA功能，需要参考example/sdma或example/cmo，配置`attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_SDMA`以启动SDMA引擎。
+**重要**：本示例中的Device侧CMO接口`aclshmemx_cmo_nbi`依赖SDMA功能，需要参考`examples/sdma`或`examples/cmo`，配置`attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_SDMA`以启动SDMA引擎。
+
+### SDMA能力提醒
+
+Ascend950及以上平台当前仅支持通过STARS v2 SDMA-CMO SQE执行CMO预取，暂不支持通过SDMA put/get接口使用read/write数据搬运能力。因此，`aclshmemx_sdma_put_nbi`、`aclshmemx_sdma_get_nbi`等SDMA put/get接口不适用于Ascend950及以上平台。
 
 ## 编译步骤
 
-### 1. 编译并安装SHMEM软件包
+### 1. 编译示例程序
 
-```bash
-cd shmem/
-bash scripts/build.sh -package
-./install/*/SHMEM_1.0.0_linux-*.run --install
-source install/set_env.sh
-```
-
-### 2. 编译示例程序
+编译环境配置、源码编译、二进制包安装等通用流程请参考[编译与构建](../../docs/compilation_build_guide.md)。
 
 ```bash
 cd shmem/
 bash scripts/build.sh -examples
 ```
 
-编译成功后，可执行文件位于：`build/bin/cmo`
+Ascend950平台编译时需要指定SOC类型：
+
+```bash
+cd shmem/
+bash scripts/build.sh -examples -soc_type Ascend950
+```
+
+编译成功后，关键产物包括：
+- 可执行文件：`build/bin/cmo`
+- SHMEM库：`build/lib/libshmem.so`
 
 ## 运行方法
 
@@ -170,5 +190,5 @@ PE 1 Finished!
 
 ## 参考文档
 
-- [CANN应用开发接口文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900beta1/appdevg/acldevg/acldevg_0001.html)
-- [内存管理 aclrtCmoAsync](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/appdevgapi/aclcppdevg_03_0123.html)
+- [CANN应用开发接口文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910beta1/index/index.html)
+- [内存管理 aclrtCmoAsync](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910beta1/API/runtimeapi/aclcppdevg_03_0123.html)

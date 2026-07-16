@@ -131,7 +131,7 @@ shmem/                                  # 项目根目录
 ## 五、常见问题（FAQ）
 **Q1：编译时报「CANN 环境未找到」？**
 
-A：确认已执行 `source /usr/local/Ascend/ascend-toolkit/set_env.sh`，且 CANN 版本满足 [CANN 版本说明](docs/quickstart.md#43-cann)。
+A：确认已安装 CANN toolkit，并已执行 `source /usr/local/Ascend/ascend-toolkit/set_env.sh`。项目编译默认使用 CANN toolkit 提供的 `bisheng` 编译器，CANN 版本需满足 [CANN 版本说明](docs/quickstart.md#43-cann)。
 
 **Q2：运行示例时报「卡间通信超时」？**
 
@@ -145,13 +145,21 @@ A：确认已安装 wheel 包，且 `source` 了 install 目录下的 `set_env.s
 
 A：需在 `aclshmemx_init_attr` 前调用 `aclshmemx_set_conf_store_tls`，初始化后无法修改 TLS 配置。
 
-**Q5：googletest、catlass 这两个插件执行 `build.sh` 时提示 git 失败？**
+**Q5：googletest、nlohmann/json 这些依赖执行 `build.sh` 时提示 git 失败？**
 
-A：确认 git 配置是否可以访问网站，如果环境不能连接网站可以尝试手动下载文件到 3rdparty 目录下。
+A：确认 git 配置是否可以访问 GitCode。`googletest v1.14.x` 用于 UT 构建，`nlohmann/json v3.11.3` 用于 Ascend950 平台构建，默认由 `scripts/build.sh` 自动拉取；离线环境可提前准备到 `3rdparty/googletest` 和 `3rdparty/json`。详情见 [第三方源码依赖](docs/quickstart.md#47-第三方源码依赖).
 
 **Q6：CANN 包安装失败怎么办？**
 
 A：查看[常见问题](https://www.hiascend.com/document/detail/zh/AscendFAQ/CommuFunc/resdl/rdl_011.html)
+
+**Q7：仓库根目录没有 Dockerfile，如何准备容器环境？**
+
+A：本仓当前不维护独立 Dockerfile。建议根据芯片、系统架构和 CANN 版本从[昇腾镜像仓库](https://www.hiascend.com/developer/ascendhub)选择 CANN 容器镜像，再按 [Docker 容器环境](docs/quickstart.md#49-docker-容器环境) 和快速开始步骤完成源码构建。
+
+**Q8：无 NPU 环境能否运行 UT 和 examples？**
+
+A：可以做依赖检查和编译验证，但 `scripts/run.sh`、`scripts/run_examples.sh` 需要可用 NPU、驱动和 CANN 运行时，运行结果需在硬件环境或项目 CI 中验证。
 
 > 更多故障排查见：[Troubleshooting](docs/debug/Troubleshooting_FAQs.md)
 

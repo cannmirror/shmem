@@ -31,6 +31,19 @@
    - cmake ≥ 3.19
    - GLIBC ≥ 2.28
    - Python >= 3.9.0
+   - bisheng（随 CANN toolkit 安装，用于编译 Device 侧 AscendC kernel）
+
+项目默认使用 CANN toolkit 提供的 `bisheng` 作为 C/C++ 编译器。编译前需完成 CANN toolkit 安装，并执行：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+```
+
+如果 CANN 安装在自定义路径，请执行：
+
+```bash
+source ${install_path}/ascend-toolkit/set_env.sh
+```
 
 ### 4.3 CANN
 #### 4.3.1 CANN 版本说明
@@ -85,7 +98,18 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source ${install_path}/ascend-toolkit/set_env.sh
 ```
 
-### 4.4 安装`Pytorch`框架和`torch_npu`插件
+### 4.4 构建与运行依赖汇总
+
+| 依赖 | 使用场景 | 获取方式 | 离线环境准备 |
+| --- | --- | --- | --- |
+| CANN toolkit | 核心库、Device kernel、examples 和 UT 编译运行 | 安装 CANN toolkit `.run` 包 | 提前下载匹配 CPU 架构的 toolkit 安装包 |
+| CANN ops 包 | 社区版 CANN、SDMA 等场景的运行依赖 | 安装与 SoC/CANN 版本匹配的 ops `.run` 包 | 提前下载匹配 SoC、CANN 版本和 CPU 架构的 ops 包 |
+| bisheng | Device 侧 AscendC kernel 编译 | 随 CANN toolkit 提供 | 安装 toolkit 后执行 `set_env.sh` |
+| Python 依赖 | 构建脚本、Python 示例和测试 | `requirements.txt`、`requirements-examples.txt` | 提前准备 pip wheel 或使用内部 PyPI 源 |
+| googletest v1.14.x | `-uttests` 单元测试构建 | `scripts/build.sh` 自动从 GitCode 拉取 | 预置到 `3rdparty/googletest` |
+| nlohmann/json v3.11.3 | Ascend950 平台构建依赖 | `scripts/build.sh -soc_type Ascend950` 自动从 GitCode 拉取 | 预置到 `3rdparty/json` |
+
+### 4.5 安装`Pytorch`框架和`torch_npu`插件
 编译运行 torch 输入输出 tensor 的算子时必须安装本包。
 
 以`CANN 9.0.0`为例，参考 [Ascend Extension for PyTorch 26.0.0-昇腾社区](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/zh/installation_guide/installation_via_binary_package.md) 文档。
@@ -109,7 +133,7 @@ pip3 install torch_npu-2.7.1.post4-cp311-cp311-manylinux_2_28_aarch64.whl
 ```
 
 
-### 4.5 Python 依赖安装
+### 4.6 Python 依赖安装
 ```bash
 # 基础依赖（构建期 + 运行期硬依赖）
 python3 -m pip install -r requirements.txt
@@ -118,13 +142,30 @@ python3 -m pip install -r requirements.txt
 python3 -m pip install -r requirements-examples.txt
 ```
 
-### 4.6 可选依赖
+### 4.7 第三方源码依赖
+
+`scripts/build.sh` 会按构建选项自动准备部分第三方源码依赖：
+
+- `googletest v1.14.x`：执行 `bash scripts/build.sh -uttests` 时自动拉取并安装到 `3rdparty/googletest`，用于 gtest/gmock 单元测试。
+- `nlohmann/json v3.11.3`：执行 `bash scripts/build.sh -soc_type Ascend950` 时自动拉取到 `3rdparty/json`，用于 Ascend950 平台相关构建依赖（如 UDMA/RDMA 等路径）。
+
+如果构建环境无法访问 GitCode，可提前在联网环境准备依赖目录，并拷贝到仓库根目录的 `3rdparty/` 下：
+
+```text
+3rdparty/
+├── googletest/
+└── json/
+```
+
+### 4.8 可选依赖
 - MPI：OpenMPI 4.0+（分布式通信场景）
 - PyTorch：1.12+（Python 示例运行）
 
-### 4.7 Docker 容器环境
+### 4.9 Docker 容器环境
 
 用户可以根据具体芯片类型，操作系统在[昇腾镜像仓库](https://www.hiascend.com/developer/ascendhub)拉取已配置好CANN环境的容器进行项目开发。Docker使用方法可以参考昇腾CANN镜像仓库内[快速开始](https://www.hiascend.com/developer/ascendhub/detail/17da20d1c2b6493cb38765adeba85884)章节
+
+本仓当前不维护独立 Dockerfile。建议使用昇腾官方 CANN 容器镜像作为基础环境，再按本文档完成源码拉取、第三方依赖准备、编译和运行。容器内运行 UT 或 examples 仍需宿主机提供可用 NPU、驱动、设备挂载和 CANN 运行时。
 
 ## 5 快速上手
 
@@ -332,6 +373,8 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, attributes);
 - **单元测试：** 覆盖核心接口（初始化、内存操作、同步等），位于 `tests/unittest/`
 
 - **算子泛化性测试：** 针对通算融合算子样例，支持动态生成测试数据与精度校验
+
+测试和样例分为编译阶段与运行阶段：编译阶段需要 CANN toolkit、`bisheng` 和对应第三方依赖；运行阶段的 `scripts/run.sh`、`scripts/run_examples.sh` 需要可用 NPU、驱动、CANN 运行时和正确的 rank/NPU 参数。无 NPU 的普通容器环境可用于依赖检查和编译验证，不能完整验证 UT 或 examples 的运行时行为。
 
 ### 9.1 运行单元测试
 

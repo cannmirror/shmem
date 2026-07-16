@@ -2,11 +2,7 @@
 > **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 
 ## 环境要求和准备
-SDMA put/get接口需要CANN 9.0.0-beta.2及以上版本支持，可用于read/write数据搬运。请参考[CANN版本说明](../../docs/quickstart.md#431-cann-版本说明)下载并安装对应版本的toolkit包；使能SDMA时，还需要按硬件平台安装对应的ops-legacy包。
-
-## 支持设备
-
-SDMA put/get接口当前支持在Atlas 200I A2/A3、Atlas 300T A2/A3等A2/A3平台使用read/write数据搬运能力。Ascend950及以上平台暂不支持通过SDMA put/get接口使用read/write数据搬运能力。
+SDMA put/get接口需要CANN 9.0.0-beta.2及以上版本支持，可用于read/write数据搬运。请参考[CANN版本说明](../../docs/quickstart.md#431-cann-版本说明)下载并安装对应版本的toolkit包；使能SDMA时，还需要安装与toolkit版本和设备类型匹配的ops包。
 
 ## example使用方式：
 1.在`shmem/`目录编译软件包并安装：

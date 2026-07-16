@@ -2,9 +2,8 @@
 > **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 
 ## 环境要求和准备
-SDMA功能在9.0.0及以上版本（尝鲜版）新增支持。需要下载并安装以下cann和ops软件包：
-- toolkit包（[CANN master obp镜像网站](https://mirror-centralrepo.devcloud.cn-north-4.huaweicloud.com/artifactory/cann-run-mirror/software/master/)）
-- ops-legacy包（根据硬件平台下载对应版本：[A2 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-x86_64.run)/[A2 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-910b-ops-legacy_9.1.0_linux-aarch64.run)/[A3 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-x86_64.run)/[A3 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260520_newest/cann-A3-ops-legacy_9.1.0_linux-aarch64.run)）
+SDMA功能需要CANN 9.0.0-beta.2及以上版本支持。请参考[CANN版本说明](../../docs/quickstart.md#431-cann-版本说明)下载并安装对应版本的toolkit包；使能SDMA时，还需要安装与toolkit版本和设备类型匹配的ops包。
+
 ## example执行说明
 1.在`shmem/`目录编译软件包并安装：
 ```bash

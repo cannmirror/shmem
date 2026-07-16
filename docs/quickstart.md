@@ -1,7 +1,7 @@
 # 快速开始
 
 ## 1 介绍
-本系统主要面向昇腾平台上的模型和算子开发者，提供便携易用的多机多卡内存访问方式，方便用户开发在卡间同步数据，加速通信或通算融合类算子开发。  
+本系统主要面向昇腾平台上的模型和算子开发者，提供便携易用的多机多卡内存访问方式，方便用户开发在卡间同步数据，加速通信或通算融合类算子开发。
 
 ## 2 软件架构
 共享内存库接口主要分为 host 和 device 接口部分：
@@ -10,7 +10,7 @@
 
 ## 3 目录结构说明
 详细介绍见[code_organization](code_organization.md)
-``` 
+```
 ├── 3rdparty // 依赖的第三方库
 ├── docs     // 文档
 ├── examples // 使用样例
@@ -36,8 +36,7 @@
 #### 4.3.1 CANN 版本说明
 | 驱动固件 | CANN 版本 | D2D | D2H/H2D | D2rH/rH2D | 其他依赖 |
 | --- | --- | --- | --- | --- | --- |
-| Ascend HDK 25.0.RC1.1 | 9.0.0-beta.2 及以上<br>[社区版资源](https://www.hiascend.com/developer/download/community/result?module=cann) | MTE<br>RDMA<br>SDMA | MTE | MTE | 使能 SDMA 需下载社区版 [ops-legacy 包](https://www.hiascend.com/developer/download/community/result?module=cann) |
-| Ascend HDK 25.0.RC1.1 | 9.0.0 及以上<br>尝鲜版 toolkit 包：[x86_64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260305000326487/x86_64/Ascend-cann-toolkit_9.0.0_linux-x86_64.run) / [aarch64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260305000326487/aarch64/Ascend-cann-toolkit_9.0.0_linux-aarch64.run) | MTE<br>RDMA<br>SDMA | MTE | MTE | 使能 SDMA 需下载 ops-legacy 包（按硬件平台）：[A2 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260305_newest/cann-910b-ops-legacy_9.0.0_linux-x86_64.run) / [A2 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260305_newest/cann-910b-ops-legacy_9.0.0_linux-aarch64.run) / [A3 x86_64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260305_newest/cann-A3-ops-legacy_9.0.0_linux-x86_64.run) / [A3 aarch64](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/20260305_newest/cann-A3-ops-legacy_9.0.0_linux-aarch64.run) |
+| Ascend HDK 25.0.RC1.1 | 9.0.0-beta.2 及以上<br>[社区版资源](https://www.hiascend.com/developer/download/community/result?module=cann) | MTE<br>RDMA<br>SDMA | MTE | MTE | 使能 SDMA 需下载与 toolkit 版本和设备类型匹配的 [ops 包](https://www.hiascend.com/developer/download/community/result?module=cann) |
 | Ascend HDK 25.0.RC1.1 | 8.5.0 及以上<br>[社区版资源](https://www.hiascend.com/developer/download/community/result?module=cann) | MTE<br>RDMA | MTE | MTE | 使能 A3 D2rH/rH2D：LingQu Computing Network [1.5.0 版本](https://support.huawei.com/enterprise/zh/ascend-computing/lingqu-computing-network-pid-258003841/software)<br>升级指导：[安装指南](https://support.huawei.com/enterprise/zh/ascend-computing/lingqu-computing-network-pid-258003841) |
 | Ascend HDK 25.0.RC1.1 | 8.3.RC1 及以上<br>[社区版资源](https://www.hiascend.com/developer/download/community/result?module=cann) | MTE<br>RDMA |  |  | |
 
@@ -58,7 +57,7 @@ soc的信息如下，可以参考安装。
 |Ascend 910C|A3|
 |Ascend 950	|无|
 
-安装 toolkit 包 
+安装 toolkit 包
 ```sh
 chmod +x Ascend-cann-toolkit_${cann_version}_linux-$(uname -m).run
 # 默认安装路径
@@ -197,7 +196,7 @@ bash run.sh -pes 2 -type int
 ```
 注：example及其他样例代码仅供参考，在生产环境中请谨慎使用。
 
-`run.sh`脚本提供`-ranks`、`-ipport`、`-test_filter`等参数自定义执行用例的卡数、ip端口、gtest_filter等  
+`run.sh`脚本提供`-ranks`、`-ipport`、`-test_filter`等参数自定义执行用例的卡数、ip端口、gtest_filter等
 
 例
 

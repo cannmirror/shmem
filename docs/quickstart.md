@@ -30,6 +30,7 @@
 ### 4.1 硬件要求
 
 - Atlas 系列：800I A2/A3、800T A2/A3
+- Ascend 950 系列
 - 架构兼容：aarch64、x86
 
 ### 4.2 工具链依赖
@@ -66,7 +67,7 @@ source ${install_path}/ascend-toolkit/set_env.sh
 
 参考[快速安装 CANN](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html?OS=openEuler&InstallType=local)
 
-商发版本只需要安装`toolkit`的`.run`包即可。
+商发版本需要安装`toolkit`的`.run`包。从 CANN 8.5.0 版本起，`hccl`等算子已迁移至 ops 包中，商发版本同样需要安装对应 SoC 的 ops 包，否则运行时会报缺少`libhccl.so`等库文件的错误。
 
 社区版本需要额外安装一个`Ascend-cann-{soc_name}-ops-{cann_version}-{os_arch}.run`的`.run`安装包，需要选择cann版本，选择对应的soc、操作系统、架构的版本。（如果没有`{soc_name}-ops`的算子包，可能会提示缺少`libhccl.so`库文件）。
 
@@ -153,6 +154,8 @@ pip3 install torch_npu-2.7.1.post4-cp311-cp311-manylinux_2_28_aarch64.whl
 
 
 ### 4.6 Python 依赖安装
+
+> **前提条件**：本节需要用到仓库根目录下的 `requirements.txt` 和 `requirements-examples.txt` 文件，请先完成 [5.1.1 源码编译](#511-方式一源码编译) 中的代码克隆步骤。
 
 ```bash
 # 基础依赖（构建期 + 运行期硬依赖）
@@ -338,10 +341,10 @@ bash scripts/run.sh -ranks 8 -ipport 127.0.0.1:8666 -test_filter Init
 
 5. 设置是否开启 TLS 认证，默认开启，若关闭 TLS 认证，请使用如下接口
 
-   ```python
-   import shmem as shm
-   shm.set_conf_store_tls(False, "")   # 关闭tls认证
-   ```
+```python
+import shmem as shm
+shm.set_conf_store_tls(False, "")   # 关闭TLS认证
+```
 
    ```python
    import shmem as shm
@@ -351,11 +354,12 @@ bash scripts/run.sh -ranks 8 -ipport 127.0.0.1:8666 -test_filter Init
 
 6. 使用torchrun运行测试demo
 
-   ```sh
-   torchrun --nproc-per-node=k test.py # k为想运行的ranksize
-   ```
+`test.py` 为用户自行编写的测试脚本，可参考仓库中 `examples/python_extension/test/` 目录下的已有测试文件（如 `core/test_init_final.py`）进行编写。
 
-   看到日志中打印出“test.py running success!”即为demo运行成功。
+```sh
+torchrun --nproc-per-node=<n> test.py # <n> 为想运行的 ranksize，替换为实际数值
+```
+看到日志中打印出"test.py running success!"即为demo运行成功
 
 ## 7 `unique id` 初始化方式
 

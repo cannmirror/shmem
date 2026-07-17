@@ -1,28 +1,32 @@
-## 示例场景
+# 示例场景
 
 本示例演示通过 RDMA RoCE 传输通路，使用低阶接口 `aclshmemx_roce_put_nbi` 配合同步/栅栏原语完成多 PE 之间的全交换（all-gather）数据通信，并验证数据正确性。
 
 具体包含以下 8 种同步模式：
-- **sync_all**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_sync_all` 完成全局同步
-- **sync_all_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_sync_all(buf, sync_id)` 显式传入 UB buffer 和 sync_id
-- **barrier_all**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier_all` 完成全局同步（barrier 内部自动 quiet）
-- **barrier_all_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier_all(buf, sync_id)` 显式传入 UB buffer 和 sync_id
-- **sync_team**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_team_sync(team)` 在 team 内完成同步
-- **sync_team_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_team_sync(team, buf, sync_id)` 在 team 内显式传入参数
-- **barrier_team**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier(team)` 在 team 内完成同步
-- **barrier_team_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier(team, buf, sync_id)` 显式传入参数
+
+- **sync_all**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_sync_all` 完成全局同步。
+- **sync_all_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_sync_all(buf, sync_id)` 显式传入 UB buffer 和 sync_id。
+- **barrier_all**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier_all` 完成全局同步（barrier 内部自动 quiet）。
+- **barrier_all_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier_all(buf, sync_id)` 显式传入 UB buffer 和 sync_id。
+- **sync_team**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_team_sync(team)` 在 team 内完成同步。
+- **sync_team_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_quiet` + `aclshmemx_roce_team_sync(team, buf, sync_id)` 在 team 内显式传入参数。
+- **barrier_team**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier(team)` 在 team 内完成同步。
+- **barrier_team_buf**：使用 `aclshmemx_roce_put_nbi` + `aclshmemx_roce_barrier(team, buf, sync_id)` 显式传入参数。
 
 ## 环境要求
+
 同[rdma_demo](../rdma_demo/README.md)中的环境要求。
 
 ## 使用方式
 
 ### 编译
 
-在shmem/目录编译。RDMA 编译参数（Ascend910B/C，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../docs/compilation_build_guide.md#rdma参数使用说明)。
+在shmem/目录编译。RDMA 编译参数（A2/A3，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../docs/compilation_build_guide.md#rdma参数使用说明)。
 
 ### 运行
+
 > 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](../rdma_demo/README.md#ibv_extend_drivers-环境变量)。
+
 #### 方式一：在 `examples/rdma_sync_barrier_demo` 目录下执行 `bash run.sh`
 
 `run.sh` 支持通过参数指定 demo 类型，默认为 `sync_all`。
@@ -141,12 +145,12 @@ for pid in ${pids[@]}; do wait $pid; done
 
 每个 PE 向所有其他 PE 发送自己的数据（值为 `pe_id + 10`），同步完成后各 PE 校验收到的数据是否正确。校验通过后输出：
 
-```
+```sh
 [PASS] check success, pe=<pe_id>
 ```
 
 若校验失败，会打印具体的不匹配信息：
 
-```
+```sh
 [FAIL] pe=<pe_id> offset=<offset> got=<actual> expected=<expected>
 ```

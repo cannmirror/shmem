@@ -345,6 +345,7 @@ aclFinalize();
 ```
 
 ***
+
 ## 三、注意事项
 
 1. **内存申请**：跨机调用RDMA接口时，必须使用`aclshmem_malloc`分配对称内存。
@@ -354,4 +355,3 @@ aclFinalize();
    - `aclshmemx_signal_wait_until_on_stream`不支持RDMA跨机，HCCS可通时支持MTE跨机
    - 跨机场景下需确保网络配置正确，相关环境变量已正确设置
    - **RDMA路径同步**：当使用RDMA接口时，需要调用`aclshmemx_handle_wait`来保证数据已经被接收完成。
-

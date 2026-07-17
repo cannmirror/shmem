@@ -1,9 +1,9 @@
-## 样例介绍
+# 样例介绍
 
 本样例展示在 SIMD 与 SIMT 混合编译模式下，如何对 SIMT 远程内存访问（RMA）接口进行性能测试（Performance Test）。
 测试用于评估单机两卡间 Device-to-Device 的 `gm2gm`（global memory 到 global memory）数据传输能力，覆盖**单向**的 `put` 与 `get` 操作，并输出带宽与时延统计。
 
-### 测试模型
+## 测试模型
 
 测试固定使用两张卡，PE 号分别为 0 和 1：
 
@@ -17,7 +17,7 @@
 | `put` | Active PE 的对称内存 → Passive PE 的对称内存 | Passive PE |
 | `get` | Passive PE 的对称内存 → Active PE 的对称内存 | Active PE |
 
-### 性能测试方法
+## 性能测试方法
 
 为获得贴近真实的带宽与时延、避免数据缓存（Data Cache）命中导致结果虚高，以及方便实现，本样例采用以下设计：
 
@@ -39,7 +39,6 @@
 | `THREAD_COUNT` | SIMT 模式下单 Core 启动的线程数，决定向量指令流的并发规模。 | 默认 `1024` |
 
 > **提示**：修改上述常量后，需重新回到根目录执行编译（见下文），新配置才会生效。
-
 > 由于部分原因，目前同一个编译单元中，两个仅调用相似simt rma接口的vf函数会导致编译错误（尽管编译不会报错，运行时会有错误），本样例通过修改源码以测试不同的simt RMA接口，并提供了常量定义以方便修改。
 
 ## 支持的设备
@@ -50,6 +49,7 @@
 
 1. **配置 CANN 环境变量**
    编译前需先加载 CANN 的环境变量（按实际安装路径选择其一）：
+
    ```bash
    # 默认安装路径
    source /usr/local/Ascend/cann/bin/set_env.sh
@@ -59,12 +59,14 @@
 
 2. **编译项目**
    在 `shmem/` 根目录下执行编译脚本：
+
    ```bash
    bash scripts/build.sh -examples -enable_simt -soc_type Ascend950
    ```
 
 3. **运行示例程序**
    进入示例目录并执行运行脚本：
+
    ```bash
    cd examples/shmem_perftest/simt_rma_perftest
    bash run.sh [options]
@@ -92,10 +94,10 @@
 | `--ub-size` | 每个 Core 使用的 Unified Buffer 大小，单位 KB。**仅在 SIMD 模式下生效；默认的 SIMT 模式不使用该参数。** | 16 |
 
 > 本测试为固定的两卡（Active PE0 / Passive PE1）模型，启动进程数与程序内 PE 数均固定为 2。`-pes` 和 `-gnpus` 保留为与 shmem_perftest 参数兼容，但传入非 2 的值会报错。
-
 > 测试会从 `--exponent-range` 的 min 到 max 逐个指数遍历单次传输数据量（即 $2^{min}, 2^{min+1}, \dots, 2^{max}$ 字节），并在 `--block-range`（或 `--block-list`）指定的核数集合上逐个核数遍历，每个（核数, 数据量）组合各产出一行统计结果。
 
 例如，测试 `4` 个 Core 在传输 $2^8$ 到 $2^{12}$ 字节数据时的性能表现：
+
 ```bash
 bash run.sh -b 4 --exponent-range 8 12
 ```
@@ -104,7 +106,7 @@ bash run.sh -b 4 --exponent-range 8 12
 
 测试正常结束后，Active PE（PE 0）会在示例目录下的 `output/` 子目录中输出一个 `.csv` 性能统计文件，文件名格式为：
 
-```
+```bash
 [DATA_SIZE]_[blocks]_[OpType]_[VfType]_[minExp]-[maxExp]_l[loop_count]_t[THREAD_COUNT]_.csv
 ```
 

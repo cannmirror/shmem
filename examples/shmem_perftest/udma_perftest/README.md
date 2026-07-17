@@ -139,7 +139,7 @@ CSV 文件名加 metric 前缀：`output/udma_<metric>_<test_type>_<dtype>_<pe>.
 
 CSV 列与 MTE 版保持一致，便于复用 `examples/utils/perf_data_process.py` 出图：
 
-```
+```bash
 DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, CoreMaxTime/us, SingleCoreTime/us
 ```
 
@@ -147,7 +147,7 @@ DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, CoreMaxTime/us, SingleCoreT
 
 ## 输出示例
 
-```
+```bash
 [INFO] udma_perftest start, pe=0, t=put, d=float, exp=10-10, loop=100, ub=16KB, metric=bw, batch=100
 pe: 0 size: 1024 frame_id: 0
 [Verification] put: checking...

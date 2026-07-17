@@ -1,3 +1,5 @@
+# 样例说明
+
 > **暂不支持 Ascend950**：当前暂不支持在 Ascend950 平台配套编译运行。
 
 ## 概述
@@ -42,7 +44,7 @@ cd examples/rma_d2h_demo
 bash run.sh
 ```
 
-用例执行完成，打屏信息出现“[INFO] demo run end in pe <my_pe>”，说明样例执行结束；打屏信息出现“[SUCCESS] run success in pe <my_pe>”，说明样例执行成功且结果准确。
+用例执行完成，打屏信息出现`[INFO] demo run end in pe <my_pe>`，说明样例执行结束；打屏信息出现`[SUCCESS] run success in pe <my_pe>`，说明样例执行成功且结果准确。
 
 ## 约束限制
 

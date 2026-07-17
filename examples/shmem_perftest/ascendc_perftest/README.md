@@ -9,6 +9,7 @@ ascendc_perftest是一个用于**测试AscendC::DataCopy性能并可与shmem的p
 ## 测试目的
 
 本示例主要用于比较以下两种数据传输方式的性能：
+
 1. **AscendC::DataCopy**：基于Ascend C的数据传输接口
 2. **shmem的put/get接口**：共享内存的数据传输接口
 
@@ -152,11 +153,12 @@ python ../utils/perf_data_process.py -d output
 
 测试运行后，会在当前目录下生成`output`文件夹，其中包含测试结果的CSV文件，文件名格式为：
 
-```
+```bash
 {rank}_{test_type}_{data_type}.csv
 ```
 
 例如：
+
 - `0_put_float.csv` - PUT操作，float类型
 - `0_get_int32.csv` - GET操作，int32类型
 - `0_ub2gm_local_float.csv` - 本地UB到GM操作，float类型
@@ -184,13 +186,15 @@ CSV文件包含以下字段：
 - **GET操作**: 验证从远端读取的数据是否正确
 
 验证成功时会显示：
-```
+
+```bash
 [Verification] SUCCESS: All cores' first values transferred correctly!
 ```
 
 ## 注意事项
 
 1. **环境配置**: 运行前请确保已正确设置Ascend环境变量：
+
    ```bash
    source /usr/local/Ascend/ascend-toolkit/set_env.sh
    ```
@@ -221,25 +225,33 @@ CSV文件包含以下字段：
 ### 常见问题
 
 1. **设备不可用错误**
-   ```
+
+   ```bash
    错误: 设备ID无效
    ```
+
    解决方案：使用 `npu-smi info` 检查可用设备，确保device1和device2参数正确
 
 2. **内存分配失败**
-   ```
+
+   ```bash
    错误: aclrtMalloc failed
    ```
+
    解决方案：减小数据量范围或核数，确保设备有足够内存
 
 3. **Peer Access失败**
-   ```
+
+   ```bash
    错误: aclrtDeviceEnablePeerAccess failed
    ```
+
    解决方案：确保两个设备之间支持Peer Access
 
 4. **数据验证失败**
-   ```
+
+   ```bash
    [Verification] FAILED: Data mismatch
    ```
-   解决方案：检查设备状态，可能需要重置设备或重新运行测试
+
+   解决方案：检查设备状态，可能需要重置设备或重新运行测试。

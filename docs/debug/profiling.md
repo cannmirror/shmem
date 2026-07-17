@@ -10,14 +10,16 @@ Profiling工具核心特性：
 关于GetSystemCycle的详细介绍，可参考[GetSystemCycle](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/ascendcopapi/atlasascendc_api_07_0282.html)。
 
 ## 插入调试代码
+
 1. 插入打点，修改kernel代码在需要打点的位置前后插入SHMEMI_PROF_START和SHMEMI_PROF_END，具体可参考`examples/allgather/allgather_kernel.cpp`。
+
     ```diff
     --- a/examples/allgather/allgather_kernel.cpp
     +++ b/examples/allgather/allgather_kernel.cpp
     @@ -12,6 +12,9 @@
     #include "acl/acl.h"
     #include "shmem.h"
-    
+
     +// shmem prof
     +#include "utils/prof/shmemi_prof.h"
     +
@@ -57,41 +59,49 @@ Profiling工具核心特性：
             T *output_host;
             size_t output_size = n_ranks * trans_size * sizeof(T);
     ```
-   注意：只打印采集的pe和block，无数据的会跳过打印。
+
+    注意：只打印采集的pe和block，无数据的会跳过打印。
 
 ## 编译运行
 
 1. 按照如上步骤修改完后，进行编译算子样例。
 
-   - Ascend910B/C 平台:
+   - A2/A3 平台:
+
    ```sh
    bash scripts/build.sh -examples
    ```
+
    - Ascend950 平台:
+
    ```sh
    bash scripts/build.sh -soc_type Ascend950 -examples
    ```
+
 2. 在examples/allgather目录执行demo:
 
    ```sh
    export SHMEM_CYCLE_PROF_PE=0  # 设置需要采集的pe，当前仅支持采集某个指定的pe
    bash run.sh -ranks 2
    ```
+
 3. 观察其demo打印，会有如下样式打印：
+
     ```sh
     ============================================================
-    BlockID   FrameID   Cycles         Count          AvgTime(us)    
+    BlockID   FrameID   Cycles         Count          AvgTime(us)
     ------------------------------------------------------------
-    0         0         7506966        34050          4.409          
-    1         0         7485800        34050          4.397          
-    2         0         8290500        34050          4.870          
-    3         0         8279083        34050          4.863          
-    4         0         8255644        34050          4.849          
-    5         0         8275272        34050          4.861          
-    6         0         8429026        34050          4.951          
-    7         0         8404425        34050          4.937          
+    0         0         7506966        34050          4.409
+    1         0         7485800        34050          4.397
+    2         0         8290500        34050          4.870
+    3         0         8279083        34050          4.863
+    4         0         8255644        34050          4.849
+    5         0         8275272        34050          4.861
+    6         0         8429026        34050          4.951
+    7         0         8404425        34050          4.937
     ============================================================
     ```
+
     字段描述
 
     | keyword      | description   |

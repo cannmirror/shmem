@@ -1,12 +1,15 @@
 # SHMEM API 样例
+
 SHMEM包含host和device两类接口。host接口用ACLSHMEM_HOST_API宏标识，device接口用ACLSHMEM_DEVICE宏标识。
 
 此章介绍各类API的常见接口的使用样例。
 
 ## Init API
+
 SHMEM的初始化接口样例
 
 ### 初始化状态
+
 ```c++
 enum {
     ACLSHMEM_STATUS_NOT_INITIALIZED = 0,    // 未初始化
@@ -17,6 +20,7 @@ enum {
 ```
 
 ### 初始化所需的attributes
+
 ```c++
 // 初始化属性
 typedef struct {
@@ -35,12 +39,13 @@ typedef struct {
     uint32_t shm_init_timeout;
     uint32_t shm_create_timeout;
     uint32_t control_operation_timeout;
-    // apply avaliable port in advance
+    // apply available port in advance
     int32_t sockFd;
 } aclshmem_init_optional_attr_t;
 ```
 
 ### 初始化样例
+
 ```c++
 #include <iostream>
 #include <unistd.h>
@@ -76,6 +81,7 @@ aclFinalize();
 ### 自定义日志打印
 
 自定义日志打印是可选操作，如果未注册自定义日志打印函数，日志则默认打屏，接口示例如下。
+
 ```c
 void cpp_logger_example(int level, const char* msg)
 {
@@ -111,11 +117,13 @@ int ret = aclshmemx_set_config_store_tls_key(pk, pk_len, password, pw_len, my_ke
 ```
 
 如需关闭加密特性，则调用如下接口。关闭后，则无需调用aclshmemx_set_config_store_tls_key接口。
+
 ```c
 int ret = aclshmemx_set_conf_store_tls(false, nullptr, 0);
 ```
 
 ### Team API
+
 SHMEM的通信域管理接口样例
 
 ### host侧接口样例
@@ -150,6 +158,7 @@ aclshmem_team_destroy(team_odd);
 ```
 
 ### device侧接口样例
+
 ```c++
 class kernel_state_test {
 public:
@@ -199,7 +208,9 @@ void get_device_state(uint32_t block_dim, void* stream, uint8_t* gva, aclshmem_t
     device_state_test<<<block_dim, nullptr, stream>>>(gva, (int)team_id);
 }
 ```
+
 ## Mem API
+
 SHMEM的内存管理接口样例
 
 ```c++
@@ -215,6 +226,7 @@ aclshmem_free(ptr);
 ```
 
 ## RMA API
+
 SHMEM的远端内存访问接口样例
 
 ```c++
@@ -256,6 +268,7 @@ void put_one_num_do(uint32_t block_dim, void* stream, uint8_t* gva, float val)
 ```
 
 ## Sync API
+
 SHMEM的同步管理接口样例
 
 ```c++

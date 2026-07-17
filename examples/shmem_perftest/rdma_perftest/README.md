@@ -22,7 +22,7 @@
 | `-b/--block-size`、`--block-range` | 控制核数 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 | 入参兼容，但**强制 1**，输入其他值会打印 WARN 后忽略 |
 | UB 缓冲 | MTE 必需，影响传输 | UDMA 必须，用于低阶接口 UB 入参 | RDMA 必须，大小至少为 64B，默认为 64B，自动 64B 对齐 |
 | 测试模式 | put / bi_put / get / bi_get | put / bi_put / get / bi_get / **put_signal** | put / bi_put / get / bi_get |
-| SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort | **Ascend950（需指定 `XSCALE` 或 `HNS_1825` 后端）或 Ascend910B/C** |
+| SOC 限制 | 通用 | **仅 Ascend950**：非 950 上 device kernel 内置 abort | **Ascend950（需指定 `XSCALE` 或 `HNS_1825` 后端）或 A2/A3* |
 | CSV 文件名 | `<test>_<dtype>_<pe>.csv` | `udma_<test>_<dtype>_<pe>.csv` | `rdma_<test>_<dtype>_<pe>.csv` |
 
 ## 环境要求
@@ -31,12 +31,14 @@
 
 ## 编译说明
 
-RDMA 功能需要在编译时启用 `-enable_rdma` 参数，并根据 SOC 类型配置后端。RDMA 编译参数（Ascend910B/C，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../../docs/compilation_build_guide.md#rdma参数使用说明)。
+RDMA 功能需要在编译时启用 `-enable_rdma` 参数，并根据 SOC 类型配置后端。RDMA 编译参数（A2/A3，以及 Ascend950 的 `XSCALE` / `HNS_1825` 后端）详见 [编译与构建 - RDMA 参数使用说明](../../../docs/compilation_build_guide.md#rdma参数使用说明)。
 
 ## 使用方法
 
 ### 基本用法
+
 > 注：Ascend950 平台需设置 `IBV_EXTEND_DRIVERS` 环境变量，参见[环境变量说明](../../rdma_demo/README.md#ibv_extend_drivers-环境变量)。
+
 ```bash
 cd examples/shmem_perftest/rdma_perftest/
 bash run.sh [选项]
@@ -97,7 +99,7 @@ bash run.sh [选项]
 
 CSV 格式如图：
 
-```
+```bash
 DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, Bandwidth/GiB/s, CoreMaxTime/us
 ```
 
@@ -105,7 +107,7 @@ DataSize/B, Npus, Blocks, UBsize/KB, Bandwidth/GB/s, Bandwidth/GiB/s, CoreMaxTim
 
 ## 输出示例
 
-```
+```bash
 测试类型: bi_get
 数据类型: float
 幂数范围: 11-20

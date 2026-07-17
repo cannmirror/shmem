@@ -1,35 +1,44 @@
-### 使用方式
+# 样例介绍
 
-1. **编译项目**  
+## 使用方式
+
+1. **编译项目**
    在 `shmem/` 根目录下执行编译脚本：
-   - Ascend910B/C 平台:
+   - A2/A3 平台:
+
    ```bash
    bash scripts/build.sh -examples
    ```
+
    - Ascend950 平台:
+
    ```bash
    bash scripts/build.sh -soc_type Ascend950 -examples
    ```
 
-2. **运行KV_Shuffle示例程序**  
+2. **运行KV_Shuffle示例程序**
    进入示例目录并执行运行脚本：
+
    ```bash
    cd examples/kv_shuffle
    bash scripts/run.sh [pe_size]
    ```
 
-   - **参数说明**：
-     - `pe_size`：指定算子运行的pe个数。
-     - 示例：使用第0和第1个NPU设备运行2卡kv_shuffle示例：
+   **参数说明**：
+   - `pe_size`：指定算子运行的pe个数。
+   - 示例：使用第0和第1个NPU设备运行2卡kv_shuffle示例：
+
        ```bash
        bash scripts/run.sh 2
        ```
-### 算子介绍
+
+## 算子介绍
+
 KV Shuffle 算子核心功能是实现 KV Cache（键值缓存）的跨设备 / 跨 PE 数据重排与远程拷贝，适配大模型训练 / 推理中 KV Cache 的分布式调度需求。
 
 在大模型分布式训练 / 推理场景中，KV Cache 会按 Block（块）管理，不同计算 PE 之间需要根据调度策略（如 shuffle table）对 KV Cache 的 Block 进行重排、迁移，本算子为该场景提供高效 KV Block 跨 PE 拷贝与重映射，相比传统主机侧调度，大幅降低 KV Cache 迁移的延迟和带宽开销。
 
-#### cpp接口
+### cpp接口
 
 ```cpp
 class KVShuffleOps {
@@ -59,19 +68,19 @@ private:
 
 **接口参数说明**
 
-| 参数名      | 输入/输出 | 描述                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| :------------ | :---------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| uint8_t* k_cache| 输入/输出      | 指向键缓存全局内存的指针，存储需要进行shuffle操作的键数据块，连续内存，按块组织，每个块的大小为 kv_head_num * page_size * head_dim * sizeof(data_type) |
-| uint8_t* v_cache | 输入/输出      | 指向值缓存全局内存的指针，存储需要进行shuffle操作的值数据块，与k_cache相同的连续内存布局 |
-| uint8_t* global_shuffle_table | 输入      | 全局shuffle表，存储每个进程的配对信息和操作类型，实际存储int64_t类型数据，内存布局 ：数组结构，每个PE对应2个int64_t条目：[pair_rank_0, operation_0, pair_rank_1, operation_1, ..., pair_rank_n, operation_n] 数据限制 ：大小必须为 2 * n_pes * sizeof(int64_t) ，其中n_pes是进程总数，operation只能是0或1（0表示发送，1表示接收）配对关系必须是双向的（A的pair_rank是B，则B的pair_rank必须是A）|
-| uint8_t* src_block_table | 输入      | 源块索引表，指示每个shuffle操作的源块ID，实际存储int64_t类型数据，一维数组，长度为block_nums，每个元素的值必须是有效的块ID（0 ≤ src_block_id < block_nums） |
-| uint8_t* dst_block_table | 输入      |目标块索引表，指示每个shuffle操作的目标块ID，实际存储int64_t类型数据，每个元素的值必须是有效的块ID（0 ≤ dst_block_id < block_nums） |
-| int64_t block_nums | 输入      | 需要进行shuffle操作的块数量 |
-| int64_t kv_head_num | 输入      |键值数据的头数量 |
-| int64_t page_size | 输入      | KV缓存中每个页面的大小|
-| int64_t head_dim | 输入      | 每个头的维度 |
+| 参数名      | 输入/输出 | 描述|
+| :------------ | :---------- | :-------- |
+| `uint8_t*k_cache`| 输入/输出      | 指向键缓存全局内存的指针，存储需要进行shuffle操作的键数据块，连续内存，按块组织，每个块的大小为`kv_head_num * page_size * head_dim * sizeof(data_type)` |
+| `uint8_t* v_cache` | 输入/输出      | 指向值缓存全局内存的指针，存储需要进行shuffle操作的值数据块，与k_cache相同的连续内存布局 |
+| `uint8_t* global_shuffle_table` | 输入      | 全局shuffle表，存储每个进程的配对信息和操作类型，实际存储int64_t类型数据，内存布局 ：数组结构，每个PE对应2个int64_t条目：`[pair_rank_0, operation_0, pair_rank_1, operation_1, ..., pair_rank_n, operation_n]` 数据限制 ：大小必须为`2 * n_pes * sizeof(int64_t)`，其中`n_pes`是进程总数，operation只能是0或1（0表示发送，1表示接收）配对关系必须是双向的（A的`pair_rank`是B，则B的`pair_rank`必须是A）|
+| `uint8_t* src_block_table` | 输入      | 源块索引表，指示每个shuffle操作的源块ID，实际存储int64_t类型数据，一维数组，长度为`block_nums`，每个元素的值必须是有效的块`ID(0 ≤ src_block_id < block_nums)` |
+| `uint8_t* dst_block_table` | 输入      |目标块索引表，指示每个shuffle操作的目标块ID，实际存储int64_t类型数据，每个元素的值必须是有效的块`ID(0 ≤ dst_block_id < block_nums)`|
+| `int64_t block_nums` | 输入      | 需要进行shuffle操作的块数量 |
+| `int64_t kv_head_num` | 输入      |键值数据的头数量 |
+| `int64_t page_size` | 输入      | KV缓存中每个页面的大小|
+| `int64_t head_dim` | 输入      | 每个头的维度 |
 
-#### torch接口
+### torch接口
 
 ```py
 # 创建算子
@@ -83,13 +92,14 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
 
 **接口参数说明**
 
-##### 1. global_shuffle_tensor
+#### 1. global_shuffle_tensor
 
 - 含义 ：全局shuffle表，存储每个进程的配对信息和操作类型
 - 数据类型 ：PyTorch张量， torch.int64 类型
 - 形状 ：二维数组，形状为 [n_pes, 2] ，其中n_pes是进程总数
 - 内容结构 ：
-  ```
+
+  ```py
   [
     [pair_rank_0, operation_0],
     [pair_rank_1, operation_1],
@@ -97,13 +107,14 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
     [pair_rank_n, operation_n]
   ]
   ```
+
 - 数据限制 ：
   - 必须在NPU设备上（使用 .npu() 方法转换）
   - operation 只能是0或1（0表示发送，1表示接收）
   - 配对关系必须是双向的（A的pair_rank是B，则B的pair_rank必须是A）
   - 数据类型必须是 int64
 
-##### 2. aclshmem_k_cache_tensor
+#### 2. aclshmem_k_cache_tensor
 
 - 含义 ：指向键缓存全局内存的张量，存储需要进行shuffle操作的键数据块
 - 数据类型 ：PyTorch张量，torch.int8 类型
@@ -113,7 +124,7 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
   - 维度顺序必须严格为 [块数, 头数, 页大小, 头维度]
   - 块数必须与 block_nums 参数匹配
 
-##### 3. aclshmem_v_cache_tensor
+#### 3. aclshmem_v_cache_tensor
 
 - 含义 ：指向值缓存全局内存的张量，存储需要进行shuffle操作的值数据块
 - 数据类型 ：PyTorch张量，与 aclshmem_k_cache_tensor 相同
@@ -124,7 +135,7 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
   - 数据类型必须与 aclshmem_k_cache_tensor 一致
   - 形状必须与 aclshmem_k_cache_tensor 完全匹配
 
-##### 4. src_block_tensor
+#### 4. src_block_tensor
 
 - 含义 ：源块索引表，指示每个shuffle操作的源块ID
 - 数据类型 ：PyTorch张量， torch.int64 类型
@@ -135,7 +146,7 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
   - 每个元素的值必须是有效的块ID（0 ≤ src_block_id < block_nums）
   - 数组长度必须与当前进程需要处理的块数匹配
 
-##### 5. dst_block_tensor
+#### 5. dst_block_tensor
 
 - 含义 ：目标块索引表，指示每个shuffle操作的目标块ID
 - 数据类型 ：PyTorch张量， torch.int64 类型
@@ -146,7 +157,7 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
   - 每个元素的值必须是有效的块ID（0 ≤ dst_block_id < block_nums）
   - 数组长度必须与 src_block_tensor 完全匹配
 
-##### 关键参数推导
+#### 关键参数推导
 
 在PyTorch扩展的C++实现中，以下参数从输入张量中推导出来：
 
@@ -188,12 +199,13 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
 ##### 2.2 关系公式
 
 1. **块数计算**：一个batch需要的块数 = batch token数 ÷ 页面大小 + 1（向上取整）
-   
+
    ```python
    block_num = seqlen // PAGE_SIZE + 1
    ```
+
 2. **KV缓存总大小**：
-   
+
    ```python
    total_cache_size = max_block_nums × kv_head_num × page_size × head_dim × data_type_size
    ```
@@ -209,7 +221,7 @@ kv_shuffle.compute(global_shuffle_tensor, aclshmem_k_cache_tensor,
 
 ##### 2.4 直观理解
 
-```
+```text
 Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 ┌─────────────────┐     ┌────────────────────────────────────────────┐
 │ Token 0-5       │     │ Block 0 (PAGE_SIZE=4): 存储Token 0-3       │
@@ -227,7 +239,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **K缓存数据**：
 
-```
+```text
 # Block 0
 [[[1.1, 1.2], [1.3, 1.4], [1.5, 1.6], [1.7, 1.8]]]
 
@@ -243,7 +255,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **V缓存数据**：
 
-```
+```text
 # Block 0
 [[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]]]
 
@@ -263,7 +275,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **K缓存数据**：
 
-```
+```text
 # Block 0
 [[[5.1, 5.2], [5.3, 5.4], [5.5, 5.6], [5.7, 5.8]]]
 
@@ -273,7 +285,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **V缓存数据**：
 
-```
+```text
 # Block 0
 [[[3.3, 3.4], [3.5, 3.6], [3.7, 3.8], [3.9, 4.0]]]
 
@@ -405,7 +417,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **K缓存**：
 
-```
+```text
 # Block 0
 [[[1.1, 1.2], [1.3, 1.4], [1.5, 1.6], [1.7, 1.8]]]
 
@@ -421,7 +433,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **V缓存**：
 
-```
+```text
 # Block 0
 [[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]]]
 
@@ -439,7 +451,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **K缓存**：
 
-```
+```text
 # Block 0（原有）
 [[[5.1, 5.2], [5.3, 5.4], [5.5, 5.6], [5.7, 5.8]]]
 
@@ -455,7 +467,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 **V缓存**：
 
-```
+```text
 # Block 0（原有）
 [[[3.3, 3.4], [3.5, 3.6], [3.7, 3.8], [3.9, 4.0]]]
 
@@ -489,7 +501,7 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 #### 7. 数据流转总结
 
-```
+```text
 ┌─────────────────────────┐     ┌────────────────────────┐
 │        进程0初始数据     │     │        进程1初始数据    │
 │  K块0: [1.1, 1.2, ...]  │     │  K块0: [5.1, 5.2, ...]  │
@@ -531,14 +543,14 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 ##### 8.1 global_shuffle_tensor
 
-```
+```text
 [[1, 0],  # 进程0与进程1配对，角色为发送方
  [0, 1]]  # 进程1与进程0配对，角色为接收方
 ```
 
 ##### 8.2 aclshmem_k_cache_tensor（进程0）
 
-```
+```text
 # 形状: (4, 1, 4, 2)
 [[[[1.1, 1.2], [1.3, 1.4], [1.5, 1.6], [1.7, 1.8]]],  # Block 0
  [[[2.1, 2.2], [2.3, 2.4], [2.5, 2.6], [2.7, 2.8]]],  # Block 1
@@ -548,13 +560,13 @@ Batch Token (seqlen=6) → 映射到 → KV缓存的2个块
 
 ##### 8.3 src_block_tensor（进程0）
 
-```
+```text
 [0, 1]  # 要传输的源块ID
 ```
 
 ##### 8.4 dst_block_tensor（进程0）
 
-```
+```text
 [2, 3]  # 传输到目标进程的块ID
 ```
 

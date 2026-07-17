@@ -1,9 +1,11 @@
 # 安全声明
 
 ## 安全加固
+
 ### 加固须知
 
 本文中列出的安全加固措施为基本的加固建议项。用户应根据自身业务，重新审视整个系统的网络安全加固措施。用户应按照所在组织的安全策略进行相关配置，包括并不局限于软件版本、口令复杂度要求、安全配置（协议、加密套件、密钥长度等）， 权限配置、防火墙设置等。必要时可参考业界优秀加固方案和安全专家的建议。
+
 ### 通信矩阵
 
 | 组件               | tcp store                                          |
@@ -28,6 +30,7 @@
 支持通过环境变量 `ACCLINK_CHECK_PERIOD_HOURS`和`ACCLINK_CERT_CHECK_AHEAD_DAYS` 配置证书检查周期与证书过期预警时间
 
 使用接口示例：
+
 ```c
 // 配置关闭tls:
 aclshmemx_set_conf_store_tls(false, nullptr, 0);
@@ -45,6 +48,7 @@ char *tls_info ="                               \
     packagePath: /etc/lib"
 int32_t ret = aclshmemx_set_conf_store_tls(true, tls_info, strlen(tls_info));
 ```
+
 | 环境变量             | 说明              |
 |------------------| --------------- |
 | SHMEM_LOG_LEVEL  | shmem日志级别      |
@@ -78,16 +82,19 @@ root是Linux系统中的超级特权用户，具有所有Linux系统资源的访
 ASLR（address space layout randomization）开启后能增强漏洞攻击防护能力，建议用户将/proc/sys/kernel/randomize_va_space里面的值设置为2，开启该功能。
 
 ## 公网地址声明
+
 本项目代码中包含的公网地址声明如下所示：
 
 | 类型  |        开源代码地址        | 文件名                  | 公网IP地址/公网URL地址/域名/邮箱地址/压缩文件地址                                           | 用途说明                                      |
 | :---: | :------------------------: | :---------------------- | :------------------------------------------------------------------------------------------ | :-------------------------------------------- |
-| 依赖  |           不涉及           | build.sh                | https://gitcode.com/cann/catlass.git                                                            | 从gitcode下载catlass源码，作用编译依赖          |
-| 依赖  | https://gitcode.com/gh_mirrors/do/doxygen | build.sh                | https://gitcode.com/gh_mirrors/do/doxygen/releases/download/Release_1_9_6/doxygen-1.9.6.src.tar.gz | 从gitcode下载doxygen-1.9.6源码，作用编译依赖   |
-| 依赖  |           不涉及           | build.sh                | https://gitcode.com/GitHub_Trending/go/googletest                                                    | 从gitcode下载googletest源码，单元测试框架依赖   |
-| 依赖  |           不涉及           | build.sh                | https://gitcode.com/GitHub_Trending/js/json.git                                                      | 从gitcode下载nlohmann json源码，SOC_TYPE为Ascend950时编译依赖 |
-| 文档  |           不涉及           | shmemi_device_barrier.h | https://www.inf.ed.ac.uk/teaching/courses/ppls/BarrierPaper.pdf                             | 并行编程语言和系统                            |
+| 依赖  |           不涉及           | build.sh                | <https://gitcode.com/cann/catlass.git>                                                            | 从gitcode下载catlass源码，作用编译依赖          |
+| 依赖  | <https://gitcode.com/gh_mirrors/do/doxygen> | build.sh                | <https://gitcode.com/gh_mirrors/do/doxygen/releases/download/Release_1_9_6/doxygen-1.9.6.src.tar.gz> | 从gitcode下载doxygen-1.9.6源码，作用编译依赖   |
+| 依赖  |           不涉及           | build.sh                | <https://gitcode.com/GitHub_Trending/go/googletest>                                                    | 从gitcode下载googletest源码，单元测试框架依赖   |
+| 依赖  |           不涉及           | build.sh                | <https://gitcode.com/GitHub_Trending/js/json.git>                                                      | 从gitcode下载nlohmann json源码，SOC_TYPE为Ascend950时编译依赖 |
+| 文档  |           不涉及           | shmemi_device_barrier.h | <https://www.inf.ed.ac.uk/teaching/courses/ppls/BarrierPaper.pdf>                             | 并行编程语言和系统                            |
+
 ## 漏洞机制说明
+
 [漏洞管理](https://gitcode.com/cann/community/blob/master/security/security.md)
 
 ## 附录

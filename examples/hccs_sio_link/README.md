@@ -3,8 +3,8 @@
 HCCS/SIO 链路测试工具，用于验证 NPU 之间 SIO / HCCS 链路的正确性。
 
 > **注意**：当前 CANN 版本暂未支持，预计 CANN 9.1.0 版本支持该功能。
-
 > **依赖**：
+>
 > - Ascend HDK 版本 >= 26.0.0
 > - LingQu Computing Network 版本 >= 1.5.3。下载地址：[LingQu Computing Network](https://support.huawei.com/enterprise/zh/ascend-computing/lingqu-computing-network-pid-258003841/software)
 
@@ -14,7 +14,7 @@ HCCS/SIO 链路测试工具，用于验证 NPU 之间 SIO / HCCS 链路的正确
 
 - **SIO**：Die 间原有互连链路。shmem 初始化后默认获得的 VA 访问对端 Die 时即走 SIO 链路。
 
-- **HCCS**：新增的 Die 间互连链路。通过 [`aclrtMemMapSelectedLink`](https://gitcode.com/cann/runtime/blob/master/docs/03_api_ref/11-04_虚拟内存管理.md#aclrtmemmapselectedlink) 将新 VA 映射到与原 SIO VA 相同的 PA，并使用 `ACL_RT_MEM_LINK_IDX_1` 选中 HCCS 链路，此时通过新 VA 访问即走 HCCS 链路。
+- **HCCS**：新增的 Die 间互连链路。通过 [`aclrtMemMapSelectedLink`](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/11-04_virtual_memory_management.md#aclrtmemmapselectedlink) 将新 VA 映射到与原 SIO VA 相同的 PA，并使用 `ACL_RT_MEM_LINK_IDX_1` 选中 HCCS 链路，此时通过新 VA 访问即走 HCCS 链路。
 
 - **SIO + HCCS 双路并行**：同时使用 SIO 和 HCCS 两条链路传输数据，充分利用双链路带宽提升传输性能。
 
@@ -27,7 +27,7 @@ HCCS/SIO 链路测试工具，用于验证 NPU 之间 SIO / HCCS 链路的正确
 1. **获取本地堆基址**：调用 `aclshmemx_get_heap_base()` 获取当前 PE 的对称堆基址。
 2. **转换为对端地址**：调用 `aclshmem_ptr()` 将本地堆基址转换为对端 PE 的可访问虚拟地址（`peer_heap_base`），该地址走 SIO 链路。
 3. **预留虚拟地址空间**：调用 `aclrtReserveMemAddress()` 在当前 PE 的虚拟地址空间中预留一段未映射的 VA 区域（`hccs_ptr`）。
-4. **映射到 HCCS 链路**：调用 [`aclrtMemMapSelectedLink`](https://gitcode.com/cann/runtime/blob/master/docs/03_api_ref/11-04_虚拟内存管理.md#aclrtmemmapselectedlink) 将预留的 VA 映射到与 `peer_heap_base` 所对应的物理地址（PA），并指定 `ACL_RT_MEM_LINK_IDX_1` 选中 HCCS 链路。此时通过 `hccs_ptr` 访问即走 HCCS 链路，而通过原 SIO 路径的 VA 访问仍走 SIO 链路——两条 VA 指向同一 PA，但走不同物理链路。
+4. **映射到 HCCS 链路**：调用 [`aclrtMemMapSelectedLink`](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/11-04_virtual_memory_management.md#aclrtmemmapselectedlink) 将预留的 VA 映射到与 `peer_heap_base` 所对应的物理地址（PA），并指定 `ACL_RT_MEM_LINK_IDX_1` 选中 HCCS 链路。此时通过 `hccs_ptr` 访问即走 HCCS 链路，而通过原 SIO 路径的 VA 访问仍走 SIO 链路——两条 VA 指向同一 PA，但走不同物理链路。
 
 > **关键原理**：SIO 和 HCCS 两条链路共享同一物理地址（PA），但通过不同的虚拟地址（VA）和链路索引实现分流，从而支持双路并行传输。
 
@@ -57,7 +57,7 @@ HCCS/SIO 链路测试工具，用于验证 NPU 之间 SIO / HCCS 链路的正确
 
 本示例需要通过 `-examples` 编译选项启用，CMake 会自动检测当前 CANN 版本是否支持 `aclrtMemMapSelectedLink` 函数，若支持则自动编译本示例：
 
-> **仅支持 Ascend910C（Atlas A3）**：本示例依赖 Die 间 SIO/HCCS 链路，仅在 Ascend910C（Atlas A3 训练系列/推理系列）上支持，不支持 Ascend910B 与 Ascend950。
+> **仅支持 Atlas A3**：本示例依赖 Die 间 SIO/HCCS 链路，仅在 A3（Atlas A3 训练系列/Atlas A3 推理系列）上支持，不支持 A2（Atlas A2 训练系列/Atlas A2 推理系列）与 Ascend950。
 
 ```bash
 bash scripts/build.sh -examples
@@ -181,7 +181,7 @@ bash run.sh -pes 2 -size 8 -type fp32 -mode mixed_put_perf
 
 正确性测试：
 
-```
+```text
 PE 0: [SIO] path verification PASSED for PE 1
 PE 1: [SIO] path verification PASSED for PE 0
 PE 0: [HCCS] path verification PASSED for PE 1
@@ -190,7 +190,7 @@ PE 1: [HCCS] path verification PASSED for PE 0
 
 混合测试：
 
-```
+```text
 PE 0: [MIXED-SIO] path verification PASSED for PE 1
 PE 0: [MIXED-HCCS] path verification PASSED for PE 1
 PE 1: [MIXED-SIO] path verification PASSED for PE 0

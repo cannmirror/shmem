@@ -8,7 +8,7 @@
 
 atomic 接口分为两层：
 
-```
+```text
 aclshmem_<type>_atomic_<op>()          ← 标准接口
     │
     ├── topo == MTE  → aclshmemx_mte_atomic_<op>()   ← MTE 后端
@@ -37,7 +37,7 @@ aclshmem_<type>_atomic_<op>()          ← 标准接口
 | `aclshmemx_mte_atomic_swap` | T | uint32, uint64 | 950 |
 | `aclshmemx_mte_atomic_compare_swap` | T | uint32, uint64 | 950 |
 | `aclshmemx_mte_atomic_inc` | void | int32, uint32, float, int64, uint64 | 950 |
-| `aclshmemx_mte_atomic_add` | void | int8, int16, bf16, half, int32, float (910B/910C/950) + uint32, uint64, int64 (950) | 910B/910C/950 |
+| `aclshmemx_mte_atomic_add` | void | int8, int16, bf16, half, int32, float (A2/A3/950) + uint32, uint64, int64 (950) | A2/A3/950 |
 | `aclshmemx_mte_atomic_fetch_inc` | T | int32, uint32, float, int64, uint64 | 950 |
 | `aclshmemx_mte_atomic_fetch_add` | T | int32, uint32, float, int64, uint64 | 950 |
 
@@ -112,7 +112,7 @@ aclshmem_<type>_atomic_<op>()          ← 标准接口
 
 标准接口根据拓扑自动分派到 MTE 或 ROCE 后端，并在后端调用之上**额外添加同步保证**。
 
-```
+```text
 aclshmem_<type>_atomic_<op>(dst, val, pe)
     │
     ├── topo_list[pe] & MTE
@@ -160,7 +160,7 @@ aclshmem_<type>_atomic_<op>(dst, val, pe)
 
 ## 五、同步规则速查（针对MTE和ROCE通路）
 
-```
+```text
 使用 aclshmem_<type>_atomic_<op> 接口
 │
 ├── fetch_add / fetch_inc / fetch_and / fetch_or / fetch_xor / fetch / swap / compare_swap
@@ -183,7 +183,7 @@ aclshmem_<type>_atomic_<op>(dst, val, pe)
 
 | 传输通路 | 支持类型 | MTE 实现方式 | 硬件平台 |
 |---|---|---|---|
-| MTE | int8, int16, bf16, half, int32, float | UB + MTE3 | 910B/910C/950 |
+| MTE | int8, int16, bf16, half, int32, float | UB + MTE3 | A2/A3/950 |
 | MTE | uint32, uint64, int64 | Scalar AtomicAdd | 950 |
 | ROCE | int32, uint32, int64, uint64 | — | 950 |
 

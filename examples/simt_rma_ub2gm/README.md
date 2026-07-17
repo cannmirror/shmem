@@ -1,4 +1,4 @@
-## 样例介绍
+# 样例介绍
 
 本样例旨在展示 SIMD 与 SIMT 混合编译模式下，SIMT 远程内存访问（RMA）接口使用 UB 作为中转缓冲区进行数据搬运的典型方法。样例代码通过 `__simt_vf__` 函数在 Device 侧申请 UB 数组，并调用 SIMT RMA NBI 接口在 GM 与 UB 之间完成数据传输。
 
@@ -18,7 +18,7 @@ simt::aclshmem_int32_put_nbi(__gm__ int32_t *dst, __ubuf__ int32_t *src, uint32_
 | `elem_size` | 传输的 `int32_t` 元素个数 |
 | `pe` | 目标或源 PE 编号 |
 
-### 样例执行流程
+## 样例执行流程
 
 本样例通过以下流程演示 UB 到 GM 的 RMA 数据路径：
 

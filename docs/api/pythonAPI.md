@@ -1,6 +1,9 @@
-## SHMEM Python API Reference
-### shmem.core API
-##### 对外接口
+# SHMEM Python API Reference
+
+## shmem.core API
+
+### 对外接口
+
 1. 获取当前库版本。返回 ACLSHMEM 库的版本信息。
 
     ```python
@@ -11,7 +14,7 @@
     |-|-|-|
     |返回值|[out]|版本信息组成的字符串，格式为 ``"libaclshmem_version=X.Y"``|
 
-1. 生成用于 UID 初始化的唯一 ID。应由单个进程（如 rank 0）调用，并通过广播分发给其他进程。
+2. 生成用于 UID 初始化的唯一 ID。应由单个进程（如 rank 0）调用，并通过广播分发给其他进程。
 
     ```python
     def get_unique_id(empty: bool=False) -> UniqueID
@@ -22,7 +25,7 @@
     |empty|[in]|预留参数，无实际意义|
     |返回值|[out]|代表一个唯一 ID 的句柄。若生成失败则引发 ``AclshmemError``|
 
-1. 使用唯一 ID 初始化 ACLSHMEM 运行时。这是一个集合（collective）操作，所有 PE 必须调用。
+3. 使用唯一 ID 初始化 ACLSHMEM 运行时。这是一个集合（collective）操作，所有 PE 必须调用。
 
     ```python
     def init(device: int=None, uid: UniqueID=None, rank: int=None, nranks: int=None, mpi_comm=None, initializer_method: str="", mem_size: int=None) -> None
@@ -39,7 +42,7 @@
     |mem_size|[in]|每个 PE 分配的对称内存大小（字节），必填|
     |返回值|-|无返回值。参数缺失引发 ``AclshmemInvalid``，初始化失败引发 ``AclshmemError``|
 
-1. 销毁 ACLSHMEM 运行时，释放所有资源。每个进程在完成所有 ACLSHMEM 操作后应调用一次。
+4. 销毁 ACLSHMEM 运行时，释放所有资源。每个进程在完成所有 ACLSHMEM 操作后应调用一次。
 
     ```python
     def finalize() -> None
@@ -49,7 +52,7 @@
     |-|-|-|
     |返回值|-|无返回值。若销毁失败则引发 ``AclshmemError``|
 
-1. 分配一个由 ACLSHMEM 支持的 NPU 缓冲区。这是一个集合（collective）操作，所有 PE 必须同步调用。
+5. 分配一个由 ACLSHMEM 支持的 NPU 缓冲区。这是一个集合（collective）操作，所有 PE 必须同步调用。
 
     ```python
     def buffer(size, release=False, except_on_del=True) -> Buffer
@@ -62,7 +65,7 @@
     |except_on_del|[in]|预留参数，无实际意义|
     |返回值|[out]|通过地址和字节长度表示的原始内存缓冲区。若分配失败则引发 ``AclshmemError``|
 
-1. 释放由 ``buffer()`` 分配的缓冲区。这是一个集合（collective）操作。
+6. 释放由 ``buffer()`` 分配的缓冲区。这是一个集合（collective）操作。
 
     ```python
     def free(buf: Buffer) -> None
@@ -73,7 +76,7 @@
     |buf|[in]|需要释放的缓冲区|
     |返回值|-|无返回值|
 
-1. 获取指定 PE 上目标缓冲区的对称地址，可用于直接引用该 PE 上的数据。
+7. 获取指定 PE 上目标缓冲区的对称地址，可用于直接引用该 PE 上的数据。
 
     ```python
     def get_peer_buffer(buf: Buffer, pe: int) -> Buffer
@@ -85,7 +88,7 @@
     |pe|[in]|PE 编号|
     |返回值|[out]|指定 PE 上的远程对称地址缓冲区。若获取失败则引发 ``AclshmemError``|
 
-1. 从本地 PE 复制连续数据到指定 PE 的对称内存地址，并在完成后更新远程信号变量。当前仅支持 MTE（Memory Transfer Engine）。同步（blocking）接口。
+8. 从本地 PE 复制连续数据到指定 PE 的对称内存地址，并在完成后更新远程信号变量。当前仅支持 MTE（Memory Transfer Engine）。同步（blocking）接口。
 
     ```python
     def put_signal(dst: Buffer, src: Buffer, signal_var: Buffer, signal_val: int, signal_operation: SignalOp, remote_pe: int=-1, stream=None) -> None
@@ -102,7 +105,7 @@
     |stream|[in]|预留参数，忽略。底层使用默认流|
     |返回值|-|无返回值|
 
-1. 在指定流上将本地 PE 的连续数据复制到远程 PE 的对称内存地址。调用者需同步流以确保传输完成。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
+9. 在指定流上将本地 PE 的连续数据复制到远程 PE 的对称内存地址。调用者需同步流以确保传输完成。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
 
     ```python
     def put(dst: Buffer, src: Buffer, remote_pe: int=-1, stream: int=None) -> None
@@ -116,7 +119,7 @@
     |stream|[in]|ACL 流对象，用于执行排序。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-1. 在指定流上将远程 PE 对称内存中的连续数据复制到本地缓冲区。调用者需同步流以确保传输完成。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
+10. 在指定流上将远程 PE 对称内存中的连续数据复制到本地缓冲区。调用者需同步流以确保传输完成。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
 
     ```python
     def get(dst: Buffer, src: Buffer, remote_pe: int=-1, stream: int=None) -> None
@@ -130,7 +133,7 @@
     |stream|[in]|ACL 流对象，用于执行排序。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-1. 在指定的 PE 上对远程信号变量执行原子操作，操作在给定流上执行。调用者需同步流以观察结果。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
+11. 在指定的 PE 上对远程信号变量执行原子操作，操作在给定流上执行。调用者需同步流以观察结果。当前仅支持 MTE（Memory Transfer Engine）。非阻塞（non-blocking）接口。
 
     ```python
     def signal_op(signal_var: Buffer, signal_val: int, signal_operation: SignalOp, remote_pe: int=-1, stream: int=None) -> None
@@ -145,7 +148,7 @@
     |stream|[in]|ACL 流对象，用于执行排序。传入 ``None`` 将引发 ``AclshmemInvalid`` 异常|
     |返回值|-|无返回值。若 ``stream`` 为 ``None`` 则引发 ``AclshmemInvalid``|
 
-1. 等待对称信号变量满足指定比较条件。等待操作在给定流上执行，调用在 host 侧立即返回。同步流后，条件 ``signal_var`` ``cmp`` ``signal_val`` 保证为真。当前仅支持 MTE（Memory Transfer Engine）。
+12. 等待对称信号变量满足指定比较条件。等待操作在给定流上执行，调用在 host 侧立即返回。同步流后，条件 ``signal_var`` ``cmp`` ``signal_val`` 保证为真。当前仅支持 MTE（Memory Transfer Engine）。
 
     ```python
     def signal_wait(signal_var: Buffer, signal_val: int, signal_operation: ComparisonType, stream: int) -> None
@@ -159,7 +162,7 @@
     |stream|[in]|ACL 流对象，用于执行排序。传入 ``None`` 将引发 ``AclshmemInvalid`` 异常|
     |返回值|-|无返回值。若 ``stream`` 为 ``None`` 则引发 ``AclshmemInvalid``|
 
-1. 确保所有先前发出的对称数据操作在给定流上完成。quiet 操作排入指定流中，调用在 host 侧立即返回；调用者需同步流以观测完成。当前仅支持 MTE（Memory Transfer Engine）。
+13. 确保所有先前发出的对称数据操作在给定流上完成。quiet 操作排入指定流中，调用在 host 侧立即返回；调用者需同步流以观测完成。当前仅支持 MTE（Memory Transfer Engine）。
 
     ```python
     def quiet(stream: int) -> None
@@ -170,7 +173,7 @@
     |stream|[in]|执行 quiet 操作的 ACL 流。必须传入有效流，``None`` 将引发 ``AclshmemInvalid``|
     |返回值|-|无返回值。若 ``stream`` 为 ``None`` 则引发 ``AclshmemInvalid``|
 
-1. 获取本地 PE 编号。
+14. 获取本地 PE 编号。
 
     ```python
     def my_pe() -> int
@@ -180,7 +183,7 @@
     |-|-|-|
     |返回值|[out]|本地 PE 编号|
 
-1. 获取当前进程在指定 team 中的 PE 编号。
+15. 获取当前进程在指定 team 中的 PE 编号。
 
     ```python
     def team_my_pe(team) -> int
@@ -191,7 +194,7 @@
     |team|[in]|目标 team 的 ID|
     |返回值|[out]|指定 team 中的 PE 编号，若 team 无效则返回 -1|
 
-1. 获取程序中运行的 PE 总数（world team 维度）。
+16. 获取程序中运行的 PE 总数（world team 维度）。
 
     ```python
     def n_pes() -> int
@@ -201,7 +204,7 @@
     |-|-|-|
     |返回值|[out]|PE 总数|
 
-1. 获取指定 team 中的 PE 总数。
+17. 获取指定 team 中的 PE 总数。
 
     ```python
     def team_n_pes(team) -> int
@@ -212,7 +215,7 @@
     |team|[in]|目标 team 的 ID|
     |返回值|[out]|指定 team 中的 PE 数目，若 team 无效则返回 -1|
 
-1. 查询共享内存模块的当前初始化状态。
+18. 查询共享内存模块的当前初始化状态。
 
     ```python
     def init_status() -> InitStatus
@@ -222,7 +225,8 @@
     |-|-|-|
     |返回值|[out]|返回初始化状态枚举值：``NOT_INITIALIZED`` / ``SHM_CREATED`` / ``INITIALIZED`` / ``INVALID``|
 
-##### 类
+### 类
+
 1. UniqueId 类 — 用于 UID 初始化的唯一标识符句柄。
 
     ```python
@@ -237,7 +241,7 @@
     |n_pes|[out]|所有进程的 PE 总数|
     |internal|[out]|UID 的内部信息（字节）|
 
-1. InitStatus 枚举类 — 共享内存模块的初始化状态。
+2. InitStatus 枚举类 — 共享内存模块的初始化状态。
 
     ```python
     class InitStatus(Enum):
@@ -254,7 +258,7 @@
     |INITIALIZED|初始化完成|
     |INVALID|无效状态|
 
-1. SignalOp 枚举类 — 信号变量原子操作类型。
+3. SignalOp 枚举类 — 信号变量原子操作类型。
 
     ```python
     class SignalOp(Enum):
@@ -267,7 +271,7 @@
     |SIGNAL_SET|原子设置：将给定值写入远程信号|
     |SIGNAL_ADD|原子加：将给定值加到远程信号现有值上|
 
-1. ComparisonType 枚举类 — 信号等待比较操作类型。
+4. ComparisonType 枚举类 — 信号等待比较操作类型。
 
     ```python
     class ComparisonType(Enum):
@@ -289,7 +293,9 @@
     |CMP_LE|小于等于（<=）|
 
 ### shmem._pyshmem API
-##### 对外接口
+
+#### 对外接口
+
 1. 初始化共享内存模块。这是一个集合（collective）操作。
 
     ```python
@@ -303,7 +309,7 @@
     |mem_size|[in]|每个 PE 分配的内存大小（字节）|
     |返回值|[out]|成功返回 0，失败返回非零错误码|
 
-1. 销毁共享内存模块，释放所有资源。
+2. 销毁共享内存模块，释放所有资源。
 
     ```python
     def aclshmem_finalize() -> None
@@ -314,7 +320,7 @@
     |无参数|[in]|-|
     |返回值|-|无返回值|
 
-1. 查询共享内存模块的当前初始化状态。
+3. 查询共享内存模块的当前初始化状态。
 
     ```python
     def aclshmemx_init_status() -> InitStatus
@@ -324,7 +330,7 @@
     |-|-|-|
     |返回值|[out]|返回初始化状态枚举值。返回 ``INITIALIZED`` 表示初始化已完成|
 
-1. 设置 TLS 私钥与密码，并注册解密回调函数。
+4. 设置 TLS 私钥与密码，并注册解密回调函数。
 
     ```python
     def set_conf_store_tls_key(tls_pk, tls_pk_pw, py_decrypt_func:Callable[[str], str]) -> int
@@ -337,7 +343,7 @@
     |py_decrypt_func|[in]|解密回调函数，接受 ``(str cipher_text)`` 返回 ``(str plain_text)``|
     |返回值|[out]|成功返回 0，失败返回非零错误码|
 
-1. 分配对称内存。这是一个集合（collective）操作，内嵌隐式 barrier。
+5. 分配对称内存。这是一个集合（collective）操作，内嵌隐式 barrier。
 
     ```python
     def aclshmem_malloc(size) -> int
@@ -348,7 +354,7 @@
     |size|[in]|分配内存大小（字节）|
     |返回值|[out]|成功返回指向已分配内存的指针（int），若 size 为 0 或分配失败返回 0 并引发异常|
 
-1. 分配零初始化的对称内存。集合操作，内嵌隐式 barrier。
+6. 分配零初始化的对称内存。集合操作，内嵌隐式 barrier。
 
     ```python
     def aclshmem_calloc(nmemb, size) -> int
@@ -360,7 +366,7 @@
     |size|[in]|每个元素的大小（字节）|
     |返回值|[out]|成功返回指向已分配内存的指针（int），若 nmemb 或 size 为 0 返回 0 并引发异常|
 
-1. 分配指定对齐方式的对称内存。集合操作，内嵌隐式 barrier。
+7. 分配指定对齐方式的对称内存。集合操作，内嵌隐式 barrier。
 
     ```python
     def aclshmem_align(alignment, size) -> int
@@ -372,7 +378,7 @@
     |size|[in]|要分配的字节数|
     |返回值|[out]|成功返回指向已分配内存的指针（int），若分配失败则引发异常|
 
-1. 释放由对称内存分配函数分配的内存空间。集合操作，内嵌隐式 barrier。
+8. 释放由对称内存分配函数分配的内存空间。集合操作，内嵌隐式 barrier。
 
     ```python
     def aclshmem_free(ptr) -> None
@@ -383,7 +389,7 @@
     |ptr|[in]|要释放的内存指针|
     |返回值|-|无返回值|
 
-1. 获取指定 PE 上对称地址的远程引用地址，可用于直接访问该 PE 上的数据。
+9. 获取指定 PE 上对称地址的远程引用地址，可用于直接访问该 PE 上的数据。
 
     ```python
     def aclshmem_ptr(ptr, peer) -> int
@@ -395,7 +401,7 @@
     |peer|[in]|PE 编号|
     |返回值|[out]|成功返回远程对称地址（int），若输入地址非法则返回 0|
 
-1. 获取 PE 编号（world team 维度）。
+10. 获取 PE 编号（world team 维度）。
 
     ```python
     def my_pe() -> int
@@ -405,7 +411,7 @@
     |-|-|-|
     |返回值|[out]|本地 PE 编号|
 
-1. 获取指定 team 中的 PE 编号。
+11. 获取指定 team 中的 PE 编号。
 
     ```python
     def team_my_pe(team_id) -> int
@@ -416,7 +422,7 @@
     |team_id|[in]|team 的句柄|
     |返回值|[out]|指定 team 中 PE 的编号，出错返回 -1|
 
-1. 获取 PE 总数（world team 维度）。
+12. 获取 PE 总数（world team 维度）。
 
     ```python
     def pe_count() -> int
@@ -426,7 +432,7 @@
     |-|-|-|
     |返回值|[out]|PE 总数|
 
-1. 获取指定 team 中的 PE 数量。
+13. 获取指定 team 中的 PE 数量。
 
     ```python
     def team_n_pes(team_id) -> int
@@ -437,7 +443,7 @@
     |team_id|[in]|team 的句柄|
     |返回值|[out]|指定 team 中 PE 的数量，出错返回 -1|
 
-1. 从现有父 team 中按步长拆分子 team。这是一个集合（collective）操作。
+14. 从现有父 team 中按步长拆分子 team。这是一个集合（collective）操作。
 
     ```python
     def team_split_strided(parent, start, stride, size) -> int
@@ -451,7 +457,7 @@
     |size|[in]|子 team 包含的 PE 数量|
     |返回值|[out]|成功返回新 team ID，出错返回 -1|
 
-1. 基于二维笛卡尔空间从父 team 中拆分 team。集合操作。
+15. 基于二维笛卡尔空间从父 team 中拆分 team。集合操作。
 
     ```python
     def team_split_2d(parent, x_range) -> tuple
@@ -463,7 +469,7 @@
     |x_range|[in]|第一维度的元素数量|
     |返回值|[out]|成功返回 (x_team_id, y_team_id) 元组，失败引发异常|
 
-1. 获取创建 team 时传入的 team 配置。
+16. 获取创建 team 时传入的 team 配置。
 
     ```python
     def aclshmem_team_get_config(team) -> TeamConfig
@@ -474,7 +480,7 @@
     |team|[in]|team ID|
     |返回值|[out]|成功返回 ``TeamConfig`` 对象，失败引发异常|
 
-1. 将连续数据从本地 PE 复制到指定 PE 的对称地址。同步（blocking）接口。
+17. 将连续数据从本地 PE 复制到指定 PE 的对称地址。同步（blocking）接口。
 
     ```python
     def aclshmem_putmem(dst, src, elem_size, pe) -> None
@@ -488,7 +494,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将对称内存中指定 PE 上的连续数据复制到本地 PE。同步（blocking）接口。
+18. 将对称内存中指定 PE 上的连续数据复制到本地 PE。同步（blocking）接口。
 
     ```python
     def aclshmem_getmem(dst, src, elem_size, pe) -> None
@@ -502,7 +508,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将本地内存中按 sst 步距排列的数据复制到指定 PE 对称内存的 dst 步距位置。同步（blocking）接口。
+19. 将本地内存中按 sst 步距排列的数据复制到指定 PE 对称内存的 dst 步距位置。同步（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_iput(dest, source, dst, sst, nelems, pe)
@@ -519,7 +525,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将远程 PE 对称内存中按 sst 步距排列的数据复制到本地 dst 步距位置。同步（blocking）接口。
+20. 将远程 PE 对称内存中按 sst 步距排列的数据复制到本地 dst 步距位置。同步（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_iget(dest, source, dst, sst, nelems, pe)
@@ -536,7 +542,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将连续数据从本地 PE 复制到指定 PE 的对称内存地址。同步（blocking）接口。
+21. 将连续数据从本地 PE 复制到指定 PE 的对称内存地址。同步（blocking）接口。
 
     ```python
     def aclshmem_put{BITS}(dst, src, elem_size, pe)
@@ -551,7 +557,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将对称内存中指定 PE 上的连续数据复制到本地 PE。同步（blocking）接口。
+22. 将对称内存中指定 PE 上的连续数据复制到本地 PE。同步（blocking）接口。
 
     ```python
     def aclshmem_get{BITS}(dst, src, elem_size, pe)
@@ -566,7 +572,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将本地内存中按 sst 步距排列的数据复制到指定 PE 的 dst 步距位置（位宽版本）。同步（blocking）接口。
+23. 将本地内存中按 sst 步距排列的数据复制到指定 PE 的 dst 步距位置（位宽版本）。同步（blocking）接口。
 
     ```python
     def aclshmem_iput{BITS}(dest, source, dst, sst, nelems, pe)
@@ -583,7 +589,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将远程 PE 对称内存中按 sst 步距排列的数据复制到本地 dst 步距位置（位宽版本）。同步（blocking）接口。
+24. 将远程 PE 对称内存中按 sst 步距排列的数据复制到本地 dst 步距位置（位宽版本）。同步（blocking）接口。
 
     ```python
     def aclshmem_iget{BITS}(dest, source, dst, sst, nelems, pe)
@@ -600,7 +606,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 返回库的主版本号和次版本号。
+25. 返回库的主版本号和次版本号。
 
     ```python
     def aclshmem_info_get_version() -> tuple
@@ -610,7 +616,7 @@
     |-|-|-|
     |返回值|[out]|返回 (major, minor) 元组|
 
-1. 返回供应商定义的名称字符串。
+26. 返回供应商定义的名称字符串。
 
     ```python
     def aclshmem_info_get_name() -> str
@@ -620,7 +626,7 @@
     |-|-|-|
     |返回值|[out]|供应商定义的名称字符串|
 
-1. 将一个 team 中的给定 PE 编号转换为另一个 team 中的对应 PE 编号。
+27. 将一个 team 中的给定 PE 编号转换为另一个 team 中的对应 PE 编号。
 
     ```python
     def team_translate_pe(src_team, src_pe, dest_team) -> int
@@ -633,7 +639,7 @@
     |dest_team|[in]|目标 team ID|
     |返回值|[out]|成功返回目标 team 中对应的 PE 编号，出错返回 -1|
 
-1. 销毁一个 team。
+28. 销毁一个 team。
 
     ```python
     def team_destroy(team) -> None
@@ -644,7 +650,7 @@
     |team|[in]|要销毁的 team ID|
     |返回值|-|无返回值|
 
-1. 获取运行时 FFTS 配置。
+29. 获取运行时 FFTS 配置。
 
     ```python
     def get_ffts_config() -> str
@@ -654,7 +660,7 @@
     |-|-|-|
     |返回值|[out]|FFTS 配置字符串|
 
-1. 将本地 PE 上的连续数据复制到指定 PE 的对称地址。异步（non-blocking）接口。
+30. 将本地 PE 上的连续数据复制到指定 PE 的对称地址。异步（non-blocking）接口。
 
     ```python
     def aclshmem_putmem_nbi(dst, src, elem_size, pe) -> None
@@ -668,7 +674,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将对称内存中指定 PE 上的连续数据复制到本地 PE。异步（non-blocking）接口。
+31. 将对称内存中指定 PE 上的连续数据复制到本地 PE。异步（non-blocking）接口。
 
     ```python
     def aclshmem_getmem_nbi(dst, src, elem_size, pe) -> None
@@ -682,7 +688,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将连续数据从本地 PE 复制到指定 PE 的对称内存地址（位宽版本）。异步（non-blocking）接口。
+32. 将连续数据从本地 PE 复制到指定 PE 的对称内存地址（位宽版本）。异步（non-blocking）接口。
 
     ```python
     def aclshmem_put{BITS}_nbi(dst, src, elem_size, pe)
@@ -697,7 +703,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 将对称内存中指定 PE 上的连续数据复制到本地 PE（位宽版本）。异步（non-blocking）接口。
+33. 将对称内存中指定 PE 上的连续数据复制到本地 PE（位宽版本）。异步（non-blocking）接口。
 
     ```python
     def aclshmem_get{BITS}_nbi(dst, src, elem_size, pe)
@@ -712,7 +718,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 从本地 PE 复制连续数据到指定 PE 的对称地址，并在完成后更新远程信号变量。异步（non-blocking）接口。
+34. 从本地 PE 复制连续数据到指定 PE 的对称地址，并在完成后更新远程信号变量。异步（non-blocking）接口。
 
     ```python
     def aclshmemx_putmem_signal_nbi(dst, src, elem_size, sig, signal, sig_op, pe) -> None
@@ -729,7 +735,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 从本地 PE 复制连续数据到指定 PE 的对称地址，并更新远程信号变量。同步（blocking）接口。
+35. 从本地 PE 复制连续数据到指定 PE 的对称地址，并更新远程信号变量。同步（blocking）接口。
 
     ```python
     def aclshmemx_putmem_signal(dst, src, elem_size, sig, signal, sig_op, pe) -> None
@@ -746,7 +752,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 从本地 PE 复制连续数据到指定 PE 对称地址并更新远程信号（位宽版本）。异步（non-blocking）接口。
+36. 从本地 PE 复制连续数据到指定 PE 对称地址并更新远程信号（位宽版本）。异步（non-blocking）接口。
 
     ```python
     def aclshmemx_put{BITS}_signal_nbi(dst, src, elem_size, sig, signal, sig_op, pe)
@@ -764,7 +770,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 从本地 PE 复制连续数据到指定 PE 对称地址并更新远程信号（位宽版本）。同步（blocking）接口。
+37. 从本地 PE 复制连续数据到指定 PE 对称地址并更新远程信号（位宽版本）。同步（blocking）接口。
 
     ```python
     def aclshmemx_put{BITS}_signal(dst, src, elem_size, sig, signal, sig_op, pe)
@@ -782,7 +788,7 @@
     |pe|[in]|远程 PE 编号|
     |返回值|-|无返回值|
 
-1. 所有 PE 通过广播调用 exit() 退出进程。
+38. 所有 PE 通过广播调用 exit() 退出进程。
 
     ```python
     def aclshmem_global_exit(status) -> None
@@ -793,7 +799,7 @@
     |status|[in]|传递给 exit() 的状态值|
     |返回值|-|无返回值|
 
-1. 确保所有先前发出的对称数据操作在默认流上完成。quiet 操作排入默认流中，调用在 host 侧立即返回；调用者需同步默认流以观测完成。
+39. 确保所有先前发出的对称数据操作在默认流上完成。quiet 操作排入默认流中，调用在 host 侧立即返回；调用者需同步默认流以观测完成。
 
     ```python
     def aclshmem_quiet() -> None
@@ -803,7 +809,7 @@
     |-|-|-|
     |返回值|-|无返回值|
 
-1. 获取指定 team 中的 PE 编号。
+40. 获取指定 team 中的 PE 编号。
 
     ```python
     def my_pe(team) -> int
@@ -814,7 +820,7 @@
     |team|[in]|team ID|
     |返回值|[out]|指定 team 中 PE 的编号，出错返回 -1|
 
-1. 获取指定 team 中的 PE 数量。
+41. 获取指定 team 中的 PE 数量。
 
     ```python
     def pe_count(team) -> int
@@ -825,7 +831,7 @@
     |team|[in]|team ID|
     |返回值|[out]|指定 team 中 PE 的数目，出错返回 -1|
 
-1. 等待信号变量满足比较条件（``*sig_addr cmp cmp_val``）时返回。阻塞（blocking）接口。
+42. 等待信号变量满足比较条件（``*sig_addr cmp cmp_val``）时返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_signal_wait_until(sig_addr, cmp, cmp_val) -> int
@@ -838,7 +844,7 @@
     |cmp_val|[in]|比较值|
     |返回值|[out]|满足条件时 ``sig_addr`` 的值|
 
-1. 等待单个元素满足比较条件 ``ivar cmp cmp_val`` 后返回（类型化版本）。阻塞（blocking）接口。
+43. 等待单个元素满足比较条件 ``ivar cmp cmp_val`` 后返回（类型化版本）。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until(ivar, cmp, cmp_val) -> None
@@ -852,7 +858,7 @@
     |cmp_val|[in]|比较值|
     |返回值|-|无返回值|
 
-1. 等待信号变量不等于给定值时返回。阻塞（blocking）接口。
+44. 等待信号变量不等于给定值时返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait(ivar, cmp_val) -> None
@@ -865,7 +871,7 @@
     |cmp_val|[in]|比较值|
     |返回值|-|无返回值|
 
-1. 等待数组中所有元素均满足比较条件 ``ivars[i] cmp cmp_val`` 后返回。阻塞（blocking）接口。
+45. 等待数组中所有元素均满足比较条件 ``ivars[i] cmp cmp_val`` 后返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_all(ivars_ptr, nelems, status_ptr, cmp, cmp_val) -> None
@@ -881,7 +887,7 @@
     |cmp_val|[in]|比较值|
     |返回值|-|无返回值|
 
-1. 等待数组中至少有一个元素满足比较条件 ``ivars[i] cmp cmp_val`` 后返回。阻塞（blocking）接口。
+46. 等待数组中至少有一个元素满足比较条件 ``ivars[i] cmp cmp_val`` 后返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_any(ivars_ptr, nelems, status_ptr, cmp, cmp_val, res_out_ptr) -> None
@@ -898,7 +904,7 @@
     |res_out_ptr|[out]|接收满足比较条件的元素索引值|
     |返回值|-|无返回值|
 
-1. 等待数组中至少有一个元素满足比较条件，并返回所有满足条件的元素索引。阻塞（blocking）接口。
+47. 等待数组中至少有一个元素满足比较条件，并返回所有满足条件的元素索引。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_some(ivars_ptr, nelems, indices_ptr, status_ptr, cmp, cmp_val, res_out_ptr) -> None
@@ -916,7 +922,7 @@
     |res_out_ptr|[out]|接收满足比较条件的元素个数|
     |返回值|-|无返回值|
 
-1. 等待数组中所有元素均满足向量比较条件 ``ivars[i] cmp cmp_values[i]`` 后返回。阻塞（blocking）接口。
+48. 等待数组中所有元素均满足向量比较条件 ``ivars[i] cmp cmp_values[i]`` 后返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_all_vector(ivars_ptr, nelems, status_ptr, cmp, cmp_values_ptr) -> None
@@ -932,7 +938,7 @@
     |cmp_values_ptr|[in]|比较值数组|
     |返回值|-|无返回值|
 
-1. 等待数组中至少有一个元素满足向量比较条件 ``ivars[i] cmp cmp_values[i]`` 后返回。阻塞（blocking）接口。
+49. 等待数组中至少有一个元素满足向量比较条件 ``ivars[i] cmp cmp_values[i]`` 后返回。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_any_vector(ivars_ptr, nelems, status_ptr, cmp, cmp_values_ptr, res_out_ptr) -> None
@@ -949,7 +955,7 @@
     |res_out_ptr|[out]|接收满足比较条件的元素索引值|
     |返回值|-|无返回值|
 
-1. 等待数组中至少有一个元素满足向量比较条件，并返回所有满足条件的元素索引。阻塞（blocking）接口。
+50. 等待数组中至少有一个元素满足向量比较条件，并返回所有满足条件的元素索引。阻塞（blocking）接口。
 
     ```python
     def aclshmem_{TYPE}_wait_until_some_vector(ivars_ptr, nelems, indices_ptr, status_ptr, cmp, cmp_values_ptr, res_out_ptr) -> None
@@ -967,7 +973,7 @@
     |res_out_ptr|[out]|接收满足比较条件的元素个数|
     |返回值|-|无返回值|
 
-1. 检查单个元素是否满足比较条件 ``ivar cmp cmp_value``。非阻塞（non-blocking）查询接口。
+51. 检查单个元素是否满足比较条件 ``ivar cmp cmp_value``。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test(ivar, cmp, cmp_value, res_out_ptr) -> None
@@ -982,7 +988,7 @@
     |res_out_ptr|[out]|满足条件返回 1，否则返回 0|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 返回|
 
-1. 检查数组中是否至少有一个元素满足比较条件 ``ivars[i] cmp cmp_value``。非阻塞（non-blocking）查询接口。
+52. 检查数组中是否至少有一个元素满足比较条件 ``ivars[i] cmp cmp_value``。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test_any(ivars_ptr, nelems, status_ptr, cmp, cmp_value, res_out_ptr) -> None
@@ -999,7 +1005,7 @@
     |res_out_ptr|[out]|满足条件的元素索引值；若无元素满足或测试集为空则返回 ``SIZE_MAX``|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 返回|
 
-1. 检查数组中是否至少有一个元素满足比较条件，并返回所有满足条件的元素索引。非阻塞（non-blocking）查询接口。
+53. 检查数组中是否至少有一个元素满足比较条件，并返回所有满足条件的元素索引。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test_some(ivars_ptr, nelems, indices_ptr, status_ptr, cmp, cmp_value, res_out_ptr) -> None
@@ -1017,7 +1023,7 @@
     |res_out_ptr|[out]|满足条件的元素个数；若测试集为空则返回 0|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 和 ``indices_ptr`` 返回|
 
-1. 检查数组中所有元素是否均满足向量比较条件 ``ivars[i] cmp cmp_values[i]``。非阻塞（non-blocking）查询接口。
+54. 检查数组中所有元素是否均满足向量比较条件 ``ivars[i] cmp cmp_values[i]``。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test_all_vector(ivars_ptr, nelems, status_ptr, cmp, cmp_values_ptr, res_out_ptr) -> None
@@ -1034,7 +1040,7 @@
     |res_out_ptr|[out]|全部满足或 nelems 为 0 返回 1，否则返回 0|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 返回|
 
-1. 检查数组中是否至少有一个元素满足向量比较条件 ``ivars[i] cmp cmp_values[i]``。非阻塞（non-blocking）查询接口。
+55. 检查数组中是否至少有一个元素满足向量比较条件 ``ivars[i] cmp cmp_values[i]``。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test_any_vector(ivars_ptr, nelems, status_ptr, cmp, cmp_values_ptr, res_out_ptr) -> None
@@ -1051,7 +1057,7 @@
     |res_out_ptr|[out]|满足条件的第一个元素索引值；若无元素满足或测试集为空则返回 ``SIZE_MAX``|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 返回|
 
-1. 检查数组中是否至少有一个元素满足向量比较条件，并返回所有满足条件的元素索引。非阻塞（non-blocking）查询接口。
+56. 检查数组中是否至少有一个元素满足向量比较条件，并返回所有满足条件的元素索引。非阻塞（non-blocking）查询接口。
 
     ```python
     def aclshmem_{TYPE}_test_some_vector(ivars_ptr, nelems, indices_ptr, status_ptr, cmp, cmp_values_ptr, res_out_ptr) -> None
@@ -1069,7 +1075,7 @@
     |res_out_ptr|[out]|满足条件的元素个数；若测试集为空则返回 0|
     |返回值|-|无返回值，结果通过 ``res_out_ptr`` 和 ``indices_ptr`` 返回|
 
-1. 在指定流上将连续数据从本地 PE 复制到指定 PE 的对称地址。非阻塞（non-blocking）接口。
+57. 在指定流上将连续数据从本地 PE 复制到指定 PE 的对称地址。非阻塞（non-blocking）接口。
 
     ```python
     def aclshmemx_putmem_on_stream(dst, src, elem_size, pe, stream) -> None
@@ -1084,7 +1090,7 @@
     |stream|[in]|ACL 流对象。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-1. 在指定流上将对称内存中指定 PE 上的连续数据复制到本地 PE。非阻塞（non-blocking）接口。
+58. 在指定流上将对称内存中指定 PE 上的连续数据复制到本地 PE。非阻塞（non-blocking）接口。
 
     ```python
     def aclshmemx_getmem_on_stream(dst, src, elem_size, pe, stream) -> None
@@ -1099,7 +1105,7 @@
     |stream|[in]|ACL 流对象。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-1. 在指定流上对远程信号变量执行原子操作。当前仅支持 MTE。非阻塞（non-blocking）接口。
+59. 在指定流上对远程信号变量执行原子操作。当前仅支持 MTE。非阻塞（non-blocking）接口。
 
     ```python
     def aclshmemx_signal_op_on_stream(sig, signal, sig_op, pe, stream) -> None
@@ -1114,7 +1120,7 @@
     |stream|[in]|ACL 流对象。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-1. 非阻塞（non-blocking）接口。在指定流上等待信号变量满足比较条件。调用在 host 侧立即返回，等待在流上执行。调用者需同步流以确保等待完成。当前仅支持 MTE。
+60. 非阻塞（non-blocking）接口。在指定流上等待信号变量满足比较条件。调用在 host 侧立即返回，等待在流上执行。调用者需同步流以确保等待完成。当前仅支持 MTE。
 
     ```python
     def aclshmemx_signal_wait_until_on_stream(sig, cmp, cmp_val, stream) -> None
@@ -1128,7 +1134,7 @@
     |stream|[in]|ACL 流对象，用于执行排序。必须传入有效流|
     |返回值|-|无返回值|
 
-1. 确保所有先前发出的对称数据操作在给定流上完成。quiet 操作排入指定流中，调用在 host 侧立即返回；调用者需同步流以观测完成。当前仅支持 MTE。
+61. 确保所有先前发出的对称数据操作在给定流上完成。quiet 操作排入指定流中，调用在 host 侧立即返回；调用者需同步流以观测完成。当前仅支持 MTE。
 
     ```python
     def aclshmemx_quiet_on_stream(stream) -> None
@@ -1139,7 +1145,8 @@
     |stream|[in]|执行 quiet 操作的 ACL 流。传入 ``0`` 或 ``None`` 使用默认流|
     |返回值|-|无返回值|
 
-##### 类
+#### 类
+
 1. OpEngineType 枚举类 — 数据传输引擎类型。
 
     ```python
@@ -1157,7 +1164,7 @@
     |ROCE|RDMA over Converged Ethernet|
     |UDMA|Unified DMA|
 
-1. OptionalAttr 类 — 初始化可选属性配置。
+2. OptionalAttr 类 — 初始化可选属性配置。
 
     ```python
     class OptionalAttr:
@@ -1173,7 +1180,7 @@
     |control_operation_timeout|[in]|控制操作的超时时间|
     |sockFd|[in]|socket 文件描述符，默认 -1|
 
-1. InitAttr 类 — 初始化属性配置。
+3. InitAttr 类 — 初始化属性配置。
 
     ```python
     class InitAttr:
@@ -1188,7 +1195,7 @@
     |local_mem_size|[in]|当前 PE 分配的对称内存大小（字节）|
     |option_attr|[in]|``OptionalAttr`` 可选属性配置|
 
-1. TeamConfig 类 — Team 配置。
+4. TeamConfig 类 — Team 配置。
 
     ```python
     class TeamConfig:
@@ -1198,7 +1205,7 @@
     |-|-|-|
     |num_contexts|[in]|一个 team 中可以同时运行的上下文数量|
 
-1. UniqueId 类 — UID 初始化的唯一标识符句柄。
+5. UniqueId 类 — UID 初始化的唯一标识符句柄。
 
     ```python
     class UniqueId:
@@ -1212,7 +1219,7 @@
     |n_pes|[out]|所有进程的 PE 总数|
     |internal|[out]|UID 的内部信息（字节）|
 
-1. InitStatus 枚举类 — 共享内存模块初始化状态。
+6. InitStatus 枚举类 — 共享内存模块初始化状态。
 
     ```python
     class InitStatus(Enum):
@@ -1229,7 +1236,7 @@
     |INITIALIZED|初始化完成|
     |INVALID|无效状态|
 
-1. SignalOp 枚举类 — 信号变量原子操作类型。
+7. SignalOp 枚举类 — 信号变量原子操作类型。
 
     ```python
     class SignalOp(Enum):
@@ -1242,7 +1249,7 @@
     |SIGNAL_SET|原子设置：将给定值写入远程信号|
     |SIGNAL_ADD|原子加：将给定值加到远程信号现有值上|
 
-1. CmpOp 枚举类 — 信号比较操作类型。
+8. CmpOp 枚举类 — 信号比较操作类型。
 
     ```python
     class CmpOp(Enum):

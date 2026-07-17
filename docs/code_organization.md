@@ -1,6 +1,8 @@
 # 代码组织结构
+
 ## SHMEM组织结构
-```
+
+```text
 ├── 3rdparty // 依赖的第三方库
 ├── docs     // 文档
 ├── examples // 使用样例
@@ -11,7 +13,8 @@
 ```
 
 ## include
-```
+
+```text
 include目录下的头文件是按照如下文件层级进行组织的
 include/
 ├── shmem.h                                 // shmem所有对外API汇总
@@ -52,8 +55,10 @@ include/
     └── utils/                              // host侧dfx接口
         └── shmem_log.h                     // host dfx-log接口
 ```
+
 ## src
-```
+
+```text
 └── src
     ├── device             // device侧接口实现
     └── host
@@ -66,8 +71,10 @@ include/
         ├─team            // host侧通信域管理接口实现
         └─transport       // 建链相关内容
 ```
+
 ## examples
-```
+
+```text
 └── examples
     ├── allgather                              // allgather通信算子样例
     ├── cmo                                    // cmo缓存性能样例
@@ -93,8 +100,10 @@ include/
     ├── udma_demo                              // udma实现样例
     └── utils                                  // 样例公共工具
 ```
+
 ## tests
-```
+
+```text
 └── tests
     ├── examples
     └── unittest
@@ -103,8 +112,10 @@ include/
         ├── sync  // 同步管理接口单元测试
         └── team  // 通信域管理接口单元测试
 ```
+
 ## docs
-```
+
+```text
 └── docs
     ├── api                          // shmem api
     ├── debug                        // shmem debug调测
@@ -123,5 +134,6 @@ include/
 ```
 
 ## scripts
+
 存放相关脚本。
 [脚本具体功能和使用](compilation_build_guide.md)

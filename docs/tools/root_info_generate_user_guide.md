@@ -5,6 +5,7 @@
 **root_info_generate** 是一个辅助工具，用于查看Ascend950 NPU设备拓扑地址信息，帮助用户了解组网结构和设备配置。
 
 **重要说明**：
+
 - **支持范围**：当前仅支持Ascend950平台
 - **自动生成**：root info信息会在SHMEM初始化时自动调用相关接口生成，无需用户手动执行工具
 - **辅助用途**：本工具主要用于辅助用户查看和了解组网拓扑、EID地址等信息，便于开发和调试
@@ -18,7 +19,7 @@
 
 #### 组网介绍
 
-组网主要采用了MESH和CLOS两种类型组网。相关介绍可参考论文：https://arxiv.org/abs/2503.20377
+组网主要采用了MESH和CLOS两种类型组网。相关介绍可参考论文：<https://arxiv.org/abs/2503.20377>
 
 ##### MESH组网
 
@@ -27,6 +28,7 @@
 **示例**：在同一个NPU板上有8个NPU，因此存在 `8*7/2 = 28` 条物理路径，即28对通信地址。
 
 **特点**：
+
 - 直连链路，无交换芯片
 - 通信质量最高，时延最低
 - 地址数量：N*(N-1)/2 对地址（N为NPU数量）
@@ -40,6 +42,7 @@
 **示例**：在液冷POD中，NPU使用两个独立的逻辑口连接两个分开的网络平面。
 
 **特点**：
+
 - 通过交换芯片转发
 - 地址数量与平面数量相同
 - 可实现流量分担和冗余
@@ -79,12 +82,13 @@
 
 EID地址为16字节（128位），在JSON输出中表示为32位十六进制字符串：
 
-```
+```json
 格式示例: "000000000000006000100000dfdf008b"
 长度: 32个十六进制字符 = 16字节
 ```
 
 **EID结构**（参考）：
+
 - 包含subnet_prefix（子网前缀）
 - 包含interface_id（接口标识）
 - 用于UB网络的端点寻址
@@ -108,11 +112,13 @@ EID地址为16字节（128位），在JSON输出中表示为32位十六进制字
 ## 前置条件
 
 ### 系统要求
+
 - **SOC类型**: Ascend950
 - **平台**: Linux
 - **依赖库**: libdcmi.so驱动库、c_sec安全库
 
 ### 编译要求
+
 - CMake 3.16+
 - C++17编译器
 - Ascend驱动已安装
@@ -137,6 +143,7 @@ bash scripts/build.sh -soc_type Ascend950
 ### 验证安装
 
 编译完成后可立即使用：
+
 ```bash
 # 检查编译生成的工具
 ls -l build/bin/root_info_generate
@@ -151,7 +158,8 @@ ls -l build/bin/root_info_generate
 ### 打包安装
 
 完整编译安装后生成安装包：
-```
+
+```bash
 install/aarch64/SHMEM_1.0.0_linux-aarch64.run
 ```
 
@@ -164,6 +172,7 @@ install/aarch64/SHMEM_1.0.0_linux-aarch64.run
 ```
 
 **参数说明**:
+
 - `物理ID`: NPU物理ID（整数，范围：0-63）
 
 ### 使用示例
@@ -175,7 +184,8 @@ install/aarch64/SHMEM_1.0.0_linux-aarch64.run
 ```
 
 **预期输出**:
-```
+
+```bash
 Generating root info for NPU with physical ID: 3
 Required buffer size: 2048 bytes
 topo_addr_info_get succeeded, actual size: 1329 bytes
@@ -199,7 +209,8 @@ Root info generation completed successfully
 ```
 
 **错误输出**:
-```
+
+```bash
 Generating root info for NPU with physical ID: 100
 Error: topo_addr_info_get_size failed with ret=-1
 ```
@@ -211,12 +222,14 @@ Error: topo_addr_info_get_size failed with ret=-1
 工具执行成功后会输出以下信息：
 
 1. **缓冲区大小**
-   ```
+
+   ```bash
    Required buffer size: XXX bytes
    ```
 
 2. **实际数据大小**
-   ```
+
+   ```bash
    topo_addr_info_get succeeded, actual size: XXX bytes
    ```
 
@@ -225,18 +238,21 @@ Error: topo_addr_info_get_size failed with ret=-1
    - 可使用 `jq '.'` 格式化输出便于阅读
 
 4. **拓扑文件路径**
-   ```
+
+   ```bash
    Topology file path: /usr/local/Ascend/driver/topo/950/atlas_850_1.json
    ```
 
 ### 错误处理
 
 当工具执行失败时会输出错误信息：
-```
+
+```bash
 Error: topo_addr_info_get_size failed with ret=-1
 ```
 
 常见错误原因：
+
 - 物理ID超出范围（有效范围0-63）
 - 驱动未初始化或设备不可访问
 - 设备权限不足
@@ -246,11 +262,13 @@ Error: topo_addr_info_get_size failed with ret=-1
 ### 问题1：工具找不到
 
 **现象**:
+
 ```bash
 ./root_info_generate: command not found
 ```
 
 **解决方案**:
+
 1. 使用SOC_TYPE=Ascend950编译
 2. 验证安装位置: `build/bin/` 或 `install/shmem/bin/`
 3. 检查编译日志确认工具已生成
@@ -258,11 +276,13 @@ Error: topo_addr_info_get_size failed with ret=-1
 ### 问题2：库依赖缺失
 
 **现象**:
+
 ```bash
 error while loading shared libraries: libshmem.so: cannot open shared object file
 ```
 
 **解决方案**:
+
 ```bash
 # root_info_generate 依赖 SHMEM 主库，设置库路径
 export LD_LIBRARY_PATH=install/shmem/lib:$LD_LIBRARY_PATH
@@ -275,11 +295,13 @@ ldconfig
 ### 问题3：驱动未初始化
 
 **现象**:
+
 ```bash
 Error: topo_addr_info_get_size failed with ret=-1
 ```
 
 **解决方案**:
+
 1. 检查Ascend驱动安装: `ls /usr/local/Ascend/`
 2. 初始化驱动: 运行驱动初始化脚本
 3. 验证NPU设备: `ls /dev/davinci*`
@@ -287,11 +309,13 @@ Error: topo_addr_info_get_size failed with ret=-1
 ### 问题4：权限拒绝
 
 **现象**:
+
 ```bash
 Error: cannot access /dev/davinci0
 ```
 
 **解决方案**:
+
 ```bash
 # 检查设备权限
 ls -l /dev/davinci*
@@ -306,11 +330,13 @@ sudo ./root_info_generate 0
 ### 问题5：无效物理ID
 
 **现象**:
+
 ```bash
 Error: get_mainboard_id returned null for phy_id=100
 ```
 
 **解决方案**:
+
 - 使用有效的物理ID范围: 0到ACLSHMEMI_MAX_NPU_COUNT-1
 - 检查可用NPU: `ls /dev/davinci*`
 
@@ -326,6 +352,7 @@ Error: get_mainboard_id returned null for phy_id=100
 ### 调试模式
 
 启用详细日志用于调试：
+
 ```bash
 # 设置调试环境（如果可用）
 export SHMEM_LOG_LEVEL=DEBUG
@@ -335,6 +362,7 @@ export SHMEM_LOG_LEVEL=DEBUG
 ### 日志分析
 
 检查系统日志获取额外信息：
+
 ```bash
 # 检查驱动日志
 dmesg | grep -i ascend

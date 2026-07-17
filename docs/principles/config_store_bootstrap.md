@@ -27,7 +27,7 @@ Bootstrap 完成后，`g_boot_handle.barrier` / `allgather` 由 `SmemNetGroupEng
 
 ### 2.1 总调用链
 
-```
+```text
 aclshmemx_init_attr()
   └─ aclshmemi_bootstrap_init()                    [shmemi_bootstrap.cpp]
        ├─ 按 flags 选择插件、解析 ip_port / UID
@@ -427,9 +427,10 @@ Barrier **通过之后**，各 PE 进入 `config_store_bootstrap_finalize` → `
 1. `accClientLink_ = nullptr`
 2. `accClient_->Stop()` — 断开本 PE 到 PE 0 的 client TCP
 
-**仅 PE 0 额外**（`accServer_ != nullptr`），在 client 停止之后 **立即**（`store_tcp_config.cpp:226-228`）：
+    **仅 PE 0 额外**（`accServer_ != nullptr`），在 client 停止之后 **立即**（`store_tcp_config.cpp:226-228`）：
 
 3. `AccStoreServer::Shutdown` → `accTcpServer_->Stop()`（`acc_tcp_server_default.cpp:109`）：
+
    - **先** `StopAndCleanListener`（L117）→ join accept 线程 → `SafeCloseFd(listenFd_)`
    - **再** `StopAndCleanWorkers`（L119）— teardown 仍连着的入站 TCP
    - **再** `StopAndCleanDelayCleanup`（L121）

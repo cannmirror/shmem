@@ -3,7 +3,9 @@
 本文面向使用 SHMEM 的开发者，整理 README、docs、include 和 examples 中常见的缩写与名词。
 
 说明：
+
 - 本项目中的 `SHMEM` 主要围绕“对称内存”通信模型：各 PE 按相同规则分配可远程访问的对称数据对象或对称堆内存。文档中出现“共享内存”时，通常指 SHMEM 管理的可跨 PE 访问内存区域或基于该区域实现的通信能力。
+
 - 除 `SHMEM` 项目特有术语，其他华为/昇腾/CANN 相关术语说明以[昇腾](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html)、[CANN](https://www.hiascend.com/cann)、[灵衢 UB](https://www.unifiedbus.com/zh) 官网为准。
 
 ## 编程模型与接口
@@ -38,7 +40,6 @@
 | `Quiet` | Quiet | 完成等待 | 等待调用 PE 先前发出的对称数据对象操作完成。 |
 | `Fence` | Fence | 顺序栅栏 | OpenSHMEM 语义中用于约束 Put、AMO 和 store 的投递顺序；本项目当前实现与 `quiet` 行为接近，同时保证顺序和完成。 |
 
-
 ## 通信引擎、协议与数据通路
 
 | 术语 | 英文展开 | 中文说明 | 项目语境 |
@@ -54,7 +55,7 @@
 | `UBMEM` / `UBmem` | UBMEM | 内存语义 | 华为新一代互联协议，提供内存语义通信。 |
 | `URMA` | Unified Remote Memory Access | 统一远程内存访问 | 华为新一代互联协议，基于 UB 总线，提供类似本地访问语义的远程内存操作能力。 |
 | `PCIe` | Peripheral Component Interconnect Express | 高速外设互联总线 | CPU 与 NPU 等其他外设的连接标准，也用于部分拓扑中的跨组互联。 |
-| `SIO` | **S**erial **I**/**O** Link | SIO 链路/通路 | 昇腾 910C 处理器片内，两个物理 Die （芯片裸片）之间的高速互联通路。 |
+| `SIO` | **S**erial **I**/**O** Link | SIO 链路/通路 | 昇腾 A3 处理器片内，两个物理 Die （芯片裸片）之间的高速互联通路。 |
 | `RoCE` / `ROCE` | RDMA over Converged Ethernet | 基于融合以太网的 RDMA | 一种网络协议，允许应用通过以太网实现远程内存直接访问，常用于跨节点的网络通信。 |
 | `D2D` | Device to Device | 设备到设备 | 本端 NPU Device 内存与对端 NPU Device 内存之间的数据访问或搬运。 |
 | `D2H` | Device to Host | 设备到主机 | 本端 NPU Device 内存到本端 Host 内存的数据通路。 |
@@ -64,7 +65,6 @@
 | `gm2gm` / `GM2GM` | Global Memory to Global Memory | 全局内存到全局内存 | Device 侧 AICore 驱动的 GM 到 GM 数据面接口/通路，常用于跨 PE 对称内存访问。 |
 | `ub2gm` / `UB2GM` | Unified Buffer to Global Memory | 统一缓冲区到全局内存 | AICore 本地 UB 到远端设备 GM 的数据面接口/通路。 |
 | `CMO` | Cache Maintenance Operation | 缓存维护操作 | SDMA 侧公开的缓存维护接口，用于显式控制缓存预取/维护操作，如 GM2L2。 |
-
 
 ## 内存、硬件与执行单元
 
@@ -83,7 +83,6 @@
 | `HBM` | High Bandwidth Memory | 高带宽内存 | NPU 侧高带宽设备内存。 |
 | `DRAM` | Dynamic Random Access Memory | 动态随机访问内存 | Host 侧内存。 |
 | `L2` | Level-2 Cache | 二级缓存 | CMO、缓存预取和示例中出现的缓存层级。 |
-
 
 ## 平台、环境变量与工具
 

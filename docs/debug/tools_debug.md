@@ -74,11 +74,11 @@ bash scripts/build.sh -mssanitizer
 bash scripts/build.sh -soc_type Ascend950 -mssanitizer
 ```
 
-不同芯片型号的编译选项有所差异：
-- **Ascend950**：内存检测所有功能不需要 `--cce-enable-sanitizer` 编译选项，编译时仅添加 `-g` 即可，mssanitizer 功能正常生效。
-- **其他芯片型号（如 Ascend910B）**：编译时需添加 `-g --cce-enable-sanitizer` 编译选项以启用 mssanitizer 插桩。
-
-当前构建脚本会根据 `SOC_TYPE` 自动选择对应的编译选项，无需手动配置。
+不同芯片型号的编译选项有所差异（构建脚本会按 `SOC_TYPE` 与 bisheng 版本自动选择，无需手动配置）：
+- **Ascend950**：CMake 根据 `bisheng -v` 版本时间戳决定是否联编 `--cce-enable-sanitizer`：
+  - 新版本 CANN：添加 `-g --cce-enable-sanitizer`，可对 AscendC API 相关内存访问做完整插桩检测。
+  - 旧版本 CANN：尚不支持 Ascend950 与 `--cce-enable-sanitizer` 一起编译，仅添加 `-g`；此时 **AscendC API 相关内存检测功能不可用**。如需该能力，请升级 CANN 后重新编译（具体版本门槛见 cmake 配置日志中的当前/预期时间戳对比）。
+- **其他芯片型号（如 Ascend910B）**：编译时添加 `-g --cce-enable-sanitizer` 以启用 mssanitizer 插桩。
 
 工具默认开启内存检测能力，即--tool memcheck，一般情况按如下方式拉起可执行文件即可。
 ```sh
@@ -90,7 +90,7 @@ mssanitizer --tool=racecheck --check-cross-npu-races=yes application
 ```
 如果需要更详细的工具能力可参考[MindStudio Sanitizer 使用指南](https://gitcode.com/Ascend/mssanitizer/blob/master/docs/zh/user_guide/mssanitizer_user_guide.md)按如下格式控制参数
 ```sh
-mssanitizer <options> -- <user_program> <user_options> 
+mssanitizer <options> -- <user_program> <user_options>
 ```
 ### mssanitizer执行SHMEM自带的example样例
 

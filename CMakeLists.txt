@@ -72,23 +72,15 @@ else()
     add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
-if(USE_MSSANITIZER)
-    if(SOC_TYPE STREQUAL "Ascend950")
-        set(SANITIZER_FLAGS -g)
-    else()
-        set(SANITIZER_FLAGS
-            -g --cce-enable-sanitizer
-        )
-    endif()
-else()
-    set(SANITIZER_FLAGS)
-endif()
-
 # AscendC head files
 set(ASCEND_HOME_PATH $ENV{ASCEND_HOME_PATH})
 set(PLUGIN_VERSION 0)
-# 分界版本时间戳
+
+# 分界版本时间戳：xasc 与 xcce 编译模式切换
 set(TARGET_TIMESTAMP 20260327)
+# Ascend950 支持 --cce-enable-sanitizer 的 bisheng 起始时间戳
+set(MSSANITIZER_CCE_FLAG_TIMESTAMP 20260701)
+
 set(CURRENT_TIMESTAMP 0)
 set(IS_NEW_VERSION FALSE)
 
@@ -125,6 +117,35 @@ if(BISHENG_VERSION_OUTPUT)
 else()
     message(WARNING "Failed to run bisheng -v, treat as OLD version")
     set(IS_NEW_VERSION FALSE)
+endif()
+
+# mssanitizer 编译选项：依赖 bisheng 版本时间戳判断是否启用 --cce-enable-sanitizer
+if(USE_MSSANITIZER)
+    if(SOC_TYPE STREQUAL "Ascend950")
+        if(CURRENT_TIMESTAMP GREATER_EQUAL ${MSSANITIZER_CCE_FLAG_TIMESTAMP})
+            set(SANITIZER_FLAGS
+                -g --cce-enable-sanitizer
+            )
+            message(STATUS
+                "Ascend950 mssanitizer: current bisheng timestamp=${CURRENT_TIMESTAMP}, "
+                "required timestamp=${MSSANITIZER_CCE_FLAG_TIMESTAMP}; "
+                "enable -g --cce-enable-sanitizer (AscendC API memory checks available)")
+        else()
+            set(SANITIZER_FLAGS -g)
+            message(WARNING
+                "Ascend950 mssanitizer: current bisheng timestamp=${CURRENT_TIMESTAMP}, "
+                "required timestamp=${MSSANITIZER_CCE_FLAG_TIMESTAMP}. "
+                "Current CANN does not support compiling Ascend950 with --cce-enable-sanitizer; "
+                "falling back to SANITIZER_FLAGS=-g only, AscendC API memory checks are unavailable. "
+                "Upgrade CANN to enable full mssanitizer instrumentation.")
+        endif()
+    else()
+        set(SANITIZER_FLAGS
+            -g --cce-enable-sanitizer
+        )
+    endif()
+else()
+    set(SANITIZER_FLAGS)
 endif()
 
 message(STATUS "SOC_TYPE:${SOC_TYPE}")

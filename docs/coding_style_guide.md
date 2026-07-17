@@ -1108,7 +1108,7 @@ SHMEM 的 msSanitizer 验证通过编译插桩和运行时工具拉起完成。
 新增代码需要参考以下使用方式：
 
 - 使用 `bash scripts/build.sh -mssanitizer` 或组合样例参数，例如 `bash scripts/build.sh -examples -mssanitizer`。
-- `USE_MSSANITIZER=ON` 时，CMake 会按 `SOC_TYPE` 设置 sanitizer 编译选项。
+- `USE_MSSANITIZER=ON` 时，CMake 会按 `SOC_TYPE` 与 bisheng 版本设置 sanitizer 编译选项：非 Ascend950 固定为 `-g --cce-enable-sanitizer`；Ascend950 在新版本 CANN 下同样启用该选项，旧版本仅加 `-g`（此时 AscendC API 相关内存检测不可用，详见 cmake 配置日志）。
 - 运行时必须使用 mssanitizer 拉起目标程序，例如：
 
 ```sh

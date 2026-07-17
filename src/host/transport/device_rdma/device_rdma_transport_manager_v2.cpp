@@ -10,13 +10,16 @@
 
 #include "mem_entity_def.h"
 #include "shmemi_logger.h"
+#include "shmemi_scope_guard.h"
 #include "dl_acl_api.h"
 #include "device_rdma_common.h"
 #include "device_rdma_helper.h"
 #include "transport/topo/topo_reader.h"
 #include "device_rdma_transport_manager_v2.h"
 
+#include <chrono>
 #include <cstdlib>
+#include <thread>
 
 namespace shm {
 namespace transport {
@@ -25,6 +28,14 @@ namespace device {
 constexpr uint32_t RDMA_PORT_PREFIX = 60032;
 constexpr uint32_t MAX_RANKS_PER_NIC = 16;
 constexpr uint32_t ATOMIC_MAX_NUM = 128;
+// 非阻塞建链状态轮询参数(按通道个数缩放)
+constexpr uint32_t CHANNEL_STATUS_POLL_INTERVAL_PER_CH_MS = 10;   // 单通道单次轮询间隔(ms)
+constexpr uint32_t CHANNEL_STATUS_POLL_TIMEOUT_PER_CH_MS = 60000; // 单通道建链就绪等待超时(ms) = 1min
+// HcommChannelGetStatus 返回的通道状态码
+constexpr int32_t CHANNEL_STATUS_READY = 0;      // 建链就绪
+constexpr int32_t CHANNEL_STATUS_CONNECTING = 1; // 建链中，继续等待
+constexpr int32_t CHANNEL_STATUS_TIMEOUT_1 = 2;  // 建链超时
+constexpr int32_t CHANNEL_STATUS_TIMEOUT_2 = 3;  // 建链超时
 
 RdmaTransportManagerV2::~RdmaTransportManagerV2()
 {
@@ -54,7 +65,7 @@ Result RdmaTransportManagerV2::OpenDevice(const TransportOptions& options)
     SHM_ASSERT_LOG_AND_RETURN(
         ret == 0 && phyId >= 0,
         "AclrtGetPhyDevIdByLogicDevId() return=" << ret << ", userId=" << userId << ", logicDeviceId=" << logicId
-                                                   << ", output phyId=" << phyId,
+                                                 << ", output phyId=" << phyId,
         ACLSHMEM_INNER_ERROR);
     phyId_ = static_cast<uint32_t>(phyId);
 
@@ -321,8 +332,8 @@ Result RdmaTransportManagerV2::Connect()
         channelDescs[chIdx].role = isServer ? HCOMM_SOCKET_ROLE_SERVER : HCOMM_SOCKET_ROLE_CLIENT;
         uint32_t serverRank = isServer ? rankId_ : remoteRank;
         uint32_t clientRank = isServer ? remoteRank : rankId_;
-        channelDescs[chIdx].port = static_cast<uint16_t>(RDMA_PORT_PREFIX +
-            (serverRank % MAX_RANKS_PER_NIC) * MAX_RANKS_PER_NIC + (clientRank % MAX_RANKS_PER_NIC));
+        channelDescs[chIdx].port = static_cast<uint16_t>(
+            RDMA_PORT_PREFIX + (serverRank % MAX_RANKS_PER_NIC) * MAX_RANKS_PER_NIC + (clientRank % MAX_RANKS_PER_NIC));
         ++chIdx;
     }
 
@@ -341,12 +352,71 @@ Result RdmaTransportManagerV2::Connect()
     }
     SHM_LOG_DEBUG("rank[" << rankId_ << "] HcommChannelCreate success, channelNum=" << channelNum);
 
+    auto channelGuard = shm::utils::make_scope_guard(channelPtrs_.data(), [this, channelNum](ChannelHandle*) {
+        HcommChannelDestroy(reinterpret_cast<const ChannelHandle*>(channelPtrs_.data()), channelNum);
+        channelPtrs_.clear();
+    });
+
+    const uint32_t pollIntervalMs = channelNum * CHANNEL_STATUS_POLL_INTERVAL_PER_CH_MS;
+    const uint32_t pollTimeoutMs = channelNum * CHANNEL_STATUS_POLL_TIMEOUT_PER_CH_MS;
+    std::vector<int32_t> statusList(channelNum, CHANNEL_STATUS_CONNECTING);
+    bool allReady = false;
+    bool connectFailed = false;
+    uint32_t elapsedMs = 0;
+    while (elapsedMs <= pollTimeoutMs) {
+        auto statusRet = HcommChannelGetStatus(channelPtrs_.data(), channelNum, statusList.data());
+        if (statusRet != 0) {
+            SHM_LOG_ERROR("rank[" << rankId_ << "] HcommChannelGetStatus failed: " << statusRet);
+            return ACLSHMEM_INNER_ERROR;
+        }
+
+        allReady = true;
+        connectFailed = false;
+        for (uint32_t i = 0; i < channelNum; ++i) {
+            const int32_t status = statusList[i];
+            if (status == CHANNEL_STATUS_READY) {
+                continue;
+            }
+            allReady = false;
+            if (status == CHANNEL_STATUS_CONNECTING) {
+                continue; // 建链中，继续等待
+            }
+            if (status == CHANNEL_STATUS_TIMEOUT_1 || status == CHANNEL_STATUS_TIMEOUT_2) {
+                SHM_LOG_ERROR("rank[" << rankId_ << "] channel[" << i << "] connect timeout, status=" << status);
+                connectFailed = true;
+            } else {
+                SHM_LOG_ERROR("rank[" << rankId_ << "] channel[" << i << "] unknown status=" << status);
+                connectFailed = true;
+            }
+        }
+        if (allReady) {
+            break;
+        }
+        if (connectFailed) {
+            SHM_LOG_ERROR(
+                "rank[" << rankId_ << "] channel connect failed, stop polling, channelNum=" << channelNum
+                        << ", elapsedMs=" << elapsedMs);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(pollIntervalMs));
+        elapsedMs += pollIntervalMs;
+    }
+
+    if (!allReady) {
+        SHM_LOG_ERROR(
+            "rank[" << rankId_ << "] wait channel connect timeout, channelNum=" << channelNum << ", pollIntervalMs="
+                    << pollIntervalMs << ", pollTimeoutMs=" << pollTimeoutMs << ", elapsedMs=" << elapsedMs);
+        return ACLSHMEM_INNER_ERROR;
+    }
+    SHM_LOG_DEBUG("rank[" << rankId_ << "] all channels connected, elapsedMs=" << elapsedMs);
+
     auto fillRet = FillRdmaInfo();
     if (fillRet != ACLSHMEM_SUCCESS) {
         SHM_LOG_ERROR("rank[" << rankId_ << "] FillRdmaInfo failed: " << fillRet);
         return fillRet;
     }
 
+    channelGuard.release();
     SHM_LOG_INFO("rank[" << rankId_ << "] Connect success, created " << channelNum << " channels");
     return ACLSHMEM_SUCCESS;
 }
@@ -397,20 +467,20 @@ int RdmaTransportManagerV2::ValidateRanksPerNic() const
         if (network.type == IpV4) {
             sameIp = (network.ip.ipv4.sin_addr.s_addr == deviceIp_.ip.ipv4.s_addr);
         } else {
-            sameIp = (memcmp(&network.ip.ipv6.sin6_addr, &deviceIp_.ip.ipv6,
-                             sizeof(deviceIp_.ip.ipv6)) == 0);
+            sameIp = (memcmp(&network.ip.ipv6.sin6_addr, &deviceIp_.ip.ipv6, sizeof(deviceIp_.ip.ipv6)) == 0);
         }
         if (sameIp) {
             sameIpCount++;
             if (sameIpCount > MAX_RANKS_PER_NIC) {
-                SHM_LOG_ERROR("rank[" << rankId_ << "] ranks per NIC/IP exceeded: " << sameIpCount
-                                       << " > " << MAX_RANKS_PER_NIC << ", conflict rank: " << entry.first);
+                SHM_LOG_ERROR(
+                    "rank[" << rankId_ << "] ranks per NIC/IP exceeded: " << sameIpCount << " > " << MAX_RANKS_PER_NIC
+                            << ", conflict rank: " << entry.first);
                 return ACLSHMEM_INVALID_PARAM;
             }
         }
     }
-    SHM_LOG_DEBUG("rank[" << rankId_ << "] ranks on same NIC/IP: " << sameIpCount
-                          << ", max allowed: " << MAX_RANKS_PER_NIC);
+    SHM_LOG_DEBUG(
+        "rank[" << rankId_ << "] ranks on same NIC/IP: " << sameIpCount << ", max allowed: " << MAX_RANKS_PER_NIC);
     return ACLSHMEM_SUCCESS;
 }
 
@@ -429,14 +499,13 @@ void RdmaTransportManagerV2::CopyAiWQInfo(struct AiQpRMAWQ& dest, const SqContex
         dest.dbAddr = roceSq.dbHwVa;
         dest.dbSwVa = roceSq.dbSwVa;
         dest.mtuShift = roceSq.mtuShift;
-        dest.dbMode = DBMode::SW_DB;  // 新版默认软件doorbell
+        dest.dbMode = DBMode::SW_DB; // 新版默认软件doorbell
         SHM_LOG_DEBUG(
             "rank[" << rankId_ << "] CopyAiWQInfo(V2), wqn=" << dest.wqn << ", bufAddr=0x" << std::hex << dest.bufAddr
                     << std::dec << ", wqeSize=" << dest.wqeSize << ", depth=" << dest.depth << ", headAddr=0x"
-                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr
-                    << std::dec << ", sl=" << dest.sl << ", dbAddr=0x" << std::hex << dest.dbAddr
-                    << ", dbSwVa=0x" << std::hex << dest.dbSwVa << std::dec
-                    << ", mtuShift=" << static_cast<int>(dest.mtuShift));
+                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr << std::dec
+                    << ", sl=" << dest.sl << ", dbAddr=0x" << std::hex << dest.dbAddr << ", dbSwVa=0x" << std::hex
+                    << dest.dbSwVa << std::dec << ", mtuShift=" << static_cast<int>(dest.mtuShift));
     } else {
         // 旧版格式 (2026-07-07 之前 CANN) - 回退兼容
         auto v1 = ExtractSqContextRoceV1(src);
@@ -448,8 +517,8 @@ void RdmaTransportManagerV2::CopyAiWQInfo(struct AiQpRMAWQ& dest, const SqContex
         dest.tailAddr = v1.tailAddr;
         dest.sl = v1.sl;
         dest.dbAddr = v1.dbVa;
-        dest.dbSwVa = 0;            // 旧版无软doorbell
-        dest.mtuShift = 0;          // 旧版无此字段，填0
+        dest.dbSwVa = 0;   // 旧版无软doorbell
+        dest.mtuShift = 0; // 旧版无此字段，填0
         dest.dbMode = (v1.dbMode == 0) ? DBMode::HW_DB : DBMode::SW_DB;
         SHM_LOG_DEBUG(
             "rank[" << rankId_ << "] CopyAiWQInfo(V1 fallback), wqn=" << dest.wqn << ", bufAddr=0x" << std::hex
@@ -473,13 +542,13 @@ void RdmaTransportManagerV2::CopyAiCQInfo(struct AiQpRMACQ& dest, const CqContex
         dest.tailAddr = roceCq.tailAddr;
         dest.dbAddr = roceCq.dbHwVa;
         dest.dbSwVa = roceCq.dbSwVa;
-        dest.dbMode = DBMode::SW_DB;  // 新版默认软件doorbell
+        dest.dbMode = DBMode::SW_DB; // 新版默认软件doorbell
         SHM_LOG_DEBUG(
             "rank[" << rankId_ << "] CopyAiCQInfo(V2), cqn=" << dest.cqn << ", bufAddr=0x" << std::hex << dest.bufAddr
                     << std::dec << ", cqeSize=" << dest.cqeSize << ", depth=" << dest.depth << ", headAddr=0x"
-                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr
-                    << std::dec << ", dbAddr=0x" << std::hex << dest.dbAddr << ", dbSwVa=0x" << std::hex
-                    << dest.dbSwVa << std::dec);
+                    << std::hex << dest.headAddr << std::dec << ", tailAddr=0x" << std::hex << dest.tailAddr << std::dec
+                    << ", dbAddr=0x" << std::hex << dest.dbAddr << ", dbSwVa=0x" << std::hex << dest.dbSwVa
+                    << std::dec);
     } else {
         // 旧版格式 (2026-07-07 之前 CANN) - 回退兼容
         auto v1 = ExtractCqContextRoceV1(src);
@@ -490,7 +559,7 @@ void RdmaTransportManagerV2::CopyAiCQInfo(struct AiQpRMACQ& dest, const CqContex
         dest.headAddr = v1.headAddr;
         dest.tailAddr = v1.tailAddr;
         dest.dbAddr = v1.dbVa;
-        dest.dbSwVa = 0;            // 旧版无软doorbell
+        dest.dbSwVa = 0; // 旧版无软doorbell
         dest.dbMode = (v1.dbMode == 0) ? DBMode::HW_DB : DBMode::SW_DB;
         SHM_LOG_DEBUG(
             "rank[" << rankId_ << "] CopyAiCQInfo(V1 fallback), cqn=" << dest.cqn << ", bufAddr=0x" << std::hex

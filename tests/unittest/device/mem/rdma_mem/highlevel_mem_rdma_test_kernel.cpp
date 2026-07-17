@@ -35,7 +35,7 @@ constexpr uint64_t MESSAGE_SIZE = 64;
  * Test aclshmem_getmem (blocking/synchronous GET) for RDMA/ROCE engine
  * Each PE gets data from all other peers using aclshmem_getmem
  */
-extern "C" __global__ __aicore__ void RDMAGetmemTest(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAGetmemTest(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -65,7 +65,7 @@ void test_rdma_getmem(uint32_t block_dim, void* stream, uint8_t* gva, uint64_t c
  * Test aclshmem_putmem (blocking/synchronous PUT) for RDMA/ROCE engine
  * Each PE puts data to all other peers using aclshmem_putmem
  */
-extern "C" __global__ __aicore__ void RDMAPutmemTest(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAPutmemTest(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -95,7 +95,7 @@ void test_rdma_putmem(uint32_t block_dim, void* stream, uint8_t* gva, uint64_t c
  * Test aclshmem_getmem_nbi (non-blocking GET) for RDMA/ROCE engine
  * Each PE gets data from all other peers using aclshmem_getmem_nbi
  */
-extern "C" __global__ __aicore__ void RDMAGetmemNbiTest(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAGetmemNbiTest(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -127,7 +127,7 @@ void test_rdma_getmem_nbi(uint32_t block_dim, void* stream, uint8_t* gva, uint64
  * Test aclshmem_putmem_nbi (non-blocking PUT) for RDMA/ROCE engine
  * Each PE puts data to all other peers using aclshmem_putmem_nbi
  */
-extern "C" __global__ __aicore__ void RDMAPutmemNbiTest(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAPutmemNbiTest(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -170,7 +170,7 @@ void test_rdma_putmem_nbi(uint32_t block_dim, void* stream, uint8_t* gva, uint64
  * - test_rdma_##NAME##_get: Host wrapper for GET kernel
  */
 #define GEN_PUT_GET_KERNEL(NAME, TYPE)                                                                  \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##PutTestKernel(GM_ADDR gva, uint64_t config)      \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##PutTestKernel(GM_ADDR gva, uint64_t config)     \
     {                                                                                                   \
         util_set_ffts_config(config);                                                                   \
         AscendC::TPipe pipe;                                                                            \
@@ -192,7 +192,7 @@ void test_rdma_putmem_nbi(uint32_t block_dim, void* stream, uint8_t* gva, uint64
         }                                                                                               \
     }                                                                                                   \
                                                                                                         \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##GetTestKernel(GM_ADDR gva, uint64_t config)      \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##GetTestKernel(GM_ADDR gva, uint64_t config)     \
     {                                                                                                   \
         util_set_ffts_config(config);                                                                   \
         AscendC::TPipe pipe;                                                                            \
@@ -241,7 +241,7 @@ ACLSHMEM_MEM_PUT_GET_FUNC(GEN_PUT_GET_KERNEL);
  * - test_rdma_##NAME##_get_nbi: Host wrapper for GET_NBI kernel
  */
 #define GEN_PUT_GET_NBI_KERNEL(NAME, TYPE)                                                              \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##PutNbiTestKernel(GM_ADDR gva, uint64_t config)   \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##PutNbiTestKernel(GM_ADDR gva, uint64_t config)  \
     {                                                                                                   \
         util_set_ffts_config(config);                                                                   \
         AscendC::TPipe pipe;                                                                            \
@@ -264,7 +264,7 @@ ACLSHMEM_MEM_PUT_GET_FUNC(GEN_PUT_GET_KERNEL);
         }                                                                                               \
     }                                                                                                   \
                                                                                                         \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##GetNbiTestKernel(GM_ADDR gva, uint64_t config)   \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##GetNbiTestKernel(GM_ADDR gva, uint64_t config)  \
     {                                                                                                   \
         util_set_ffts_config(config);                                                                   \
         AscendC::TPipe pipe;                                                                            \
@@ -314,7 +314,7 @@ ACLSHMEM_MEM_PUT_GET_FUNC(GEN_PUT_GET_NBI_KERNEL);
  * - test_rdma_##NAME##_get_nbi_tensor: Host wrapper for GET_NBI Tensor kernel
  */
 #define GEN_PUT_GET_NBI_TENSOR_KERNEL(NAME, TYPE)                                                                  \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##PutNbiTensorTestKernel(GM_ADDR gva, uint64_t config)        \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##PutNbiTensorTestKernel(GM_ADDR gva, uint64_t config)       \
     {                                                                                                              \
         util_set_ffts_config(config);                                                                              \
         AscendC::TPipe pipe;                                                                                       \
@@ -341,7 +341,7 @@ ACLSHMEM_MEM_PUT_GET_FUNC(GEN_PUT_GET_NBI_KERNEL);
         }                                                                                                          \
     }                                                                                                              \
                                                                                                                    \
-    extern "C" __global__ __aicore__ void RDMA_##NAME##GetNbiTensorTestKernel(GM_ADDR gva, uint64_t config)        \
+    extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMA_##NAME##GetNbiTensorTestKernel(GM_ADDR gva, uint64_t config)       \
     {                                                                                                              \
         util_set_ffts_config(config);                                                                              \
         AscendC::TPipe pipe;                                                                                       \

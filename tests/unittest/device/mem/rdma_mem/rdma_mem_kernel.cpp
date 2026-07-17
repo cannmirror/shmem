@@ -12,7 +12,7 @@
 #include "shmem.h"
 constexpr uint64_t MESSAGE_SIZE = 64;
 
-extern "C" __global__ __aicore__ void RDMAGetTestLowLevel(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAGetTestLowLevel(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -38,7 +38,7 @@ void test_rdma_get_low_level(uint32_t block_dim, void* stream, uint8_t* gva, uin
     RDMAGetTestLowLevel<<<block_dim, nullptr, stream>>>(gva, config);
 }
 
-extern "C" __global__ __aicore__ void RDMAPutTestLowLevel(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAPutTestLowLevel(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
@@ -64,7 +64,7 @@ void test_rdma_put_low_level(uint32_t block_dim, void* stream, uint8_t* gva, uin
     RDMAPutTestLowLevel<<<block_dim, nullptr, stream>>>(gva, config);
 }
 
-extern "C" __global__ __aicore__ void RDMAGetTestHighLevel(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAGetTestHighLevel(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     int64_t rank = aclshmem_my_pe();
@@ -86,7 +86,7 @@ void test_rdma_get_high_level(uint32_t block_dim, void* stream, uint8_t* gva, ui
     RDMAGetTestHighLevel<<<block_dim, nullptr, stream>>>(gva, config);
 }
 
-extern "C" __global__ __aicore__ void RDMAPutTestHighLevel(GM_ADDR gva, uint64_t config)
+extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAPutTestHighLevel(GM_ADDR gva, uint64_t config)
 {
     util_set_ffts_config(config);
     int64_t rank = aclshmem_my_pe();

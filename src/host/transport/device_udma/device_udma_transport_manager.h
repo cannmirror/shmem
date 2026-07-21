@@ -26,6 +26,15 @@ namespace shm {
 namespace transport {
 namespace device {
 
+// Single point where the relay build switch is turned into a compile-time predicate. Every relay
+// vs. direct decision in this class branches on this constant via `if constexpr`, so the rest of
+// the header/.cpp stays free of scattered #ifdef blocks.
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+inline constexpr bool ACLSHMEM_UDMA_RELAY_ENABLED = true;
+#else
+inline constexpr bool ACLSHMEM_UDMA_RELAY_ENABLED = false;
+#endif
+
 class UdmaTransportManager : public TransportManager {
 public:
     UdmaTransportManager() noexcept;
@@ -52,25 +61,75 @@ public:
     }
 
 private:
+    // One rank's local HCOMM endpoint descriptor as exchanged via allgather. `valid` distinguishes
+    // real entries from the zero padding used to make every rank contribute max_count slots.
+    struct ExchangedEndpointDesc {
+        uint32_t eid_index{0};
+        uint32_t valid{0};
+        EndpointDesc desc{};
+    };
+    // Result of the endpoint-descriptor allgather. `descs` is a flat [rank * max_count + idx] table.
+    struct EndpointExchange {
+        std::vector<uint32_t> counts;             // per-rank endpoint count
+        uint32_t max_count{0};                    // max endpoint count across ranks (stride of descs)
+        std::vector<ExchangedEndpointDesc> descs; // exchanged descriptors, indexed [rank * max_count + idx]
+    };
+    // Channels created during Connect, kept in parallel arrays. handles[i] feeds udma info slot
+    // slots[i] and physically targets dst_pes[i]. Direct: slots[i] == dst_pes[i] == peer;
+    // relay: slots[i] == dst_pes[i] * rank_count_ + relay_pe.
+    struct ChannelBuildState {
+        std::vector<ChannelHandle> handles;
+        std::vector<uint32_t> slots;
+        std::vector<uint32_t> dst_pes;
+    };
     bool CreateEndpoint(uint32_t eid_index, const std::array<uint8_t, 16>& target_eid_raw);
     bool PrepareOpenDevice(uint32_t device_id, uint32_t rank_count);
-    Result BuildUdmaInfo(const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers);
+    // Allgather the local HCOMM endpoint descriptors into `exchange`.
+    Result ExchangeEndpointDescriptors(EndpointExchange& exchange) const;
+    // Locate dst_pe's exchanged endpoint descriptor on remote_eid_index, or nullptr if absent.
+    const ExchangedEndpointDesc* FindRemoteEndpointDesc(
+        const EndpointExchange& exchange, uint32_t dst_pe, uint32_t remote_eid_index) const;
+    // Create one HCOMM channel egressing on local_eid_index toward dst_pe's endpoint on
+    // remote_eid_index, and append it to `state` against udma info `slot`.
+    Result CreateChannelForSlot(
+        const EndpointExchange& exchange, uint32_t local_eid_index, uint32_t remote_eid_index, uint32_t dst_pe,
+        uint32_t slot, ChannelBuildState& state);
+    // Create all channels for this build: dispatches to the direct or relay variant based on
+    // ACLSHMEM_UDMA_RELAY_ENABLED. On failure the caller cleans up state.handles.
+    Result BuildChannels(const EndpointExchange& exchange, ChannelBuildState& state);
+    // One channel per peer (direct build): slot == peer.
+    Result BuildDirectChannels(const EndpointExchange& exchange, ChannelBuildState& state);
+    // One channel per meaningful (actual_pe, relay_pe) slot (relay build). Only reached when
+    // ACLSHMEM_UDMA_RELAY_ENABLED. Channels are created non-blocking; readiness is polled once
+    // afterwards via WaitHcommChannelReady, so no per-wave synchronization is needed.
+    Result BuildRelayChannels(const EndpointExchange& exchange, ChannelBuildState& state);
+    // Number of UDMA info slots. Direct (OFF) build: one slot per target peer (slot == peer),
+    // slot_count == rank_count_. Relay (ON) build: one slot per (actual_pe, relay_pe) pair,
+    // slot_count == rank_count_ * rank_count_, addressed by actual_pe * rank_count_ + relay_pe.
+    uint64_t SlotCount() const;
+    // channel_slots[i] is the UDMA info slot the i-th created channel feeds. Direct: slot == peer;
+    // relay: slot == actual_pe * rank_count_ + relay_pe. channel_dst_pes[i] is the actual
+    // destination PE of that channel (used for validation only).
+    Result BuildUdmaInfo(
+        const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_slots,
+        const std::vector<uint32_t>& channel_dst_pes);
     Result ReadChannelContexts(
-        const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers,
-        std::vector<SqContext>& sq_contexts_by_peer, std::vector<CqContext>& cq_contexts_by_peer,
-        std::vector<RegedBufferEntity>& remote_buffers_by_peer, std::vector<bool>& peer_valid) const;
+        const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_slots,
+        const std::vector<uint32_t>& channel_dst_pes, std::vector<SqContext>& sq_contexts_by_slot,
+        std::vector<CqContext>& cq_contexts_by_slot, std::vector<RegedBufferEntity>& remote_buffers_by_slot,
+        std::vector<bool>& slot_valid) const;
     Result PrepareUdmaInfoBuffers(std::vector<uint8_t>& eid_table_host);
     void InitHostUdmaInfo(
         uint32_t qp_num, std::vector<uint8_t>& udma_info_buffer, aclshmemi_aiv_udma_info_t*& copy_info);
     Result FillHostUdmaInfo(
-        const std::vector<SqContext>& sq_contexts_by_peer, const std::vector<CqContext>& cq_contexts_by_peer,
-        const std::vector<RegedBufferEntity>& remote_buffers_by_peer, const std::vector<bool>& peer_valid,
+        const std::vector<SqContext>& sq_contexts_by_slot, const std::vector<CqContext>& cq_contexts_by_slot,
+        const std::vector<RegedBufferEntity>& remote_buffers_by_slot, const std::vector<bool>& slot_valid,
         std::vector<uint8_t>& eid_table_host, aclshmemi_aiv_udma_info_t& copy_info);
     Result CopyEidTableToDevice(const std::vector<uint8_t>& eid_table_host);
     Result CopyUdmaInfoToDevice(
         uint32_t qp_num, std::vector<uint8_t>& udma_info_buffer, aclshmemi_aiv_udma_info_t& copy_info);
     Result ReserveScratchBuffers();
-    void FillWqCtx(const SqContext& sq_context, uint32_t peer, aclshmemi_udma_wq_ctx_t& dst_wq) const;
+    void FillWqCtx(const SqContext& sq_context, uint32_t dst_pe, aclshmemi_udma_wq_ctx_t& dst_wq) const;
     void FillCqCtx(const CqContext& cq_context, aclshmemi_udma_cq_ctx_t& dst_cq) const;
     void FillMemInfo(
         const SqContext& sq_context, const RegedBufferEntity& remote_buffer, aclshmemi_ubmem_info_t& dst_mem) const;
@@ -80,6 +139,11 @@ private:
     void DestroyChannels();
     Result CheckPrepareOptions(const HybmTransPrepareOptions& options);
     void CleanupResources();
+    // Relay-only helper (only reached when ACLSHMEM_UDMA_RELAY_ENABLED == true).
+    // Resolve (local egress EID, remote target EID) for relay slot (actual_pe, relay_pe).
+    // skip=true for the meaningless diagonal (actual == relay, actual != me).
+    Result ResolveRelaySlotRoute(
+        uint32_t actual_pe, uint32_t relay_pe, bool& skip, uint32_t& local_eid, uint32_t& remote_eid) const;
 
 private:
     uint32_t rank_id_{0};
@@ -87,21 +151,28 @@ private:
     uint32_t user_id_{0};
     uint32_t phy_id_{0};
     hybm_role_type role_{HYBM_ROLE_PEER};
-    std::map<uint32_t, uint32_t> peer_eid_index_map_;                       // peerRankId -> local eid_index
-    std::map<uint32_t, uint32_t> peer_remote_eid_index_map_;                // peerRankId -> remote eid_index
+    std::map<uint32_t, uint32_t> peer_eid_index_map_;        // peerRankId -> local eid_index
+    std::map<uint32_t, uint32_t> peer_remote_eid_index_map_; // peerRankId -> remote eid_index
+    // N x N routing matrix: [rank * rank_count_ + peer] = local-port eid_index `rank` uses to reach
+    // `peer`. Only read on the relay path to resolve each (actual_pe, relay_pe) slot's target EID.
+    std::vector<int32_t> all_local_routes_;
     std::map<uint32_t, EndpointDesc> endpoint_desc_map_;                    // eid_index -> local hcomm endpoint desc
     std::map<uint32_t, EndpointHandle> endpoint_handle_map_;                // eid_index -> hcomm endpoint handle
     std::map<uint64_t, std::map<uint32_t, HcommMemHandle>> mem_record_map_; // addr -> eid_index -> hcomm mem handle
     std::vector<ChannelHandle> channel_handles_;
-    std::vector<uint32_t> channel_peers_;
     // The control plane fills a contiguous aclshmemi_aiv_udma_info_t blob using the legacy
     // (jetty-manager) layout so the data plane consumes it unchanged. The per-peer
     // amo / remote-EID scratch buffers are allocated separately, mirroring
     // the original DeviceJettyManager allocation scheme.
-    void* udma_info_dev_{nullptr};    // device pointer to the contiguous aclshmemi_aiv_udma_info_t blob
-    uint64_t udma_info_size_{0};      // byte size of the contiguous blob
-    void* eid_dev_{nullptr};          // device pointer to uint8_t[rank_count_][16] remote EID raw, indexed by pe
-    std::vector<void*> amo_dev_list_; // per-peer uint64_t AMO scratch device buffers, indexed by pe
+    void* udma_info_dev_{nullptr}; // device pointer to the contiguous aclshmemi_aiv_udma_info_t blob
+    uint64_t udma_info_size_{0};   // byte size of the contiguous blob
+    // device pointer to uint8_t[SlotCount()][16] remote EID raw, indexed by slot.
+    // Direct build: SlotCount() == rank_count_, slot == pe. Relay build: SlotCount() == rank_count_^2,
+    // slot == actual_pe * rank_count_ + relay_pe (each slot's remote target EID differs).
+    void* eid_dev_{nullptr};
+    // per-peer uint64_t AMO scratch device buffers, sized rank_count_ and indexed by the actual
+    // destination pe in both builds (relay recovers dst_pe = slot / rank_count_).
+    std::vector<void*> amo_dev_list_;
 };
 } // namespace device
 } // namespace transport

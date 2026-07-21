@@ -154,6 +154,11 @@ if(ACLSHMEM_SIMT_SUPPORT)
     target_compile_definitions(shmem INTERFACE USE_SIMT)
 endif()
 
+# relay
+if(ACLSHMEM_RELAY_SUPPORT)
+    target_compile_definitions(shmem INTERFACE ACLSHMEM_RELAY_SUPPORT)
+endif()
+
 # UID
 add_library(aclshmem_bootstrap_uid SHARED)
 

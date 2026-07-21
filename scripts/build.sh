@@ -83,6 +83,7 @@ function print_usage()
     echo "  -examples                  Build with examples"
     echo "  -enable_rdma               Enable RDMA support. For Ascend950, must be used with -rdma_backend"
     echo "  -enable_simt               Enable SIMT support"
+    echo "  -enable_relay              Enable UDMA relay (detour) support. Requires -soc_type Ascend950 (UDMA)"
     echo "  -python_extension          Build Python extension"
     echo "  -python_example            Build Python example"
     echo "  -gendoc                    Generate documentation"
@@ -106,7 +107,17 @@ function fn_build()
         enable_udma_support=ON
     fi
 
-    cmake $COMPILE_OPTIONS -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_CXX11_ABI=$USE_CXX11_ABI -DUSE_MSSANITIZER=$USE_MSSANITIZER -DSOC_TYPE=${SOC_TYPE} -DPYEXPAND_EXAMPLE=$PYEXPAND_EXAMPLE -DACLSHMEM_UDMA_SUPPORT=$enable_udma_support ..
+    # Relay depends on UDMA (Ascend950 only). When UDMA is off, drop the relay flag so this build
+    # does not hit the top-level CMake FATAL_ERROR (relates to the -full path building examples /
+    # unittests on non-950 SOCs while COMPILE_OPTIONS still carries -DACLSHMEM_RELAY_SUPPORT=ON).
+    local build_compile_options="${COMPILE_OPTIONS}"
+    if [ "$enable_udma_support" != "ON" ] && \
+       [ -n "$(echo "$build_compile_options" | grep -o '\-DACLSHMEM_RELAY_SUPPORT=ON')" ]; then
+        echo "[WARN] -enable_relay ignored for SOC_TYPE='${SOC_TYPE}': relay requires UDMA (Ascend950 only)."
+        build_compile_options=$(echo "${build_compile_options}" | sed 's/-DACLSHMEM_RELAY_SUPPORT=ON//g')
+    fi
+
+    cmake $build_compile_options -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_CXX11_ABI=$USE_CXX11_ABI -DUSE_MSSANITIZER=$USE_MSSANITIZER -DSOC_TYPE=${SOC_TYPE} -DPYEXPAND_EXAMPLE=$PYEXPAND_EXAMPLE -DACLSHMEM_UDMA_SUPPORT=$enable_udma_support ..
     make install -j$(nproc)
     cd -
 }
@@ -114,6 +125,15 @@ function fn_build()
 function fn_whl_build()
 {
     echo "Python extension enabled. Building multi-SOC wheel (910 + 950)..."
+    export SOC_TYPE=${SOC_TYPE}
+    # setup.py reads COMPILE_OPTIONS from the environment and forwards it to CMake. Without
+    # exporting it here, wheel builds silently drop every -D flag accumulated in COMPILE_OPTIONS
+    # (e.g. -DACLSHMEM_RELAY_SUPPORT/-DACLSHMEM_RDMA_SUPPORT/-DACLSHMEM_SIMT_SUPPORT), producing a
+    # wheel whose C++ build differs from the native fn_build output.
+    export COMPILE_OPTIONS=${COMPILE_OPTIONS}
+    if [ "$SOC_TYPE" = "Ascend950" ]; then
+        export ACLSHMEM_UDMA_SUPPORT=ON
+    fi
 
     cd "${PROJECT_ROOT}/src/python"
     rm -rf shmem.egg-info ${PROJECT_ROOT}/dist
@@ -146,11 +166,20 @@ function fn_whl_build()
     # ============================================================
     # Build SOC 910 (default / Ascend910)
     # ============================================================
+    # Relay is a UDMA-only (Ascend950) feature. The 910 backend is built with UDMA support OFF,
+    # and the top-level CMake FATAL_ERRORs when ACLSHMEM_RELAY_SUPPORT=ON && ACLSHMEM_UDMA_SUPPORT=OFF.
+    # Strip the relay flag from the 910 backend options; the 950 backend below keeps it.
+    COMPILE_OPTIONS_910=${COMPILE_OPTIONS}
+    if [ -n "$(echo "$COMPILE_OPTIONS_910" | grep -o '\-DACLSHMEM_RELAY_SUPPORT=ON')" ]; then
+        echo "[WARN] -enable_relay applied to the 950 backend only; the 910 wheel backend has UDMA disabled."
+        COMPILE_OPTIONS_910=$(echo "${COMPILE_OPTIONS_910}" | sed 's/-DACLSHMEM_RELAY_SUPPORT=ON//g')
+    fi
+
     echo "===== [1/3] Building backend: 910 ====="
     # Ascend910B backend covers Ascend910 A2/A3 series.
     [ -d build ] && rm -rf build
     mkdir -p build && cd build
-    cmake ${COMPILE_OPTIONS} \
+    cmake ${COMPILE_OPTIONS_910} \
         -DCMAKE_INSTALL_PREFIX=../install \
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
         -DUSE_CXX11_ABI=${USE_CXX11_ABI} \
@@ -424,6 +453,10 @@ while [[ $# -gt 0 ]]; do
             COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_SIMT_SUPPORT=ON"
             shift
             ;;
+        -enable_relay)
+            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DACLSHMEM_RELAY_SUPPORT=ON"
+            shift
+            ;;
         -python_extension)
             PYEXPAND_TYPE=ON
             shift
@@ -500,6 +533,23 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Validate relay parameter dependencies: relay is built on top of UDMA, which is only enabled for
+# Ascend950 (see fn_build -DACLSHMEM_UDMA_SUPPORT). Fail early with a clear message instead of
+# relying solely on the CMake FATAL_ERROR.
+# Exception: the wheel/package build (fn_whl_build) always builds both the 910B and 950 backends
+# internally and only enables relay on the 950 (UDMA) backend, so -enable_relay is allowed there
+# regardless of SOC_TYPE.
+if [ -n "$(echo "$COMPILE_OPTIONS" | grep -o '\-DACLSHMEM_RELAY_SUPPORT=ON')" ]; then
+    if [ "$PYEXPAND_TYPE" != "ON" ] && [ "$BUILD_ALL" != "ON" ] && [ "$SOC_TYPE" != "Ascend950" ]; then
+        echo "Error: -enable_relay requires UDMA support, which is only enabled for Ascend950."
+        echo "       Please add -soc_type Ascend950 when using -enable_relay,"
+        echo "       or use -python_extension / -full to build the multi-SOC wheel (relay is"
+        echo "       applied only to the 950 backend)."
+        print_usage
+        exit 1
+    fi
+fi
 
 # Validate RDMA parameter dependencies
 if [ -n "$RDMA_BACKEND" ]; then

@@ -31,12 +31,6 @@ namespace device {
 
 namespace {
 
-struct exchanged_endpoint_desc_info_t {
-    uint32_t eid_index{0};
-    uint32_t valid{0};
-    EndpointDesc desc{};
-};
-
 constexpr int32_t INVALID_EID_INDEX = -1;
 constexpr const char ACLSHMEM_HCOMM_MEM_TAG[] = "aclshmem_udma";
 // Number of HCOMM channels created per peer. One channel maps to one QP.
@@ -197,17 +191,32 @@ Result ReadPeerChannelContexts(uint64_t channel_ptr, uint32_t peer, PeerChannelC
     return ACLSHMEM_SUCCESS;
 }
 
-void SetUdmaInfoSectionPtrs(aclshmemi_aiv_udma_info_t& info, void* infoBase, uint32_t rank_count, uint32_t qp_num)
+// Active queue/memory table for this build. The union members share storage, so this resolves to
+// the same bytes as the other member; the constexpr just documents which path owns them. Templated
+// on InfoT (const or non-const aclshmemi_aiv_udma_info_t) so the returned reference's constness
+// follows the argument -- one body serves both the fill (write) and print (read-only) call sites.
+template <typename InfoT>
+auto& ActiveUdmaTable(InfoT& info)
 {
-    info.sq_ptr = reinterpret_cast<uint64_t>(static_cast<aclshmemi_aiv_udma_info_t*>(infoBase) + 1);
-    info.rq_ptr = reinterpret_cast<uint64_t>(
-        reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(info.sq_ptr) + static_cast<uint64_t>(rank_count) * qp_num);
-    info.scq_ptr = reinterpret_cast<uint64_t>(
-        reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(info.rq_ptr) + static_cast<uint64_t>(rank_count) * qp_num);
-    info.rcq_ptr = reinterpret_cast<uint64_t>(
-        reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(info.scq_ptr) + static_cast<uint64_t>(rank_count) * qp_num);
-    info.mem_ptr = reinterpret_cast<uint64_t>(
-        reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(info.rcq_ptr) + static_cast<uint64_t>(rank_count) * qp_num);
+    if constexpr (ACLSHMEM_UDMA_RELAY_ENABLED) {
+        return info.relay;
+    } else {
+        return info.direct;
+    }
+}
+
+void SetUdmaInfoSectionPtrs(aclshmemi_aiv_udma_info_t& info, void* infoBase, uint64_t slot_count, uint32_t qp_num)
+{
+    aclshmemi_udma_qp_table_t& tbl = ActiveUdmaTable(info);
+    tbl.sq_ptr = reinterpret_cast<uint64_t>(static_cast<aclshmemi_aiv_udma_info_t*>(infoBase) + 1);
+    tbl.rq_ptr = reinterpret_cast<uint64_t>(
+        reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(tbl.sq_ptr) + static_cast<uint64_t>(slot_count) * qp_num);
+    tbl.scq_ptr = reinterpret_cast<uint64_t>(
+        reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(tbl.rq_ptr) + static_cast<uint64_t>(slot_count) * qp_num);
+    tbl.rcq_ptr = reinterpret_cast<uint64_t>(
+        reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(tbl.scq_ptr) + static_cast<uint64_t>(slot_count) * qp_num);
+    tbl.mem_ptr = reinterpret_cast<uint64_t>(
+        reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(tbl.rcq_ptr) + static_cast<uint64_t>(slot_count) * qp_num);
 }
 
 } // namespace
@@ -371,22 +380,40 @@ Result UdmaTransportManager::Connect()
 
 const void* UdmaTransportManager::GetQpInfo() const { return udma_info_dev_; }
 
-Result UdmaTransportManager::BuildUdmaInfo(
-    const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers)
+uint64_t UdmaTransportManager::SlotCount() const
 {
-    if (channel_ptrs.empty() || channel_peers.size() != channel_ptrs.size()) {
+    if constexpr (ACLSHMEM_UDMA_RELAY_ENABLED) {
+        // Each (actual_pe, relay_pe) pair gets one slot. Compute in uint64_t so the N*N product
+        // (and the byte-size offsets derived from it) cannot silently wrap in uint32_t (TOP-03:
+        // memory sizes/offsets must use a 64-bit type).
+        return static_cast<uint64_t>(rank_count_) * rank_count_;
+    } else {
+        // Direct path: one slot per target pe.
+        return static_cast<uint64_t>(rank_count_);
+    }
+}
+
+Result UdmaTransportManager::BuildUdmaInfo(
+    const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_slots,
+    const std::vector<uint32_t>& channel_dst_pes)
+{
+    if (channel_ptrs.empty() || channel_slots.size() != channel_ptrs.size() ||
+        channel_dst_pes.size() != channel_ptrs.size()) {
         SHM_LOG_ERROR(
             "Invalid hcomm channel ptr input, channel_ptrs = " << channel_ptrs.size()
-                                                               << ", channel_peers = " << channel_peers.size());
+                                                               << ", channel_slots = " << channel_slots.size()
+                                                               << ", channel_dst_pes = " << channel_dst_pes.size());
         return ACLSHMEM_INVALID_PARAM;
     }
 
-    std::vector<SqContext> sq_contexts_by_peer(rank_count_);
-    std::vector<CqContext> cq_contexts_by_peer(rank_count_);
-    std::vector<RegedBufferEntity> remote_buffers_by_peer(rank_count_);
-    std::vector<bool> peer_valid(rank_count_, false);
+    const uint64_t slot_count = SlotCount();
+    std::vector<SqContext> sq_contexts_by_slot(slot_count);
+    std::vector<CqContext> cq_contexts_by_slot(slot_count);
+    std::vector<RegedBufferEntity> remote_buffers_by_slot(slot_count);
+    std::vector<bool> slot_valid(slot_count, false);
     auto ret = ReadChannelContexts(
-        channel_ptrs, channel_peers, sq_contexts_by_peer, cq_contexts_by_peer, remote_buffers_by_peer, peer_valid);
+        channel_ptrs, channel_slots, channel_dst_pes, sq_contexts_by_slot, cq_contexts_by_slot, remote_buffers_by_slot,
+        slot_valid);
     if (ret != ACLSHMEM_SUCCESS) {
         return ret;
     }
@@ -403,7 +430,7 @@ Result UdmaTransportManager::BuildUdmaInfo(
     aclshmemi_aiv_udma_info_t* copy_info = nullptr;
     InitHostUdmaInfo(qp_num, udma_info_buffer, copy_info);
     ret = FillHostUdmaInfo(
-        sq_contexts_by_peer, cq_contexts_by_peer, remote_buffers_by_peer, peer_valid, eid_table_host, *copy_info);
+        sq_contexts_by_slot, cq_contexts_by_slot, remote_buffers_by_slot, slot_valid, eid_table_host, *copy_info);
     if (ret != ACLSHMEM_SUCCESS) {
         FreeDeviceInfo();
         return ret;
@@ -432,27 +459,31 @@ Result UdmaTransportManager::BuildUdmaInfo(
 }
 
 Result UdmaTransportManager::ReadChannelContexts(
-    const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_peers,
-    std::vector<SqContext>& sq_contexts_by_peer, std::vector<CqContext>& cq_contexts_by_peer,
-    std::vector<RegedBufferEntity>& remote_buffers_by_peer, std::vector<bool>& peer_valid) const
+    const std::vector<uint64_t>& channel_ptrs, const std::vector<uint32_t>& channel_slots,
+    const std::vector<uint32_t>& channel_dst_pes, std::vector<SqContext>& sq_contexts_by_slot,
+    std::vector<CqContext>& cq_contexts_by_slot, std::vector<RegedBufferEntity>& remote_buffers_by_slot,
+    std::vector<bool>& slot_valid) const
 {
+    const uint64_t slot_count = SlotCount();
     for (size_t idx = 0; idx < channel_ptrs.size(); ++idx) {
-        const uint32_t peer = channel_peers[idx];
-        if (peer >= rank_count_ || peer == rank_id_ || channel_ptrs[idx] == 0) {
-            SHM_LOG_ERROR("Invalid hcomm channel entity for peer " << peer << ", index = " << idx);
+        const uint32_t slot = channel_slots[idx];
+        const uint32_t dst_pe = channel_dst_pes[idx];
+        if (slot >= slot_count || dst_pe >= rank_count_ || dst_pe == rank_id_ || channel_ptrs[idx] == 0) {
+            SHM_LOG_ERROR(
+                "Invalid hcomm channel entity for slot " << slot << " dst_pe " << dst_pe << ", index = " << idx);
             return ACLSHMEM_INVALID_PARAM;
         }
 
         PeerChannelContexts peer_contexts{};
-        auto read_ret = ReadPeerChannelContexts(channel_ptrs[idx], peer, peer_contexts);
+        auto read_ret = ReadPeerChannelContexts(channel_ptrs[idx], dst_pe, peer_contexts);
         if (read_ret != ACLSHMEM_SUCCESS) {
             return read_ret;
         }
 
-        sq_contexts_by_peer[peer] = peer_contexts.sq_context;
-        cq_contexts_by_peer[peer] = peer_contexts.cq_context;
-        remote_buffers_by_peer[peer] = peer_contexts.remote_buffer;
-        peer_valid[peer] = true;
+        sq_contexts_by_slot[slot] = peer_contexts.sq_context;
+        cq_contexts_by_slot[slot] = peer_contexts.cq_context;
+        remote_buffers_by_slot[slot] = peer_contexts.remote_buffer;
+        slot_valid[slot] = true;
     }
     return ACLSHMEM_SUCCESS;
 }
@@ -466,8 +497,10 @@ Result UdmaTransportManager::PrepareUdmaInfoBuffers(std::vector<uint8_t>& eid_ta
         return ret;
     }
 
-    // Allocate the device-side remote EID table: uint8_t[rank_count_][URMA_EID_RAW_SIZE].
-    const uint64_t eid_table_size = static_cast<uint64_t>(rank_count_) * URMA_EID_RAW_SIZE;
+    // Allocate the device-side remote EID table: uint8_t[slot_count][URMA_EID_RAW_SIZE].
+    // Direct build: slot_count == rank_count_, indexed by pe (unchanged). Relay build: one entry
+    // per (actual_pe, relay_pe) slot, since each slot's remote target EID differs.
+    const uint64_t eid_table_size = static_cast<uint64_t>(SlotCount()) * URMA_EID_RAW_SIZE;
     ret = AllocateAndClearDeviceBuffer(eid_dev_, eid_table_size, "udma remote eid table");
     if (ret != ACLSHMEM_SUCCESS) {
         return ret;
@@ -484,51 +517,68 @@ void UdmaTransportManager::InitHostUdmaInfo(
     //   [CqCtx(scq) * rank_count_][CqCtx(rcq) * rank_count_][UBmemInfo * rank_count_]
     const uint64_t wq_size = sizeof(aclshmemi_udma_wq_ctx_t) * qp_num;
     const uint64_t cq_size = sizeof(aclshmemi_udma_cq_ctx_t) * qp_num;
-    const uint64_t one_qp_size = 2U * (wq_size + cq_size) + sizeof(aclshmemi_ubmem_info_t) * qp_num;
-    udma_info_size_ = sizeof(aclshmemi_aiv_udma_info_t) + one_qp_size * rank_count_;
+    const uint64_t one_slot_size = 2U * (wq_size + cq_size) + sizeof(aclshmemi_ubmem_info_t) * qp_num;
+    const uint64_t slot_count = SlotCount();
+    udma_info_size_ = sizeof(aclshmemi_aiv_udma_info_t) + one_slot_size * slot_count;
 
     udma_info_buffer.assign(udma_info_size_, 0);
     copy_info = reinterpret_cast<aclshmemi_aiv_udma_info_t*>(udma_info_buffer.data());
     copy_info->qp_num = qp_num;
     // Host-side section pointers used only while filling the local buffer.
-    SetUdmaInfoSectionPtrs(*copy_info, copy_info, rank_count_, qp_num);
+    SetUdmaInfoSectionPtrs(*copy_info, copy_info, slot_count, qp_num);
 }
 
 Result UdmaTransportManager::FillHostUdmaInfo(
-    const std::vector<SqContext>& sq_contexts_by_peer, const std::vector<CqContext>& cq_contexts_by_peer,
-    const std::vector<RegedBufferEntity>& remote_buffers_by_peer, const std::vector<bool>& peer_valid,
+    const std::vector<SqContext>& sq_contexts_by_slot, const std::vector<CqContext>& cq_contexts_by_slot,
+    const std::vector<RegedBufferEntity>& remote_buffers_by_slot, const std::vector<bool>& slot_valid,
     std::vector<uint8_t>& eid_table_host, aclshmemi_aiv_udma_info_t& copy_info)
 {
-    auto* wq_array = reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(copy_info.sq_ptr);
-    auto* rq_array = reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(copy_info.rq_ptr);
-    auto* scq_array = reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(copy_info.scq_ptr);
-    auto* rcq_array = reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(copy_info.rcq_ptr);
-    auto* mem_array = reinterpret_cast<aclshmemi_ubmem_info_t*>(copy_info.mem_ptr);
+    const aclshmemi_udma_qp_table_t& tbl = ActiveUdmaTable(copy_info);
+    auto* wq_array = reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(tbl.sq_ptr);
+    auto* rq_array = reinterpret_cast<aclshmemi_udma_wq_ctx_t*>(tbl.rq_ptr);
+    auto* scq_array = reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(tbl.scq_ptr);
+    auto* rcq_array = reinterpret_cast<aclshmemi_udma_cq_ctx_t*>(tbl.rcq_ptr);
+    auto* mem_array = reinterpret_cast<aclshmemi_ubmem_info_t*>(tbl.mem_ptr);
 
-    for (uint32_t peer = 0; peer < rank_count_; ++peer) {
-        if (peer == rank_id_ || !peer_valid[peer]) {
-            // Self entry and any unconnected peer stay zero-initialized; the data
-            // plane never issues a self-send and asserts against self pe.
+    const uint64_t slot_count = SlotCount();
+    for (uint64_t slot = 0; slot < slot_count; ++slot) {
+        if (!slot_valid[slot]) {
+            // Self entry, unconnected peer, and skipped relay-diagonal slots stay zero-initialized;
+            // the data plane never issues a self-send and asserts against self pe.
             continue;
         }
-        FillWqCtx(sq_contexts_by_peer[peer], peer, wq_array[peer]);
-        rq_array[peer] = wq_array[peer];
-        FillCqCtx(cq_contexts_by_peer[peer], scq_array[peer]);
-        rcq_array[peer] = scq_array[peer];
-        FillMemInfo(sq_contexts_by_peer[peer], remote_buffers_by_peer[peer], mem_array[peer]);
-
-        // Stage the remote EID raw bytes (from the SQ context) into the device EID table
-        // and point mem_array[peer].eid_addr at the device-resident copy, matching the
-        // legacy behavior where the data plane reads rmtEid[0..1] from eid_addr.
-        uint8_t* eid_slot = eid_table_host.data() + static_cast<uint64_t>(peer) * URMA_EID_RAW_SIZE;
-        int copy_ret = memcpy_s(
-            eid_slot, URMA_EID_RAW_SIZE, sq_contexts_by_peer[peer].contextInfo.ubJfs.remoteEID, URMA_EID_RAW_SIZE);
-        if (copy_ret != EOK) {
-            SHM_LOG_ERROR("Copy Hcomm UDMA remote EID failed, peer = " << peer << ", ret = " << copy_ret);
+        // The amo scratch buffer is indexed by the actual destination pe. Direct build: slot == pe.
+        // Relay build: slot == actual_pe * rank_count_ + relay_pe, so recover actual_pe from slot.
+        const uint32_t dst_pe =
+            ACLSHMEM_UDMA_RELAY_ENABLED ? static_cast<uint32_t>(slot / rank_count_) : static_cast<uint32_t>(slot);
+        // Guard index range and null amo buffer before FillWqCtx dereferences amo_dev_list_[dst_pe]
+        // (self entry is null; RED-02 / IMPL-16). Inconsistent slot mapping fails the build.
+        if (dst_pe >= rank_count_ || dst_pe == rank_id_ || amo_dev_list_[dst_pe] == nullptr) {
+            SHM_LOG_ERROR(
+                "Invalid udma slot mapping: slot "
+                << slot << " -> dst_pe " << dst_pe << " (rank_count = " << rank_count_ << ", rank_id = " << rank_id_
+                << ", amo buffer " << (dst_pe < rank_count_ && amo_dev_list_[dst_pe] != nullptr ? "set" : "null")
+                << ")");
             return ACLSHMEM_INNER_ERROR;
         }
-        mem_array[peer].eid_addr = reinterpret_cast<uint64_t>(
-            static_cast<uint8_t*>(eid_dev_) + static_cast<uint64_t>(peer) * URMA_EID_RAW_SIZE);
+        FillWqCtx(sq_contexts_by_slot[slot], dst_pe, wq_array[slot]);
+        rq_array[slot] = wq_array[slot];
+        FillCqCtx(cq_contexts_by_slot[slot], scq_array[slot]);
+        rcq_array[slot] = scq_array[slot];
+        FillMemInfo(sq_contexts_by_slot[slot], remote_buffers_by_slot[slot], mem_array[slot]);
+
+        // Stage the remote EID raw bytes (from the SQ context) into the device EID table
+        // and point mem_array[slot].eid_addr at the device-resident copy, matching the
+        // legacy behavior where the data plane reads rmtEid[0..1] from eid_addr.
+        uint8_t* eid_slot = eid_table_host.data() + static_cast<uint64_t>(slot) * URMA_EID_RAW_SIZE;
+        int copy_ret = memcpy_s(
+            eid_slot, URMA_EID_RAW_SIZE, sq_contexts_by_slot[slot].contextInfo.ubJfs.remoteEID, URMA_EID_RAW_SIZE);
+        if (copy_ret != EOK) {
+            SHM_LOG_ERROR("Copy Hcomm UDMA remote EID failed, slot = " << slot << ", ret = " << copy_ret);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        mem_array[slot].eid_addr = reinterpret_cast<uint64_t>(
+            static_cast<uint8_t*>(eid_dev_) + static_cast<uint64_t>(slot) * URMA_EID_RAW_SIZE);
     }
     return ACLSHMEM_SUCCESS;
 }
@@ -552,7 +602,7 @@ Result UdmaTransportManager::CopyUdmaInfoToDevice(
     if (alloc_ret != ACLSHMEM_SUCCESS) {
         return alloc_ret;
     }
-    SetUdmaInfoSectionPtrs(copy_info, udma_info_dev_, rank_count_, qp_num);
+    SetUdmaInfoSectionPtrs(copy_info, udma_info_dev_, SlotCount(), qp_num);
 
     auto ret = DlAclApi::AclrtMemcpy(
         udma_info_dev_, udma_info_size_, udma_info_buffer.data(), udma_info_size_, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -578,7 +628,8 @@ Result UdmaTransportManager::ReserveScratchBuffers()
     return ACLSHMEM_SUCCESS;
 }
 
-void UdmaTransportManager::FillWqCtx(const SqContext& sq_context, uint32_t peer, aclshmemi_udma_wq_ctx_t& dst_wq) const
+void UdmaTransportManager::FillWqCtx(
+    const SqContext& sq_context, uint32_t dst_pe, aclshmemi_udma_wq_ctx_t& dst_wq) const
 {
     const auto& ubJfs = sq_context.contextInfo.ubJfs;
     dst_wq.wqn = ubJfs.jfsID;
@@ -592,7 +643,8 @@ void UdmaTransportManager::FillWqCtx(const SqContext& sq_context, uint32_t peer,
     dst_wq.db_addr = ubJfs.dbVa;
     dst_wq.sl = 0;
     dst_wq.wqe_cnt = 0;
-    dst_wq.amo_addr = reinterpret_cast<uint64_t>(amo_dev_list_[peer]);
+    // amo scratch is per actual destination pe (the data plane reads it from the direct slot).
+    dst_wq.amo_addr = reinterpret_cast<uint64_t>(amo_dev_list_[dst_pe]);
 }
 
 void UdmaTransportManager::FillCqCtx(const CqContext& cq_context, aclshmemi_udma_cq_ctx_t& dst_cq) const
@@ -628,50 +680,54 @@ void UdmaTransportManager::PrintHostUdmaInfo(const aclshmemi_aiv_udma_info_t& ho
     SHM_LOG_DEBUG("=======================rank [" << rank_id_ << "] udma host info====================");
     SHM_LOG_DEBUG("rank[" << rank_id_ << "] udmaInfo.qp_num: " << host_info.qp_num);
 
-    const auto* wq_array = reinterpret_cast<const aclshmemi_udma_wq_ctx_t*>(host_info.sq_ptr);
-    const auto* cq_array = reinterpret_cast<const aclshmemi_udma_cq_ctx_t*>(host_info.scq_ptr);
-    const auto* mem_array = reinterpret_cast<const aclshmemi_ubmem_info_t*>(host_info.mem_ptr);
+    const aclshmemi_udma_qp_table_t& tbl = ActiveUdmaTable(host_info);
+    const auto* wq_array = reinterpret_cast<const aclshmemi_udma_wq_ctx_t*>(tbl.sq_ptr);
+    const auto* cq_array = reinterpret_cast<const aclshmemi_udma_cq_ctx_t*>(tbl.scq_ptr);
+    const auto* mem_array = reinterpret_cast<const aclshmemi_ubmem_info_t*>(tbl.mem_ptr);
     if (wq_array == nullptr || cq_array == nullptr || mem_array == nullptr) {
         SHM_LOG_WARN("rank[" << rank_id_ << "] udma host info section pointer is null, skip printing.");
         return;
     }
 
-    for (uint32_t pe = 0; pe < rank_count_; ++pe) {
-        const auto& wq = wq_array[pe];
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.wqn: " << wq.wqn);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.buf_addr: " << wq.buf_addr);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.wqe_size: " << wq.wqe_size);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.depth: " << wq.depth);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.head: " << wq.head);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.tail: " << wq.tail);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.db_mode: " << static_cast<int>(wq.db_mode));
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.db_addr: " << wq.db_addr);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.sl: " << wq.sl);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.wqe_cnt: " << wq.wqe_cnt);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] WQCtx.amo_addr: " << wq.amo_addr);
+    // Direct build: slot_count == rank_count_ (index is the target pe). Relay build:
+    // slot_count == rank_count_^2 (index is actual_pe * rank_count_ + relay_pe).
+    const uint64_t slot_count = SlotCount();
+    for (uint64_t slot = 0; slot < slot_count; ++slot) {
+        const auto& wq = wq_array[slot];
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.wqn: " << wq.wqn);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.buf_addr: " << wq.buf_addr);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.wqe_size: " << wq.wqe_size);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.depth: " << wq.depth);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.head: " << wq.head);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.tail: " << wq.tail);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.db_mode: " << static_cast<int>(wq.db_mode));
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.db_addr: " << wq.db_addr);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.sl: " << wq.sl);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.wqe_cnt: " << wq.wqe_cnt);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] WQCtx.amo_addr: " << wq.amo_addr);
 
-        const auto& cq = cq_array[pe];
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.cqn: " << cq.cqn);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.buf_addr: " << cq.buf_addr);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.cqe_size: " << cq.cqe_size);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.depth: " << cq.depth);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.head: " << cq.head);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.tail: " << cq.tail);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.db_mode: " << static_cast<int>(cq.db_mode));
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] CQCtx.db_addr: " << cq.db_addr);
+        const auto& cq = cq_array[slot];
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.cqn: " << cq.cqn);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.buf_addr: " << cq.buf_addr);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.cqe_size: " << cq.cqe_size);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.depth: " << cq.depth);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.head: " << cq.head);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.tail: " << cq.tail);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.db_mode: " << static_cast<int>(cq.db_mode));
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] CQCtx.db_addr: " << cq.db_addr);
 
-        const auto& mem = mem_array[pe];
+        const auto& mem = mem_array[slot];
         SHM_LOG_DEBUG(
-            "rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.token_value_valid: " << mem.token_value_valid);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.rmt_jetty_type: " << mem.rmt_jetty_type);
+            "rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.token_value_valid: " << mem.token_value_valid);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.rmt_jetty_type: " << mem.rmt_jetty_type);
         SHM_LOG_DEBUG(
-            "rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.target_hint: " << static_cast<int>(mem.target_hint));
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.tpn: " << mem.tpn);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.tid: " << mem.tid);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.rmt_token_value: " << mem.rmt_token_value);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.len: " << mem.len);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.addr: " << mem.addr);
-        SHM_LOG_DEBUG("rank[" << rank_id_ << "] peer[" << pe << "] MemInfo.eid_addr: " << mem.eid_addr);
+            "rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.target_hint: " << static_cast<int>(mem.target_hint));
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.tpn: " << mem.tpn);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.tid: " << mem.tid);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.rmt_token_value: " << mem.rmt_token_value);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.len: " << mem.len);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.addr: " << mem.addr);
+        SHM_LOG_DEBUG("rank[" << rank_id_ << "] slot[" << slot << "] MemInfo.eid_addr: " << mem.eid_addr);
     }
 }
 
@@ -688,123 +744,249 @@ std::vector<HcommMemHandle> UdmaTransportManager::CollectChannelMemHandles(uint3
     return mem_handles;
 }
 
-Result UdmaTransportManager::AsyncConnect()
+Result UdmaTransportManager::ResolveRelaySlotRoute(
+    uint32_t actual_pe, uint32_t relay_pe, bool& skip, uint32_t& local_eid, uint32_t& remote_eid) const
+{
+    skip = false;
+    local_eid = 0;
+    remote_eid = 0;
+
+    // Diagonal (actual == relay) where actual is a real peer means "peer relays to itself" --
+    // physically meaningless. The slot is left unused; callers skip it.
+    if (actual_pe == relay_pe && actual_pe != rank_id_) {
+        skip = true;
+        return ACLSHMEM_SUCCESS;
+    }
+
+    // Source EID bucket (my local egress port). For the (actual, relay == me) direct slot we must
+    // egress straight toward actual_pe (matching the OFF build); for a relay slot we egress toward
+    // relay_pe.
+    if (relay_pe == rank_id_) {
+        auto local_route_it = peer_eid_index_map_.find(actual_pe);
+        if (local_route_it == peer_eid_index_map_.end()) {
+            SHM_LOG_ERROR("Missing local route for direct peer rank " << actual_pe);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        local_eid = local_route_it->second;
+    } else {
+        auto local_route_it = peer_eid_index_map_.find(relay_pe);
+        if (local_route_it == peer_eid_index_map_.end()) {
+            SHM_LOG_ERROR("Missing local route for relay rank " << relay_pe);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        local_eid = local_route_it->second;
+    }
+
+    // Target EID: actual_pe's port toward relay_pe; the fabric forwards by this EID via relay.
+    if (relay_pe == rank_id_) {
+        // (actual, relay == me) is the direct path: actual_pe's port toward me.
+        auto remote_route_it = peer_remote_eid_index_map_.find(actual_pe);
+        if (remote_route_it == peer_remote_eid_index_map_.end()) {
+            SHM_LOG_ERROR("Missing remote route for peer rank " << actual_pe);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        remote_eid = remote_route_it->second;
+    } else {
+        // Look up actual_pe's local EID toward relay_pe in the global routing matrix.
+        if (all_local_routes_.size() != static_cast<size_t>(rank_count_) * rank_count_) {
+            SHM_LOG_ERROR(
+                "all_local_routes_ size " << all_local_routes_.size() << " != rankCount^2 "
+                                          << rank_count_ * rank_count_);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        int32_t r = all_local_routes_[actual_pe * rank_count_ + relay_pe];
+        if (r < 0) {
+            SHM_LOG_ERROR("Invalid global route for (actual=" << actual_pe << ", relay=" << relay_pe << "): " << r);
+            return ACLSHMEM_INNER_ERROR;
+        }
+        remote_eid = static_cast<uint32_t>(r);
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
+Result UdmaTransportManager::ExchangeEndpointDescriptors(EndpointExchange& exchange) const
 {
     const uint32_t local_endpoint_count = static_cast<uint32_t>(endpoint_desc_map_.size());
-    std::vector<uint32_t> all_endpoint_counts(rank_count_);
-    g_boot_handle.allgather(&local_endpoint_count, all_endpoint_counts.data(), sizeof(uint32_t), &g_boot_handle);
+    exchange.counts.assign(rank_count_, 0);
+    g_boot_handle.allgather(&local_endpoint_count, exchange.counts.data(), sizeof(uint32_t), &g_boot_handle);
 
-    const auto max_endpoint_count_it = std::max_element(all_endpoint_counts.begin(), all_endpoint_counts.end());
-    const uint32_t max_endpoint_count =
-        (max_endpoint_count_it == all_endpoint_counts.end()) ? 0 : *max_endpoint_count_it;
-    if (max_endpoint_count == 0) {
+    const auto max_it = std::max_element(exchange.counts.begin(), exchange.counts.end());
+    exchange.max_count = (max_it == exchange.counts.end()) ? 0 : *max_it;
+    if (exchange.max_count == 0) {
         SHM_LOG_ERROR("No local hcomm endpoint descriptor was exchanged.");
         return ACLSHMEM_INNER_ERROR;
     }
 
-    std::vector<exchanged_endpoint_desc_info_t> local_endpoints(max_endpoint_count);
+    // Pack this rank's descriptors into the first slots; the rest stay zero (valid == 0).
+    std::vector<ExchangedEndpointDesc> local_endpoints(exchange.max_count);
     uint32_t packed_index = 0;
     for (const auto& endpoint_entry : endpoint_desc_map_) {
-        exchanged_endpoint_desc_info_t& packed = local_endpoints[packed_index];
+        ExchangedEndpointDesc& packed = local_endpoints[packed_index];
         packed.eid_index = endpoint_entry.first;
         packed.valid = 1;
         packed.desc = endpoint_entry.second;
         ++packed_index;
     }
 
-    std::vector<exchanged_endpoint_desc_info_t> all_endpoint_info(rank_count_ * max_endpoint_count);
+    exchange.descs.assign(static_cast<size_t>(rank_count_) * exchange.max_count, ExchangedEndpointDesc{});
     g_boot_handle.allgather(
-        local_endpoints.data(), all_endpoint_info.data(),
-        static_cast<uint64_t>(sizeof(exchanged_endpoint_desc_info_t) * max_endpoint_count), &g_boot_handle);
+        local_endpoints.data(), exchange.descs.data(),
+        static_cast<uint64_t>(sizeof(ExchangedEndpointDesc) * exchange.max_count), &g_boot_handle);
+    return ACLSHMEM_SUCCESS;
+}
 
-    std::vector<ChannelHandle> created_channels;
-    std::vector<uint32_t> channel_peers;
-    auto destroyCreatedResources = [&created_channels]() {
-        if (!created_channels.empty()) {
-            (void)HcommChannelDestroy(created_channels.data(), static_cast<uint32_t>(created_channels.size()));
-            created_channels.clear();
+const UdmaTransportManager::ExchangedEndpointDesc* UdmaTransportManager::FindRemoteEndpointDesc(
+    const EndpointExchange& exchange, uint32_t dst_pe, uint32_t remote_eid_index) const
+{
+    const uint32_t count = exchange.counts[dst_pe];
+    for (uint32_t idx = 0; idx < count; ++idx) {
+        const ExchangedEndpointDesc& candidate = exchange.descs[dst_pe * exchange.max_count + idx];
+        if (candidate.valid != 0 && candidate.eid_index == remote_eid_index) {
+            return &candidate;
         }
-    };
+    }
+    return nullptr;
+}
+
+Result UdmaTransportManager::CreateChannelForSlot(
+    const EndpointExchange& exchange, uint32_t local_eid_index, uint32_t remote_eid_index, uint32_t dst_pe,
+    uint32_t slot, ChannelBuildState& state)
+{
+    auto endpoint_it = endpoint_handle_map_.find(local_eid_index);
+    if (endpoint_it == endpoint_handle_map_.end() || endpoint_it->second == nullptr) {
+        SHM_LOG_ERROR(
+            "Failed to find hcomm endpoint for dst_pe " << dst_pe << ", local_eid_index = " << local_eid_index);
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    const ExchangedEndpointDesc* remote_endpoint_info = FindRemoteEndpointDesc(exchange, dst_pe, remote_eid_index);
+    if (remote_endpoint_info == nullptr) {
+        SHM_LOG_ERROR(
+            "No remote hcomm endpoint descriptor was exchanged for dst_pe " << dst_pe << " on remote EID index "
+                                                                            << remote_eid_index);
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    std::vector<HcommMemHandle> mem_handles = CollectChannelMemHandles(local_eid_index);
+    if (mem_handles.empty()) {
+        SHM_LOG_ERROR(
+            "No active Hcomm mem handle for local EID index " << local_eid_index << " when creating channel for dst_pe "
+                                                              << dst_pe);
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    HcommChannelDesc channel_desc{};
+    auto desc_init_ret = HcommChannelDescInit(&channel_desc, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER);
+    if (desc_init_ret != 0) {
+        SHM_LOG_ERROR("HcommChannelDescInit failed for dst_pe " << dst_pe << ", ret = " << desc_init_ret);
+        return ACLSHMEM_INNER_ERROR;
+    }
+    channel_desc.remoteEndpoint = remote_endpoint_info->desc;
+    channel_desc.notifyNum = 0;
+    channel_desc.exchangeAllMems = false;
+    channel_desc.memHandles = mem_handles.data();
+    channel_desc.memHandleNum = static_cast<uint32_t>(mem_handles.size());
+    channel_desc.qos = ACLSHMEM_HCOMM_DEFAULT_QOS;
+
+    ChannelHandle channel_handle = 0;
+    auto hcomm_ret = HcommChannelCreate(
+        endpoint_it->second, COMM_ENGINE_AIV, &channel_desc, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER, &channel_handle);
+    if (hcomm_ret != 0 || channel_handle == 0) {
+        SHM_LOG_ERROR("HcommChannelCreate failed for dst_pe " << dst_pe << ", ret = " << hcomm_ret);
+        if (channel_handle != 0) {
+            (void)HcommChannelDestroy(&channel_handle, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER);
+        }
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    state.handles.push_back(channel_handle);
+    state.slots.push_back(slot);
+    state.dst_pes.push_back(dst_pe);
+    return ACLSHMEM_SUCCESS;
+}
+
+Result UdmaTransportManager::BuildRelayChannels(const EndpointExchange& exchange, ChannelBuildState& state)
+{
+    // One channel per meaningful (actual_pe, relay_pe) slot. HcommChannelCreate is non-blocking
+    // (it only starts the async connect; readiness is polled later via WaitHcommChannelReady), so
+    // channels can be created in a single straight pass -- no per-relay_pe wave synchronization is
+    // needed to avoid the old blocking-create cross-card deadlock.
+    for (uint32_t relay_pe = 0; relay_pe < rank_count_; ++relay_pe) {
+        for (uint32_t actual_pe = 0; actual_pe < rank_count_; ++actual_pe) {
+            if (actual_pe == rank_id_) {
+                continue; // self target is local; no channel
+            }
+            bool skip = false;
+            uint32_t local_eid_index = 0;
+            uint32_t remote_eid_index = 0;
+            if (ResolveRelaySlotRoute(actual_pe, relay_pe, skip, local_eid_index, remote_eid_index) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+            if (skip) {
+                continue; // diagonal (actual == relay) slot is physically meaningless
+            }
+            const uint32_t slot = actual_pe * rank_count_ + relay_pe;
+            if (CreateChannelForSlot(exchange, local_eid_index, remote_eid_index, actual_pe, slot, state) !=
+                ACLSHMEM_SUCCESS) {
+                return ACLSHMEM_INNER_ERROR;
+            }
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
+
+Result UdmaTransportManager::BuildDirectChannels(const EndpointExchange& exchange, ChannelBuildState& state)
+{
     for (uint32_t peer = 0; peer < rank_count_; ++peer) {
         if (peer == rank_id_) {
             continue;
         }
-
         auto local_eid_it = peer_eid_index_map_.find(peer);
         auto remote_eid_it = peer_remote_eid_index_map_.find(peer);
         if (local_eid_it == peer_eid_index_map_.end() || remote_eid_it == peer_remote_eid_index_map_.end()) {
             SHM_LOG_ERROR("Failed to find EID route for peer " << peer);
-            destroyCreatedResources();
             return ACLSHMEM_INNER_ERROR;
         }
+        // Direct path: slot == peer.
+        if (CreateChannelForSlot(exchange, local_eid_it->second, remote_eid_it->second, peer, peer, state) !=
+            ACLSHMEM_SUCCESS) {
+            return ACLSHMEM_INNER_ERROR;
+        }
+    }
+    return ACLSHMEM_SUCCESS;
+}
 
-        const uint32_t local_eid_index = local_eid_it->second;
-        const uint32_t remote_eid_index = remote_eid_it->second;
-        auto endpoint_it = endpoint_handle_map_.find(local_eid_index);
-        if (endpoint_it == endpoint_handle_map_.end() || endpoint_it->second == nullptr) {
-            SHM_LOG_ERROR(
-                "Failed to find hcomm endpoint for peer " << peer << ", local_eid_index = " << local_eid_index);
-            destroyCreatedResources();
-            return ACLSHMEM_INNER_ERROR;
-        }
+Result UdmaTransportManager::BuildChannels(const EndpointExchange& exchange, ChannelBuildState& state)
+{
+    // Single relay vs. direct decision for the whole class (see ACLSHMEM_UDMA_RELAY_ENABLED).
+    if constexpr (ACLSHMEM_UDMA_RELAY_ENABLED) {
+        return BuildRelayChannels(exchange, state);
+    } else {
+        return BuildDirectChannels(exchange, state);
+    }
+}
 
-        const exchanged_endpoint_desc_info_t* remote_endpoint_info = nullptr;
-        const uint32_t peer_endpoint_count = all_endpoint_counts[peer];
-        for (uint32_t idx = 0; idx < peer_endpoint_count; ++idx) {
-            const exchanged_endpoint_desc_info_t& candidate = all_endpoint_info[peer * max_endpoint_count + idx];
-            if (candidate.valid != 0 && candidate.eid_index == remote_eid_index) {
-                remote_endpoint_info = &candidate;
-                break;
-            }
-        }
-        if (remote_endpoint_info == nullptr) {
-            SHM_LOG_ERROR(
-                "No remote hcomm endpoint descriptor was exchanged for peer " << peer << " on remote EID index "
-                                                                              << remote_eid_index);
-            destroyCreatedResources();
-            return ACLSHMEM_INNER_ERROR;
-        }
-
-        std::vector<HcommMemHandle> mem_handles = CollectChannelMemHandles(local_eid_index);
-        if (mem_handles.empty()) {
-            SHM_LOG_ERROR(
-                "No active Hcomm mem handle for local EID index " << local_eid_index
-                                                                  << " when creating channel for peer " << peer);
-            destroyCreatedResources();
-            return ACLSHMEM_INNER_ERROR;
-        }
-        HcommChannelDesc channel_desc{};
-        auto desc_init_ret = HcommChannelDescInit(&channel_desc, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER);
-        if (desc_init_ret != 0) {
-            SHM_LOG_ERROR("HcommChannelDescInit failed for peer " << peer << ", ret = " << desc_init_ret);
-            destroyCreatedResources();
-            return ACLSHMEM_INNER_ERROR;
-        }
-        channel_desc.remoteEndpoint = remote_endpoint_info->desc;
-        channel_desc.notifyNum = 0;
-        channel_desc.exchangeAllMems = false;
-        channel_desc.memHandles = mem_handles.data();
-        channel_desc.memHandleNum = static_cast<uint32_t>(mem_handles.size());
-        channel_desc.qos = ACLSHMEM_HCOMM_DEFAULT_QOS;
-
-        ChannelHandle channel_handle = 0;
-        auto hcomm_ret = HcommChannelCreate(
-            endpoint_it->second, COMM_ENGINE_AIV, &channel_desc, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER, &channel_handle);
-        if (hcomm_ret != 0 || channel_handle == 0) {
-            SHM_LOG_ERROR("HcommChannelCreate failed for peer " << peer << ", ret = " << hcomm_ret);
-            if (channel_handle != 0) {
-                (void)HcommChannelDestroy(&channel_handle, ACLSHMEM_HCOMM_CHANNEL_NUM_PER_PEER);
-            }
-            destroyCreatedResources();
-            return ACLSHMEM_INNER_ERROR;
-        }
-
-        created_channels.push_back(channel_handle);
-        channel_peers.push_back(peer);
+Result UdmaTransportManager::AsyncConnect()
+{
+    EndpointExchange exchange;
+    auto ret = ExchangeEndpointDescriptors(exchange);
+    if (ret != ACLSHMEM_SUCCESS) {
+        return ret;
     }
 
-    channel_handles_ = std::move(created_channels);
-    channel_peers_ = channel_peers;
+    ChannelBuildState state;
+    if (BuildChannels(exchange, state) != ACLSHMEM_SUCCESS) {
+        // Destroy any channels created before the failure.
+        if (!state.handles.empty()) {
+            (void)HcommChannelDestroy(state.handles.data(), static_cast<uint32_t>(state.handles.size()));
+        }
+        return ACLSHMEM_INNER_ERROR;
+    }
+
+    channel_handles_ = std::move(state.handles);
+    // HcommChannelCreate is non-blocking; wait for every channel to finish connecting before the
+    // data plane consumes them.
     auto status_ret = WaitHcommChannelReady(channel_handles_);
     if (status_ret != ACLSHMEM_SUCCESS) {
         SHM_LOG_ERROR("Check hcomm UDMA channel status failed, ret = " << status_ret);
@@ -812,7 +994,7 @@ Result UdmaTransportManager::AsyncConnect()
         return status_ret;
     }
 
-    auto build_ret = BuildUdmaInfo(channel_handles_, channel_peers);
+    auto build_ret = BuildUdmaInfo(channel_handles_, state.slots, state.dst_pes);
     if (build_ret != ACLSHMEM_SUCCESS) {
         SHM_LOG_ERROR("BuildUdmaInfo failed, ret = " << build_ret);
         DestroyChannels();
@@ -902,6 +1084,11 @@ bool UdmaTransportManager::PrepareOpenDevice(uint32_t device_id, uint32_t rank_c
     std::vector<int32_t> all_route_by_peer(rank_count * rank_count, INVALID_EID_INDEX);
     g_boot_handle.allgather(
         local_route_by_peer.data(), all_route_by_peer.data(), sizeof(int32_t) * rank_count, &g_boot_handle);
+
+    if constexpr (ACLSHMEM_UDMA_RELAY_ENABLED) {
+        // Full N x N routing matrix; only the relay path needs it to resolve each slot's target EID.
+        all_local_routes_ = all_route_by_peer;
+    }
 
     for (uint32_t peer = 0; peer < rank_count; ++peer) {
         if (peer == rank_id_) {
@@ -1026,7 +1213,6 @@ void UdmaTransportManager::DestroyChannels()
         }
     }
     channel_handles_.clear();
-    channel_peers_.clear();
     SHM_LOG_INFO("Destroy hcomm channels success.");
 }
 
@@ -1065,7 +1251,6 @@ void UdmaTransportManager::CleanupResources()
     peer_remote_eid_index_map_.clear();
     endpoint_desc_map_.clear();
     channel_handles_.clear();
-    channel_peers_.clear();
     connected_ = false;
 }
 

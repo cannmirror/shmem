@@ -24,12 +24,15 @@ namespace device {
 
 constexpr uint8_t DEFAULT_RDMA_TC = 132;
 constexpr uint8_t DEFAULT_RDMA_SL = 4;
+constexpr uint8_t DEFAULT_ROCE_RETRY_CNT = 7;
+constexpr uint8_t DEFAULT_ROCE_RETRY_INTERVAL = 20;
 
-Result ParseDeviceNic(const std::string &nic, uint16_t &port);
-Result ParseDeviceNic(const std::string &nic, mf_sockaddr &address);
+Result ParseDeviceNic(const std::string& nic, uint16_t& port);
+Result ParseDeviceNic(const std::string& nic, mf_sockaddr& address);
 std::string GenerateDeviceNic(net_addr_t ip, uint16_t port);
-uint8_t GetEnvUint8(const char *envName, uint8_t defaultValue, long minVal, long maxVal, bool requireMultipleOf4 = false);
-}
-}
-}
-#endif  // MF_HYBRID_DEVICE_RDMA_HELPER_H
+uint8_t GetEnvUint8(
+    const char* envName, uint8_t defaultValue, long minVal, long maxVal, bool requireMultipleOf4 = false);
+} // namespace device
+} // namespace transport
+} // namespace shm
+#endif // MF_HYBRID_DEVICE_RDMA_HELPER_H

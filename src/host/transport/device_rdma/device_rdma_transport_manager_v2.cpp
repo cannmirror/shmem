@@ -322,6 +322,8 @@ Result RdmaTransportManagerV2::Connect()
         channelDescs[chIdx].roceAttr.queueNum = 1;
         channelDescs[chIdx].roceAttr.tc = roceTc;
         channelDescs[chIdx].roceAttr.sl = roceSl;
+        channelDescs[chIdx].roceAttr.retryCnt = DEFAULT_ROCE_RETRY_CNT;
+        channelDescs[chIdx].roceAttr.retryInterval = DEFAULT_ROCE_RETRY_INTERVAL;
         channelDescs[chIdx].socket = nullptr;
         bool isServer = (rankId_ < remoteRank);
         channelDescs[chIdx].role = isServer ? HCOMM_SOCKET_ROLE_SERVER : HCOMM_SOCKET_ROLE_CLIENT;

@@ -183,25 +183,24 @@ ACLSHMEM_DEVICE void aclshmemi_dump_wqe(__gm__ uint8_t* wqeAddr, uint32_t atomic
         auto notifyDataH = notifyCtx->notifyDataH;
         AscendC::printf(
             "WQE: notifyTokenId: %x notifyTokenValue: %x notifyAddrL: %x notifyAddrH: %x notifyDataL: %x "
-            "notifyDataH: %x \n", notifyTokenId, notifyTokenValue, notifyAddrL, notifyAddrH, notifyDataL, notifyDataH);
+            "notifyDataH: %x \n",
+            notifyTokenId, notifyTokenValue, notifyAddrL, notifyAddrH, notifyDataL, notifyDataH);
     }
     aclshmemi_dump_sge(wqeAddr, sgeNum);
     if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OPCODE_FAA)) {
         __gm__ uint8_t* amoDataAddr = (__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx);
-        uint64_t addData = (atomicLen == sizeof(uint32_t))
-            ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr)
-            : *(__gm__ uint64_t*)amoDataAddr;
+        uint64_t addData = (atomicLen == sizeof(uint32_t)) ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr) :
+                                                             *(__gm__ uint64_t*)amoDataAddr;
         AscendC::printf("SGE: add_data: 0x%llx \n", (unsigned long long)addData);
     } else if (opcode == static_cast<uint32_t>(aclshmemi_udma_opcode_t::UDMA_OP_CAS)) {
         __gm__ uint8_t* amoDataAddr = (__gm__ uint8_t*)sqeCtx + sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMSgeCtx);
-        uint64_t swapData = (atomicLen == sizeof(uint32_t))
-            ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr)
-            : *(__gm__ uint64_t*)amoDataAddr;
-        uint64_t condData = (atomicLen == sizeof(uint32_t))
-            ? static_cast<uint64_t>(*(__gm__ uint32_t*)(amoDataAddr + atomicLen))
-            : *(__gm__ uint64_t*)(amoDataAddr + atomicLen);
-        AscendC::printf("SGE: cond_data: 0x%llx, swap_data: 0x%llx\n",
-            (unsigned long long)condData, (unsigned long long)swapData);
+        uint64_t swapData = (atomicLen == sizeof(uint32_t)) ? static_cast<uint64_t>(*(__gm__ uint32_t*)amoDataAddr) :
+                                                              *(__gm__ uint64_t*)amoDataAddr;
+        uint64_t condData = (atomicLen == sizeof(uint32_t)) ?
+                                static_cast<uint64_t>(*(__gm__ uint32_t*)(amoDataAddr + atomicLen)) :
+                                *(__gm__ uint64_t*)(amoDataAddr + atomicLen);
+        AscendC::printf(
+            "SGE: cond_data: 0x%llx, swap_data: 0x%llx\n", (unsigned long long)condData, (unsigned long long)swapData);
     }
 }
 
@@ -237,11 +236,12 @@ template <typename T, aclshmemi_udma_opcode_t OP_CODE, typename SQE_PTR>
 ACLSHMEM_DEVICE void aclshmemi_fill_reduce(SQE_PTR sqeCtx)
 {
     if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
-        static_assert(AscendC::IsSameType<SQE_PTR, __gm__ ACLSHMEMSqeCtx*>::value,
-                      "WRITE_WITH_REDUCE requires SQE in HBM (PIPE_S path); UB-staged SQE not supported");
+        static_assert(
+            AscendC::IsSameType<SQE_PTR, __gm__ ACLSHMEMSqeCtx*>::value,
+            "WRITE_WITH_REDUCE requires SQE in HBM (PIPE_S path); UB-staged SQE not supported");
 
-        sqeCtx->udfType = 0;              // inline reduce
-        sqeCtx->reduceOpcode = 0xa;       // reduce add
+        sqeCtx->udfType = 0;        // inline reduce
+        sqeCtx->reduceOpcode = 0xa; // reduce add
         if constexpr (AscendC::IsSameType<T, float>::value) {
             sqeCtx->reduceDataType = 0x7; // fp32
         }
@@ -287,7 +287,7 @@ ACLSHMEM_DEVICE void aclshmemi_fill_sge_ctx(
         __gm__ T* swapDataAddr = (__gm__ T*)((__gm__ uint8_t*)sgeCtx + sizeof(ACLSHMEMSgeCtx));
         *swapDataAddr = params.value; // fill in swap_data
         __gm__ T* cmpDataAddr = (__gm__ T*)((__gm__ uint8_t*)swapDataAddr + sizeof(T));
-        *cmpDataAddr = params.cond;   // fill in cmp_data
+        *cmpDataAddr = params.cond; // fill in cmp_data
     } else if constexpr (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_REDUCE) {
         auto amoAddr = qpCtxEntry->amoAddr;
         *(__gm__ T*)amoAddr = params.value;
@@ -324,8 +324,8 @@ ACLSHMEM_DEVICE void poll_cq_when_sq_overflow(
 
 template <typename T, aclshmemi_udma_opcode_t OP_CODE, typename SQE_PTR = __gm__ ACLSHMEMSqeCtx*>
 ACLSHMEM_DEVICE void aclshmemi_udma_fill_sqe_ctx(
-    SQE_PTR sqeCtx, __gm__ uint8_t* remoteAddr, __gm__ ACLSHMEMUBmemInfo* remoteMemInfo,
-    uint32_t curHead, const aclshmemi_udma_params_t<T, OP_CODE>& params)
+    SQE_PTR sqeCtx, __gm__ uint8_t* remoteAddr, __gm__ ACLSHMEMUBmemInfo* remoteMemInfo, uint32_t curHead,
+    const aclshmemi_udma_params_t<T, OP_CODE>& params)
 {
     // Fill SQE control information (reference udma_fill_write_sqe logic).
     // Templated on SQE_PTR so the same fill logic targets either HBM (PIPE_S path)
@@ -347,9 +347,9 @@ ACLSHMEM_DEVICE void aclshmemi_udma_fill_sqe_ctx(
     sqeCtx->rmtJettyType = remoteMemInfo->rmtJettyType;
     sqeCtx->owner = (curHead & shm::UDMA_SQ_BASKBLK_CNT) == 0 ? 1 : 0; // depth: baseblk_cnt
     sqeCtx->targetHint = remoteMemInfo->targetHint;
-    sqeCtx->inlineMsgLen = 0;                                          // No inline data
+    sqeCtx->inlineMsgLen = 0; // No inline data
     sqeCtx->tpId = remoteMemInfo->tpn;
-    sqeCtx->sgeNum = 1;                                                // Single SGE
+    sqeCtx->sgeNum = 1; // Single SGE
     sqeCtx->rmtJettyOrSegId = remoteMemInfo->tid;
     sqeCtx->rmtTokenValue = remoteMemInfo->rmtTokenValue;
     aclshmemi_fill_reduce<T, OP_CODE>(sqeCtx);
@@ -406,8 +406,7 @@ ACLSHMEM_DEVICE void assert_not_self_send(uint32_t pe)
 //     aclshmemi_get_my_pe nor aclshmemi_get_total_pe is read -- zero extra work on the hot path.
 //   * ON (relay path): slot == pe * rankCount + actualRelayPe, where actualRelayPe falls back to
 //     myPe when relay_pe == -1.
-ACLSHMEM_DEVICE uint32_t aclshmemi_udma_compute_slot(
-    uint32_t pe, uint32_t relay_pe = static_cast<uint32_t>(-1))
+ACLSHMEM_DEVICE uint32_t aclshmemi_udma_compute_slot(uint32_t pe, uint32_t relay_pe = static_cast<uint32_t>(-1))
 {
 #if defined(ACLSHMEM_RELAY_SUPPORT)
     uint32_t myPe = static_cast<uint32_t>(aclshmemi_get_my_pe());
@@ -455,6 +454,9 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send(
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     qpCtxEntry->wqeCnt = wqeCnt;
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    dcci_cachelines((__gm__ uint8_t*)qpCtxEntry, sizeof(ACLSHMEMUDMAWQCtx));
+#endif
     ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeCtx, (uint32_t)sizeof(T));
 }
 
@@ -494,8 +496,8 @@ ACLSHMEM_DEVICE void aclshmemi_udma_copy_wqe_from_ub(
 template <typename T, aclshmemi_udma_opcode_t OP_CODE>
 ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     __gm__ uint8_t* remoteAddr, __gm__ uint8_t* localAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
-    __ubuf__ uint8_t* ubScratch, uint32_t syncId,
-    const aclshmemi_udma_params_t<T, OP_CODE>& params = {}, uint32_t relay_pe = static_cast<uint32_t>(-1))
+    __ubuf__ uint8_t* ubScratch, uint32_t syncId, const aclshmemi_udma_params_t<T, OP_CODE>& params = {},
+    uint32_t relay_pe = static_cast<uint32_t>(-1))
 {
     static_assert(
         OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE ||
@@ -524,10 +526,9 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     aclshmemi_udma_fill_sqe_ctx<T, OP_CODE, __ubuf__ ACLSHMEMSqeCtx*>(
         sqeUb, remoteAddr, remoteMemInfo, curHead, params);
 
-    constexpr size_t sgeOff =
-        (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY)
-            ? sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMNotifyCtx)
-            : sizeof(ACLSHMEMSqeCtx);
+    constexpr size_t sgeOff = (OP_CODE == aclshmemi_udma_opcode_t::UDMA_OP_WRITE_WITH_NOTIFY) ?
+                                  sizeof(ACLSHMEMSqeCtx) + sizeof(ACLSHMEMNotifyCtx) :
+                                  sizeof(ACLSHMEMSqeCtx);
     __ubuf__ ACLSHMEMSgeCtx* sgeUb = (__ubuf__ ACLSHMEMSgeCtx*)((__ubuf__ uint8_t*)ubScratch + sgeOff);
     // OP_CODE is restricted to non-AMO/non-REDUCE here, so the SGE only needs
     // len + va. The full FAA/CAS/REDUCE fan-out is intentionally unused in this path.
@@ -541,13 +542,15 @@ ACLSHMEM_DEVICE void aclshmemi_udma_post_send_mte3(
     AscendC::LocalTensor<uint8_t> ubLocal;
     ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ubLocal.address_.bufferAddr = reinterpret_cast<uint64_t>(ubScratch);
-    aclshmemi_udma_copy_wqe_from_ub(
-        (__gm__ uint8_t*)sqeGm, ubLocal, static_cast<uint32_t>(wqeSize * wqeBbCnt), syncId);
+    aclshmemi_udma_copy_wqe_from_ub((__gm__ uint8_t*)sqeGm, ubLocal, static_cast<uint32_t>(wqeSize * wqeBbCnt), syncId);
 
     curHead += wqeBbCnt;
     aclshmemi_udma_post_send_update_info(curHead, qpCtxEntry);
     wqeCnt++;
     qpCtxEntry->wqeCnt = wqeCnt;
+#if defined(ACLSHMEM_RELAY_SUPPORT)
+    dcci_cachelines((__gm__ uint8_t*)qpCtxEntry, sizeof(ACLSHMEMUDMAWQCtx));
+#endif
     ACLSHMEM_DEBUG_FUNC(aclshmemi_dump_wqe, (__gm__ uint8_t*)sqeGm, (uint32_t)sizeof(T));
 }
 
@@ -574,8 +577,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_write_notify_mte3(
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_write(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen,
-    uint32_t relay_pe)
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t pe, uint32_t qpIdx, uint64_t messageLen, uint32_t relay_pe)
 {
     aclshmemi_udma_post_send<T, aclshmemi_udma_opcode_t::UDMA_OP_WRITE>(
         reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), pe, qpIdx,
@@ -594,8 +596,7 @@ ACLSHMEM_DEVICE void aclshmemi_udma_write_notify(
 
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemi_udma_read(
-    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen,
-    uint32_t relay_pe)
+    __gm__ T* destDmaAddr, __gm__ T* srcDmaAddr, uint32_t srcPe, uint32_t qpIdx, uint64_t messageLen, uint32_t relay_pe)
 {
     aclshmemi_udma_post_send<T, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
         reinterpret_cast<__gm__ uint8_t*>(srcDmaAddr), reinterpret_cast<__gm__ uint8_t*>(destDmaAddr), srcPe, qpIdx,
@@ -651,16 +652,16 @@ template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(
     __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
         if constexpr (WQE_PIPE == PIPE_MTE3) {
             auto ptr = aclshmem_ptr(src, pe);
             // For UDMA_OP_READ, the SQE's "remoteAddr" slot carries the src (remote)
             // and "localAddr" carries dst (local), matching aclshmemi_udma_read().
             aclshmemi_udma_post_send_mte3<T, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
-                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0,
-                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id);
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0, elem_size * sizeof(T),
+                reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id);
         } else {
             (void)buf;
             (void)sync_id;
@@ -677,8 +678,8 @@ ACLSHMEM_DEVICE void aclshmemx_udma_get_nbi(
     uint32_t elem_size, int pe, uint32_t sync_id)
 {
     aclshmemx_udma_get_nbi<T, WQE_PIPE>(
-        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
-        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, sync_id);
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(), reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()),
+        elem_size, pe, sync_id);
 }
 
 template <typename T>
@@ -696,8 +697,8 @@ template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
         if constexpr (WQE_PIPE == PIPE_MTE3) {
             auto ptr = aclshmem_ptr(dst, pe);
@@ -719,8 +720,8 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
     const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src, const AscendC::LocalTensor<T>& buf,
     uint32_t elem_size, int pe, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
         auto dstPhyAddr = (__gm__ T*)dst.GetPhyAddr();
         auto srcPhyAddr = (__gm__ T*)src.GetPhyAddr();
@@ -741,19 +742,17 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_nbi(
 
 template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
-    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe,
-    uint32_t sync_id)
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
 #if defined(ACLSHMEM_RELAY_SUPPORT)
-        ACLSHMEM_DEBUG_FUNC(
-            aclshmemi_kernel_printf, "udma relay put: pe=%d relay_pe=%d\n", pe, relay_pe);
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_printf, "udma relay put: pe=%d relay_pe=%d\n", pe, relay_pe);
         int rankCount = aclshmemi_get_total_pe();
         int myPe = aclshmemi_get_my_pe();
-        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount ||
-            pe == relay_pe || pe == myPe || relay_pe == myPe) {
+        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount || pe == relay_pe || pe == myPe ||
+            relay_pe == myPe) {
             ACLSHMEM_DEBUG_FUNC(
                 aclshmemi_kernel_abort,
                 "udma relay put: invalid pe=%d relay_pe=%d (myPe=%d rankCount=%d); "
@@ -764,22 +763,21 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
         auto ptr = aclshmem_ptr(dst, pe);
         if constexpr (WQE_PIPE == PIPE_MTE3) {
             aclshmemi_udma_write_mte3<uint8_t>(
-                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u,
-                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id,
-                static_cast<uint32_t>(relay_pe));
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u, elem_size * sizeof(T),
+                reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id, static_cast<uint32_t>(relay_pe));
         } else {
             (void)buf;
             (void)sync_id;
             aclshmemi_udma_write<uint8_t>(
-                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u,
-                elem_size * sizeof(T), static_cast<uint32_t>(relay_pe));
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, static_cast<uint32_t>(pe), 0u, elem_size * sizeof(T),
+                static_cast<uint32_t>(relay_pe));
         }
 #else
         // sizeof(T) == 0 is always false but depends on T, so it only fires when this template is
         // actually instantiated (i.e. relay API is called) rather than at parse time. A plain
         // static_assert(false, ...) would break the whole OFF build even when relay is never used.
-        static_assert(sizeof(T) == 0,
-            "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+        static_assert(
+            sizeof(T) == 0, "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
 #endif
     } else {
         ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
@@ -788,13 +786,13 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
 
 template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
-    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src,
-    const AscendC::LocalTensor<T>& buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
+    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src, const AscendC::LocalTensor<T>& buf,
+    uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
 {
 #if defined(ACLSHMEM_RELAY_SUPPORT)
     aclshmemx_udma_relay_put_nbi<T, WQE_PIPE>(
-        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
-        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, relay_pe, sync_id);
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(), reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()),
+        elem_size, pe, relay_pe, sync_id);
 #else
     (void)dst;
     (void)src;
@@ -803,26 +801,24 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_put_nbi(
     (void)pe;
     (void)relay_pe;
     (void)sync_id;
-    static_assert(sizeof(T) == 0,
-        "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+    static_assert(
+        sizeof(T) == 0, "aclshmemx_udma_relay_put_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
 #endif
 }
 
 template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
-    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe,
-    uint32_t sync_id)
+    __gm__ T* dst, __gm__ T* src, __ubuf__ T* buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
 #if defined(ACLSHMEM_RELAY_SUPPORT)
-        ACLSHMEM_DEBUG_FUNC(
-            aclshmemi_kernel_printf, "udma relay get: pe=%d relay_pe=%d\n", pe, relay_pe);
+        ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_printf, "udma relay get: pe=%d relay_pe=%d\n", pe, relay_pe);
         int rankCount = aclshmemi_get_total_pe();
         int myPe = aclshmemi_get_my_pe();
-        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount ||
-            pe == relay_pe || pe == myPe || relay_pe == myPe) {
+        if (pe < 0 || pe >= rankCount || relay_pe < 0 || relay_pe >= rankCount || pe == relay_pe || pe == myPe ||
+            relay_pe == myPe) {
             ACLSHMEM_DEBUG_FUNC(
                 aclshmemi_kernel_abort,
                 "udma relay get: invalid pe=%d relay_pe=%d (myPe=%d rankCount=%d); "
@@ -835,22 +831,21 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
             // For UDMA_OP_READ the SQE's "remoteAddr" slot carries src (remote) and
             // "localAddr" carries dst (local), matching aclshmemi_udma_read().
             aclshmemi_udma_post_send_mte3<uint8_t, aclshmemi_udma_opcode_t::UDMA_OP_READ>(
-                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0u,
-                elem_size * sizeof(T), reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id, {},
-                static_cast<uint32_t>(relay_pe));
+                (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)dst, static_cast<uint32_t>(pe), 0u, elem_size * sizeof(T),
+                reinterpret_cast<__ubuf__ uint8_t*>(buf), sync_id, {}, static_cast<uint32_t>(relay_pe));
         } else {
             (void)buf;
             (void)sync_id;
             aclshmemi_udma_read<uint8_t>(
-                (__gm__ uint8_t*)dst, (__gm__ uint8_t*)ptr, static_cast<uint32_t>(pe), 0u,
-                elem_size * sizeof(T), static_cast<uint32_t>(relay_pe));
+                (__gm__ uint8_t*)dst, (__gm__ uint8_t*)ptr, static_cast<uint32_t>(pe), 0u, elem_size * sizeof(T),
+                static_cast<uint32_t>(relay_pe));
         }
 #else
         // sizeof(T) == 0 is always false but depends on T, so it only fires when this template is
         // actually instantiated (i.e. relay API is called) rather than at parse time. A plain
         // static_assert(false, ...) would break the whole OFF build even when relay is never used.
-        static_assert(sizeof(T) == 0,
-            "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+        static_assert(
+            sizeof(T) == 0, "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
 #endif
     } else {
         ACLSHMEM_DEBUG_FUNC(aclshmemi_kernel_abort, "UDMA is supported only on Ascend950 or later\n");
@@ -859,13 +854,13 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
 
 template <typename T, pipe_t WQE_PIPE>
 ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
-    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src,
-    const AscendC::LocalTensor<T>& buf, uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
+    const AscendC::GlobalTensor<T>& dst, const AscendC::GlobalTensor<T>& src, const AscendC::LocalTensor<T>& buf,
+    uint32_t elem_size, int pe, int relay_pe, uint32_t sync_id)
 {
 #if defined(ACLSHMEM_RELAY_SUPPORT)
     aclshmemx_udma_relay_get_nbi<T, WQE_PIPE>(
-        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(),
-        reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()), elem_size, pe, relay_pe, sync_id);
+        (__gm__ T*)dst.GetPhyAddr(), (__gm__ T*)src.GetPhyAddr(), reinterpret_cast<__ubuf__ T*>(buf.GetPhyAddr()),
+        elem_size, pe, relay_pe, sync_id);
 #else
     (void)dst;
     (void)src;
@@ -874,8 +869,8 @@ ACLSHMEM_DEVICE void aclshmemx_udma_relay_get_nbi(
     (void)pe;
     (void)relay_pe;
     (void)sync_id;
-    static_assert(sizeof(T) == 0,
-        "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
+    static_assert(
+        sizeof(T) == 0, "aclshmemx_udma_relay_get_nbi requires ACLSHMEM_RELAY_SUPPORT=ON; rebuild with it enabled");
 #endif
 }
 
@@ -904,8 +899,8 @@ ACLSHMEM_DEVICE void aclshmemx_udma_put_signal_nbi(
     __gm__ T* dst, __gm__ T* src, uint32_t elem_size, __gm__ uint64_t* sig_addr, uint64_t signal, int pe,
     __ubuf__ uint8_t* buf, uint32_t sync_id)
 {
-    static_assert(WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3,
-                  "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
+    static_assert(
+        WQE_PIPE == PIPE_S || WQE_PIPE == PIPE_MTE3, "Only PIPE_S and PIPE_MTE3 are supported for UDMA WQE_PIPE");
     if constexpr (ACLSHMEM_UDMA_SUPPORTED) {
         if constexpr (WQE_PIPE == PIPE_MTE3) {
             auto ptr = aclshmem_ptr(dst, pe);
@@ -949,8 +944,8 @@ ACLSHMEM_DEVICE uint64_t aclshmemi_udma_get_amo_addr(uint32_t pe, uint32_t qp_id
     // is (actual=pe, relay=self) = pe*N + myPe. Using the N*N formula on OFF would read amoAddr
     // from the wrong (out-of-bounds) slot and corrupt atomic fetch data.
     uint32_t slot = aclshmemi_udma_compute_slot(pe);
-    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry = (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr
-        + (slot * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
+    __gm__ ACLSHMEMUDMAWQCtx* qpCtxEntry =
+        (__gm__ ACLSHMEMUDMAWQCtx*)(udmaInfo->sqPtr + (slot * qp_num + qp_idx) * sizeof(ACLSHMEMUDMAWQCtx));
     auto amo_addr = qpCtxEntry->amoAddr;
     return amo_addr;
 }
@@ -1038,20 +1033,19 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_compare_swap(__gm__ T* dst, T cond, T va
     }
 }
 
-
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T *dst, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch(__gm__ T* dst, int32_t pe)
 {
     return aclshmemx_udma_atomic_fetch_add<T>(dst, 0, pe);
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         if (aclshmemx_udma_atomic_compare_swap(dst, old_value, value, pe) == old_value) {
@@ -1063,12 +1057,12 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_set(__gm__ T *dst, T value, int32_t p
 }
 
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         if (aclshmemx_udma_atomic_compare_swap(dst, old_value, value, pe) == old_value) {
@@ -1081,24 +1075,24 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_swap(__gm__ T *dst, T value, int32_t pe)
 }
 
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T *dst, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_inc(__gm__ T* dst, int32_t pe)
 {
     return aclshmemx_udma_atomic_fetch_add<T>(dst, 1, pe);
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T *dst, int32_t pe)
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_inc(__gm__ T* dst, int32_t pe)
 {
     aclshmemx_udma_atomic_add<T>(dst, 1, pe);
 }
 
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value & value;
@@ -1112,12 +1106,12 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_and(__gm__ T *dst, T value, int32_
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value & value;
@@ -1130,12 +1124,12 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_and(__gm__ T *dst, T value, int32_t p
 }
 
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value | value;
@@ -1149,12 +1143,12 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_or(__gm__ T *dst, T value, int32_t
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value | value;
@@ -1167,12 +1161,12 @@ ACLSHMEM_DEVICE void aclshmemx_udma_atomic_or(__gm__ T *dst, T value, int32_t pe
 }
 
 template <typename T>
-ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value ^ value;
@@ -1186,12 +1180,12 @@ ACLSHMEM_DEVICE T aclshmemx_udma_atomic_fetch_xor(__gm__ T *dst, T value, int32_
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T *dst, T value, int32_t pe)
+ACLSHMEM_DEVICE void aclshmemx_udma_atomic_xor(__gm__ T* dst, T value, int32_t pe)
 {
     uint32_t times = 0;
     while (times < MAX_RETRY_TIMES) {
         auto amo_addr = aclshmemi_udma_get_amo_addr(pe, 0);
-        aclshmemi_udma_get_nbi((__gm__ T *)amo_addr, dst, 1, pe);
+        aclshmemi_udma_get_nbi((__gm__ T*)amo_addr, dst, 1, pe);
         aclshmemx_udma_quiet(pe);
         T old_value = aclshmemi_udma_get_amo_addr_value<T>(amo_addr);
         T new_value = old_value ^ value;

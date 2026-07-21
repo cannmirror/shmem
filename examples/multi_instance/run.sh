@@ -19,7 +19,7 @@ IPPORT="tcp://127.0.0.1:8766"
 GNPU_NUM="8"
 FIRST_NPU="0"
 FIRST_PE="0"
-TEST_TYPE="int"
+TEST_TYPE="int32_t"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

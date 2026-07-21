@@ -22,8 +22,8 @@ constexpr int64_t UB_DMA_MAX_SIZE = 190 * 1024;
 constexpr int64_t GVA_BUFF_MAX_SIZE = 100 * 1024 * 1024;
 
 template <typename T>
-ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__ T *gva, int64_t max_gva_num,
-                                       int elements, int len, int64_t magic)
+ACLSHMEM_DEVICE void all_gather_origin(
+    __gm__ T* input, __gm__ T* output, __gm__ T* gva, int64_t max_gva_num, int elements, int len, int64_t magic)
 {
     const int64_t aiv_num = GetBlockNum();
     const int64_t aiv_index = GetBlockIdx();
@@ -34,17 +34,17 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
     int32_t my_rank = aclshmem_my_pe();
     int32_t pe_size = aclshmem_n_pes();
 
-    __gm__ T *input_gm = (__gm__ T *)input;
-    __gm__ T *output_gm = (__gm__ T *)output;
-    __gm__ T *gva_data_gm = (__gm__ T *)((__gm__ int32_t *)gva + data_offset);
-    __gm__ int32_t *gva_sync_gm = (__gm__ int32_t *)gva;
+    __gm__ T* input_gm = (__gm__ T*)input;
+    __gm__ T* output_gm = (__gm__ T*)output;
+    __gm__ T* gva_data_gm = (__gm__ T*)((__gm__ int32_t*)gva + data_offset);
+    __gm__ int32_t* gva_sync_gm = (__gm__ int32_t*)gva;
 
     // signal_op needed
-    __ubuf__ int32_t *flags_ub1[16];
-    __ubuf__ int32_t *flags_ub2[16];
+    __ubuf__ int32_t* flags_ub1[16];
+    __ubuf__ int32_t* flags_ub2[16];
     for (int i = 0; i * 8 < 128; i++) {
-        flags_ub1[i] = (__ubuf__ int32_t *)(32) + i * 16;
-        flags_ub2[i] = (__ubuf__ int32_t *)(544) + i * 16;
+        flags_ub1[i] = (__ubuf__ int32_t*)(32) + i * 16;
+        flags_ub2[i] = (__ubuf__ int32_t*)(544) + i * 16;
     }
 
     // 0-7 copy data to local symmetric mem, 8-15 copy remote data from symmetric mem.
@@ -53,13 +53,13 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
     int len_per_core = len / core_group_num;
 
     int group_per_num = len_per_core;
-    if (aiv_index == core_group_num - 1) {  // Remain Handle
+    if (aiv_index == core_group_num - 1) { // Remain Handle
         group_per_num = len - group_per_num * aiv_index;
     }
 
     // GM to SymmPtr
     if (aiv_index < core_group_num) {
-        __ubuf__ T *tmp_buff = reinterpret_cast<__ubuf__ T *>(uint64_t(1024 + 32));
+        __ubuf__ T* tmp_buff = reinterpret_cast<__ubuf__ T*>(uint64_t(1024 + 32));
         uint32_t copy_ub_size = UB_DMA_MAX_SIZE;
         uint32_t copy_ub_num = copy_ub_size / sizeof(T);
         uint32_t copy_total_size = group_per_num * sizeof(T);
@@ -68,9 +68,10 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
         int64_t flag = 0;
         while (copy_total_size >= copy_ub_size) {
             SHMEMI_PROF_START(0);
-            aclshmemx_mte_put_nbi(gva_data_gm + aiv_index * len_per_core + times * copy_ub_num,
-                                  input_gm + aiv_index * len_per_core + times * copy_ub_num, tmp_buff, copy_ub_size,
-                                  copy_ub_num, my_rank, EVENT_ID0);
+            aclshmemx_mte_put_nbi(
+                gva_data_gm + aiv_index * len_per_core + times * copy_ub_num,
+                input_gm + aiv_index * len_per_core + times * copy_ub_num, tmp_buff, copy_ub_size, copy_ub_num, my_rank,
+                EVENT_ID0);
             SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
             WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
             times += 1;
@@ -88,9 +89,10 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
         if (copy_total_size <= 0) {
             return;
         }
-        aclshmemx_mte_put_nbi(gva_data_gm + aiv_index * len_per_core + times * copy_ub_num,
-                              input_gm + aiv_index * len_per_core + times * copy_ub_num, tmp_buff, copy_ub_size,
-                              copy_total_size / sizeof(T), my_rank, EVENT_ID0);
+        aclshmemx_mte_put_nbi(
+            gva_data_gm + aiv_index * len_per_core + times * copy_ub_num,
+            input_gm + aiv_index * len_per_core + times * copy_ub_num, tmp_buff, copy_ub_size,
+            copy_total_size / sizeof(T), my_rank, EVENT_ID0);
         SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
         WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
         times += 1;
@@ -105,8 +107,8 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
         *flags_ub2[i] = 0;
     }
 
-    __ubuf__ T *ping_buff = reinterpret_cast<__ubuf__ T *>(uint64_t(1 * 1024 + 32));
-    __ubuf__ T *pong_buff = reinterpret_cast<__ubuf__ T *>(uint64_t(96 * 1024 + 32));
+    __ubuf__ T* ping_buff = reinterpret_cast<__ubuf__ T*>(uint64_t(1 * 1024 + 32));
+    __ubuf__ T* pong_buff = reinterpret_cast<__ubuf__ T*>(uint64_t(96 * 1024 + 32));
     uint32_t copy_ub_size = UB_DMA_MAX_SIZE / 2;
     uint32_t copy_ub_num = copy_ub_size / sizeof(T);
     int x = (aiv_index - core_group_num) / core_per_rank;
@@ -154,14 +156,14 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
             PipeBarrier<PIPE_ALL>();
             for (int i = 0; num_total > 0; i++) {
                 TEventID event_id = pingpong_id == 0 ? EVENT_ID0 : EVENT_ID1;
-                __ubuf__ T *buf = pingpong_id == 0 ? ping_buff : pong_buff;
+                __ubuf__ T* buf = pingpong_id == 0 ? ping_buff : pong_buff;
 
                 uint32_t copy_num = num_total > copy_ub_num ? copy_ub_num : num_total;
 
                 WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-                aclshmemx_mte_get_nbi(output_gm + group_recv_offset + recv_offset,
-                                      gva_data_gm + group_send_offset + send_offset, buf, copy_ub_size, copy_num, x,
-                                      event_id);
+                aclshmemx_mte_get_nbi(
+                    output_gm + group_recv_offset + recv_offset, gva_data_gm + group_send_offset + send_offset, buf,
+                    copy_ub_size, copy_num, x, event_id);
                 SetFlag<HardEvent::MTE3_MTE2>(event_id);
 
                 send_offset += copy_num;
@@ -190,8 +192,8 @@ ACLSHMEM_DEVICE void all_gather_origin(__gm__ T *input, __gm__ T *output, __gm__
 
 // all_gather
 template <typename T>
-ACLSHMEM_DEVICE void all_gather_big_data(uint64_t ffts_addr, __gm__ T *input, __gm__ T *output, __gm__ T *gva, int elements,
-                                      __gm__ int *magic)
+ACLSHMEM_DEVICE void all_gather_big_data(
+    uint64_t ffts_addr, __gm__ T* input, __gm__ T* output, __gm__ T* gva, int elements, __gm__ int* magic)
 {
     util_set_ffts_config(ffts_addr);
 
@@ -201,14 +203,15 @@ ACLSHMEM_DEVICE void all_gather_big_data(uint64_t ffts_addr, __gm__ T *input, __
     int times = (elements + max_gva_num - 1) / max_gva_num;
     int total_num = elements;
 
-    __ubuf__ int64_t *ctrl_ub = (__ubuf__ int64_t *)(0);
+    __ubuf__ int64_t* ctrl_ub = (__ubuf__ int64_t*)(0);
     for (int i = 0; i < times; i++) {
         *ctrl_ub = 0;
         PipeBarrier<PIPE_ALL>();
         int32_t len = total_num > max_gva_num ? max_gva_num : total_num;
         aclshmemx_barrier_all_vec();
-        all_gather_origin(input + i * max_gva_num, output + i * max_gva_num, gva, max_gva_num, elements, len,
-                          (magic_data + i) * 1024);
+        all_gather_origin(
+            input + i * max_gva_num, output + i * max_gva_num, gva, max_gva_num, elements, len,
+            (magic_data + i) * 1024);
         total_num -= max_gva_num;
         PipeBarrier<PIPE_ALL>();
     }
@@ -216,9 +219,11 @@ ACLSHMEM_DEVICE void all_gather_big_data(uint64_t ffts_addr, __gm__ T *input, __
 
 // all_gather
 template <typename T>
-ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, __gm__ T *output, __gm__ T *gva,
-                                        int elements, __gm__ int *magic)
+ACLSHMEM_DEVICE void all_gather_small_data(
+    uint64_t ffts_addr, __gm__ T* input, __gm__ T* output, __gm__ T* gva, int elements, __gm__ int* magic)
 {
+    util_set_ffts_config(ffts_addr);
+
     const int64_t aiv_num = GetBlockNum();
     const int64_t aiv_index = GetBlockIdx();
 
@@ -230,13 +235,13 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, 
 
     int magic_data = *magic;
 
-    __gm__ T *input_gm = (__gm__ T *)input;
-    __gm__ T *output_gm = (__gm__ T *)output;
+    __gm__ T* input_gm = (__gm__ T*)input;
+    __gm__ T* output_gm = (__gm__ T*)output;
 
-    __gm__ T *gva_data_gm = (__gm__ T *)((__gm__ int32_t *)gva + data_offset);
-    __gm__ int32_t *gva_sync_gm = (__gm__ int32_t *)gva;
+    __gm__ T* gva_data_gm = (__gm__ T*)((__gm__ int32_t*)gva + data_offset);
+    __gm__ int32_t* gva_sync_gm = (__gm__ int32_t*)gva;
 
-    __ubuf__ T *tmp_buff = (__ubuf__ T *)(64);
+    __ubuf__ T* tmp_buff = (__ubuf__ T*)(64);
 
     // data move parameters
     const uint32_t ub_size = UB_DMA_MAX_SIZE;
@@ -249,8 +254,8 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, 
     if (aiv_index == aiv_num - 1) {
         num_per_core = elements - num_per_core * aiv_index;
     }
-    aclshmemx_mte_put_nbi(gva_data_gm + gva_offset, input_gm + input_offset, tmp_buff, ub_size, num_per_core, my_rank,
-                          EVENT_ID0);
+    aclshmemx_mte_put_nbi(
+        gva_data_gm + gva_offset, input_gm + input_offset, tmp_buff, ub_size, num_per_core, my_rank, EVENT_ID0);
 
     const int64_t core_per_rank = aiv_num / pe_size;
     const int64_t core_rank_idx = aiv_index % core_per_rank;
@@ -258,9 +263,11 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, 
 
     // Sync Ensure Corresponding Tasks Done.
     aclshmem_quiet();
+    AscendC::SyncAll();
 
     aclshmemx_signal_op(gva_sync_gm + flag_offset, magic_data, ACLSHMEM_SIGNAL_SET, my_rank);
-    aclshmem_signal_wait_until((__gm__ int32_t *)aclshmem_ptr(gva_sync_gm, x) + flag_offset, ACLSHMEM_CMP_EQ, magic_data);
+    aclshmem_signal_wait_until(
+        (__gm__ int32_t*)aclshmem_ptr(gva_sync_gm, x) + flag_offset, ACLSHMEM_CMP_EQ, magic_data);
 
     // [AllGather Step 2] symmetric mem -> local output.
     num_per_core = elements / core_per_rank;
@@ -269,21 +276,21 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, 
     if (core_rank_idx == core_per_rank - 1) {
         num_per_core = elements - num_per_core * core_rank_idx;
     }
-    aclshmemx_mte_get_nbi(output_gm + output_offset, gva_data_gm + gva_offset, tmp_buff, ub_size, num_per_core, x,
-                          EVENT_ID0);
+    aclshmemx_mte_get_nbi(
+        output_gm + output_offset, gva_data_gm + gva_offset, tmp_buff, ub_size, num_per_core, x, EVENT_ID0);
 }
 
-#define ALLGATHER_FUNC_DEF(type)                                                                                   \
-    extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void ShmemAllGather_##type(uint64_t ffts_addr, GM_ADDR input, GM_ADDR output,  \
-                                                                GM_ADDR gva, int elements, __gm__ int *magic)              \
-    {                                                                                                              \
-        if (elements * sizeof(type) < 2097152) {                                                                   \
-            all_gather_small_data<type>(ffts_addr, (__gm__ type *)input, (__gm__ type *)output, (__gm__ type *)gva, \
-                                        elements, magic);                                                          \
-        } else {                                                                                                   \
-            all_gather_big_data<type>(ffts_addr, (__gm__ type *)input, (__gm__ type *)output, (__gm__ type *)gva,   \
-                                      elements, magic);                                                            \
-        }                                                                                                          \
+#define ALLGATHER_FUNC_DEF(type)                                                                           \
+    extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void ShmemAllGather_##type(             \
+        uint64_t ffts_addr, GM_ADDR input, GM_ADDR output, GM_ADDR gva, int elements, __gm__ int* magic)   \
+    {                                                                                                      \
+        if (elements * sizeof(type) < 2097152) {                                                           \
+            all_gather_small_data<type>(                                                                   \
+                ffts_addr, (__gm__ type*)input, (__gm__ type*)output, (__gm__ type*)gva, elements, magic); \
+        } else {                                                                                           \
+            all_gather_big_data<type>(                                                                     \
+                ffts_addr, (__gm__ type*)input, (__gm__ type*)output, (__gm__ type*)gva, elements, magic); \
+        }                                                                                                  \
     }
 
 #define TYPE_FUNC(fun) fun(int)
@@ -291,15 +298,17 @@ ACLSHMEM_DEVICE void all_gather_small_data(uint64_t ffts_addr, __gm__ T *input, 
 TYPE_FUNC(ALLGATHER_FUNC_DEF);
 
 template <class T>
-void allgather_demo(uint32_t block_dim, void *stream, uint64_t ffts_addr, uint8_t *input, uint8_t *output, uint8_t *gva,
-                    int elements, int *magic)
+void allgather_demo(
+    uint32_t block_dim, void* stream, uint64_t ffts_addr, uint8_t* input, uint8_t* output, uint8_t* gva, int elements,
+    int* magic)
 {
     if (std::is_same<T, int>::value) {
         ShmemAllGather_int<<<block_dim, nullptr, stream>>>(ffts_addr, input, output, gva, elements, magic);
     }
 }
 
-template void allgather_demo<int>(uint32_t block_dim, void *stream, uint64_t ffts_addr, uint8_t *input, uint8_t *output,
-                                  uint8_t *gva, int elements, int *magic);
+template void allgather_demo<int>(
+    uint32_t block_dim, void* stream, uint64_t ffts_addr, uint8_t* input, uint8_t* output, uint8_t* gva, int elements,
+    int* magic);
 
-template void run_vector_add<int>(int64_t numElements, void *a, void *b, void *c, void *stream);
+template void run_vector_add<int>(int64_t numElements, void* a, void* b, void* c, void* stream);

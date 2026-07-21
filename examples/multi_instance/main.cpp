@@ -32,7 +32,7 @@
 #include "multi_instance_kernel.h"
 
 int g_npus = 8;
-const char *ipport = "tcp://127.0.0.1:8998";
+const char* ipport = "tcp://127.0.0.1:8998";
 int f_pe = 0;
 int f_npu = 0;
 int device_id = 0;
@@ -93,40 +93,41 @@ int group_all_gather(uint64_t instance_id)
         }
 
         // Host Data Prepare
-        uint8_t *input_host;
+        uint8_t* input_host;
         aclrtMallocHost(reinterpret_cast<void**>(&input_host), trans_size * sizeof(T));
-        std::string inputFile = "../../examples/multi_instance/golden/allgather_" + std::to_string(trans_size)
-            + "_" + std::to_string(n_pes) + "/input_gm_" + std::to_string(pe_id) + ".bin";
+        std::string inputFile = "../../examples/multi_instance/golden/allgather_" + std::to_string(trans_size) + "_" +
+                                std::to_string(n_pes) + "/input_gm_" + std::to_string(pe_id) + ".bin";
         ReadFile(inputFile, input_host, trans_size * sizeof(T));
 
-        T *output_host;
+        T* output_host;
         size_t output_size = n_pes * trans_size * sizeof(T);
         status = aclrtMallocHost(reinterpret_cast<void**>(&output_host), output_size);
 
-        T *golden_host;
+        T* golden_host;
         status = aclrtMallocHost(reinterpret_cast<void**>(&golden_host), output_size);
-        std::string goldenFile = "../../examples/multi_instance/golden/allgather_" + std::to_string(trans_size)
-            + "_" + std::to_string(n_pes) + "/golden.bin";
+        std::string goldenFile = "../../examples/multi_instance/golden/allgather_" + std::to_string(trans_size) + "_" +
+                                 std::to_string(n_pes) + "/golden.bin";
         ReadFile(goldenFile, golden_host, n_pes * trans_size * sizeof(T));
 
         // Kernel Input Prepare
-        void *input_ptr;
+        void* input_ptr;
         aclrtMalloc(&input_ptr, trans_size * sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST);
         aclrtMemcpy(input_ptr, trans_size * sizeof(T), input_host, trans_size * sizeof(T), ACL_MEMCPY_HOST_TO_DEVICE);
 
-        void *output_ptr;
+        void* output_ptr;
         aclrtMalloc(&output_ptr, trans_size * n_pes * sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST);
 
         // sync Buffer + data Buffer
         int aiv_num = BLOCK_NUM;
-        void *ptr = aclshmem_malloc(aiv_num * SYNC_FLAG_INTERVAL * sizeof(T) + GVA_BUFF_MAX_SIZE / sizeof(T));
+        void* ptr = aclshmem_malloc(aiv_num * SYNC_FLAG_INTERVAL * sizeof(T) + GVA_BUFF_MAX_SIZE / sizeof(T));
 
         // AllGather
         int PERF_TIMES = 50;
         for (int zz = 0; zz < PERF_TIMES; zz++) {
             magic++;
-            group_allgather<T>(BLOCK_NUM, stream, fftsAddr, 
-                (uint8_t *)input_ptr, (uint8_t *)output_ptr, (uint8_t *)ptr, trans_size, magic * 1024, instance_id);
+            group_allgather<T>(
+                BLOCK_NUM, stream, fftsAddr, (uint8_t*)input_ptr, (uint8_t*)output_ptr, (uint8_t*)ptr, trans_size,
+                magic * 1024, instance_id);
         }
         status = aclrtSynchronizeStream(stream);
 
@@ -137,8 +138,8 @@ int group_all_gather(uint64_t instance_id)
         for (int zz = 0; zz < n_pes * trans_size; zz++) {
             if (static_cast<float>(output_host[zz]) != static_cast<float>(golden_host[zz])) {
                 std::cout << static_cast<float>(output_host[zz]) << " != " << static_cast<float>(golden_host[zz])
-                          << ", trans_size is : " << trans_size << ", idx is: " << zz
-                          << ", pe_id is: "<< pe_id << std::endl;
+                          << ", trans_size is : " << trans_size << ", idx is: " << zz << ", pe_id is: " << pe_id
+                          << std::endl;
                 std::exit(EXIT_FAILURE);
             }
         }
@@ -152,7 +153,9 @@ int group_all_gather(uint64_t instance_id)
         status = aclrtFreeHost(output_host);
         status = aclrtFreeHost(input_host);
 
-        outFile << 1 << "," << trans_size << "," << " " << "\n";
+        outFile << 1 << "," << trans_size << ","
+                << " "
+                << "\n";
 
         if (aclshmem_my_pe() == 0) {
             printf("Instance %lu, Case: %d Finished !! Result Correct !!. \n", instance_id, test_cases[i]);
@@ -165,7 +168,7 @@ int group_all_gather(uint64_t instance_id)
     return status;
 }
 
-static int aclshmem_instance_create_test(int pe_id, aclshmemx_init_attr_t &attr, std::vector<int> &dev_list)
+static int aclshmem_instance_create_test(int pe_id, aclshmemx_init_attr_t& attr, std::vector<int>& dev_list)
 {
     int status = 0;
     if (std::find(dev_list.begin(), dev_list.end(), pe_id) != dev_list.end()) {
@@ -179,7 +182,7 @@ static int aclshmem_instance_create_test(int pe_id, aclshmemx_init_attr_t &attr,
         attr.comm_args = nullptr;
         status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attr);
 
-        void *ptr = aclshmem_malloc(1024);
+        void* ptr = aclshmem_malloc(1024);
         std::vector<uint64_t> copy_arr(1024 / sizeof(uint64_t), 1);
         status = aclrtMemcpy(ptr, 1024, copy_arr.data(), 1024, ACL_MEMCPY_HOST_TO_DEVICE);
         if (status != 0) {
@@ -189,12 +192,12 @@ static int aclshmem_instance_create_test(int pe_id, aclshmemx_init_attr_t &attr,
         aclshmem_free(ptr);
         printf("Instance id : %ld malloc and free success !! \n", attr.instance_id);
 
-        status = group_all_gather<int>(attr.instance_id);
+        status = group_all_gather<int32_t>(attr.instance_id);
     }
     return status;
 }
 
-static int aclshmem_instance_destroy_test(int dev_id, aclshmemx_init_attr_t &attr, std::vector<int> &dev_list)
+static int aclshmem_instance_destroy_test(int dev_id, aclshmemx_init_attr_t& attr, std::vector<int>& dev_list)
 {
     int status = 0;
     if (std::find(dev_list.begin(), dev_list.end(), dev_id) != dev_list.end()) {
@@ -203,13 +206,13 @@ static int aclshmem_instance_destroy_test(int dev_id, aclshmemx_init_attr_t &att
     return status;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int status = 0;
     int n_pes = atoi(argv[INDEX1]);
     int pe_id = atoi(argv[INDEX2]);
     ipport = argv[INDEX3];
-    f_npu  = atoi(argv[INDEX4]);
+    f_npu = atoi(argv[INDEX4]);
 
     // Acl && Shmem init
     device_id = pe_id % g_npus + f_npu;
@@ -235,7 +238,7 @@ int main(int argc, char *argv[])
     std::vector<int> inst3_devices = {1, 3};
     status = aclshmem_instance_create_test(pe_id, inst3_attr, inst3_devices);
     status = aclshmem_instance_destroy_test(pe_id, inst3_attr, inst3_devices);
-    
+
     // ### Instance 4 Init
     aclshmemx_init_attr_t inst4_attr;
     inst4_attr.instance_id = 4;

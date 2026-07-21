@@ -24,6 +24,6 @@
     ```bash
     # 完成PEs卡下的allgather同时验证精度。
     # PEs : [4, 8]
-    # TYPEs : [int, int32_t]
+    # TYPEs : [int32_t]
     bash run.sh -pes ${PEs} -type ${TYPEs}
     ```

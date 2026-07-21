@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <algorithm>  
+#include <algorithm>
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
@@ -23,33 +23,43 @@
 #include "mte_perftest_common.h"
 
 int g_npus = 8;
-const char *ipport;
-static const char *fuc_data_type;
-static const char *fuc_test_type;
+const char* ipport;
+static const char* fuc_data_type;
+static const char* fuc_test_type;
 int f_pe = 0;
 int f_npu = 0;
 aclshmemx_uniqueid_t default_flag_uid;
 
-static aclshmem_prof_pe_t *out_profs;
-extern "C" void launch_mte_perf_kernel(uint32_t block_dim, void *stream, uint8_t *dst_gva, uint8_t *src_gva, int elements, int32_t frame_id, int test_mode, int data_type, int ub_size_kb, int64_t prof_pe_val, int loop_count);
+static aclshmem_prof_pe_t* out_profs;
+extern "C" void launch_mte_perf_kernel(
+    uint32_t block_dim, void* stream, uint64_t fftsAddr, uint8_t* dst_gva, uint8_t* src_gva, int elements,
+    int32_t frame_id, int test_mode, int data_type, int ub_size_kb, int64_t prof_pe_val, int loop_count);
 
-static perftest::mte_mode_t get_mte_mode(const char *test_type_str) {
-    if (strcmp(test_type_str, "put") == 0) return perftest::TEST_MODE_MTE_PUT;
-    else if (strcmp(test_type_str, "bi_put") == 0) return perftest::TEST_MODE_BI_PUT;
-    else if (strcmp(test_type_str, "get") == 0) return perftest::TEST_MODE_MTE_GET;
-    else if (strcmp(test_type_str, "bi_get") == 0) return perftest::TEST_MODE_BI_GET;
+static perftest::mte_mode_t get_mte_mode(const char* test_type_str)
+{
+    if (strcmp(test_type_str, "put") == 0)
+        return perftest::TEST_MODE_MTE_PUT;
+    else if (strcmp(test_type_str, "bi_put") == 0)
+        return perftest::TEST_MODE_BI_PUT;
+    else if (strcmp(test_type_str, "get") == 0)
+        return perftest::TEST_MODE_MTE_GET;
+    else if (strcmp(test_type_str, "bi_get") == 0)
+        return perftest::TEST_MODE_BI_GET;
     return perftest::TEST_MODE_MTE_PUT;
 }
 
-static aclshmem_mem_type_t get_memory_type(const char *memory_type_str) {
-    if (strcmp(memory_type_str, "dram") == 0) return HOST_SIDE;
+static aclshmem_mem_type_t get_memory_type(const char* memory_type_str)
+{
+    if (strcmp(memory_type_str, "dram") == 0)
+        return HOST_SIDE;
     return DEVICE_SIDE;
 }
 
-template<typename T>
-int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
-                                   const std::vector<int> &block_sizes,
-                                   int min_exponent, int max_exponent, int loop_count, perftest::mte_mode_t test_mode, perftest::perf_data_type_t data_type_enum, int prof_pe, int ub_size_kb, aclshmem_mem_type_t memory_type, std::vector<std::vector<std::string>>& csv_data)
+template <typename T>
+int test_shmem_mte_perf_test_impl(
+    int pe_id, int n_pes, uint64_t local_mem_size, const std::vector<int>& block_sizes, int min_exponent,
+    int max_exponent, int loop_count, perftest::mte_mode_t test_mode, perftest::perf_data_type_t data_type_enum,
+    int prof_pe, int ub_size_kb, aclshmem_mem_type_t memory_type, std::vector<std::vector<std::string>>& csv_data)
 {
     int32_t device_id = (pe_id % g_npus + f_npu);
     int status = 0;
@@ -59,6 +69,8 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
     status = aclrtSetDevice(device_id);
     status = aclrtCreateStream(&stream);
 
+    uint64_t fftsAddr = util_get_ffts_config();
+
     aclshmemx_init_attr_t attributes;
     test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
     status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_DEFAULT, &attributes);
@@ -67,10 +79,11 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
     for (int block_size : block_sizes) {
         for (int exponent = min_exponent; exponent <= max_exponent; exponent++) {
             int datasize = std::pow(2, exponent);
-            std::cout << "pe: " << pe_id << " block_size: " << block_size << " size: " << datasize << " frame_id: " << frame_id << std::endl;
-            
-            void *dst_ptr = aclshmemx_malloc(datasize * block_size, memory_type);
-            void *src_ptr = aclshmemx_malloc(datasize * block_size, memory_type);
+            std::cout << "pe: " << pe_id << " block_size: " << block_size << " size: " << datasize
+                      << " frame_id: " << frame_id << std::endl;
+
+            void* dst_ptr = aclshmemx_malloc(datasize * block_size, memory_type);
+            void* src_ptr = aclshmemx_malloc(datasize * block_size, memory_type);
 
             int all_size = datasize * block_size;
             int trans_size = all_size / sizeof(T);
@@ -82,20 +95,21 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
                 dst_input[i] = (T)(pe_id + 100);
             }
 
-            status = aclrtMemcpy(src_ptr, all_size,
-                                src_input.data(), all_size, ACL_MEMCPY_HOST_TO_DEVICE);
-            status = aclrtMemcpy(dst_ptr, all_size,
-                                dst_input.data(), all_size, ACL_MEMCPY_HOST_TO_DEVICE);
+            status = aclrtMemcpy(src_ptr, all_size, src_input.data(), all_size, ACL_MEMCPY_HOST_TO_DEVICE);
+            status = aclrtMemcpy(dst_ptr, all_size, dst_input.data(), all_size, ACL_MEMCPY_HOST_TO_DEVICE);
 
-            launch_mte_perf_kernel(block_size, stream, (uint8_t *)dst_ptr, (uint8_t *)src_ptr, trans_size, frame_id, static_cast<int>(test_mode), static_cast<int>(data_type_enum), ub_size_kb, prof_pe, loop_count);
+            launch_mte_perf_kernel(
+                block_size, stream, fftsAddr, (uint8_t*)dst_ptr, (uint8_t*)src_ptr, trans_size, frame_id,
+                static_cast<int>(test_mode), static_cast<int>(data_type_enum), ub_size_kb, prof_pe, loop_count);
             status = aclrtSynchronizeStream(stream);
 
             bool verify_success = true;
-            
-            auto compare_values = [&](T *ptr1, T *ptr2, size_t count, const char *label1, const char *label2) -> bool {
+
+            auto compare_values = [&](T* ptr1, T* ptr2, size_t count, const char* label1, const char* label2) -> bool {
                 for (size_t i = 0; i < count; i++) {
                     if (ptr1[i] != ptr2[i]) {
-                        std::cout << "  [ERROR] Mismatch at index " << i << ": " << label1 << "=" << (double)ptr1[i] << ", " << label2 << "=" << (double)ptr2[i] << std::endl;
+                        std::cout << "  [ERROR] Mismatch at index " << i << ": " << label1 << "=" << (double)ptr1[i]
+                                  << ", " << label2 << "=" << (double)ptr2[i] << std::endl;
                         return false;
                     }
                 }
@@ -116,7 +130,8 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
                     T expected_val = static_cast<T>(prof_pe + 10);
                     if (!compare_values(dst_host.data(), &expected_val, 1, "dst[0]", "peer_src[0]")) {
                         verify_success = false;
-                        std::cout << "  [ERROR] put operation: destination data does not match source data!" << std::endl;
+                        std::cout << "  [ERROR] put operation: destination data does not match source data!"
+                                  << std::endl;
                     }
                 }
             } else if (test_mode == perftest::TEST_MODE_MTE_GET) {
@@ -125,7 +140,8 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
                     T expected_val = static_cast<T>(peer_pe + 100);
                     if (!compare_values(src_host.data(), &expected_val, 1, "src[0]", "peer_dst[0]")) {
                         verify_success = false;
-                        std::cout << "  [ERROR] get operation: source data does not match destination data!" << std::endl;
+                        std::cout << "  [ERROR] get operation: source data does not match destination data!"
+                                  << std::endl;
                     }
                 }
             } else if (test_mode == perftest::TEST_MODE_BI_PUT) {
@@ -133,14 +149,16 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
                 T expected_val = static_cast<T>(peer_pe + 10);
                 if (!compare_values(dst_host.data(), &expected_val, 1, "dst[0]", "peer_src[0]")) {
                     verify_success = false;
-                    std::cout << "  [ERROR] bi_put operation: destination data does not match source data!" << std::endl;
+                    std::cout << "  [ERROR] bi_put operation: destination data does not match source data!"
+                              << std::endl;
                 }
             } else if (test_mode == perftest::TEST_MODE_BI_GET) {
                 std::cout << "\n[Verification] bi_get operation: Checking data transfer..." << std::endl;
                 T expected_val = static_cast<T>(peer_pe + 100);
                 if (!compare_values(src_host.data(), &expected_val, 1, "src[0]", "peer_dst[0]")) {
                     verify_success = false;
-                    std::cout << "  [ERROR] bi_get operation: source data does not match destination data!" << std::endl;
+                    std::cout << "  [ERROR] bi_get operation: source data does not match destination data!"
+                              << std::endl;
                 }
             }
 
@@ -152,13 +170,13 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
             std::cout << "" << std::endl;
 
             aclshmemx_get_prof(&out_profs, false);
-            collect_prof_data_to_csv_v2(out_profs, frame_id, datasize, block_size, g_npus, ub_size_kb, loop_count,
-                                        true, csv_data);
+            collect_prof_data_to_csv_v2(
+                out_profs, frame_id, datasize, block_size, g_npus, ub_size_kb, loop_count, true, csv_data);
 
             aclshmemx_free(dst_ptr, memory_type);
             aclshmemx_free(src_ptr, memory_type);
             status = aclrtSynchronizeStream(stream);
-            
+
             frame_id++;
             if (frame_id >= ACLSHMEM_CYCLE_PROF_FRAME_CNT) {
                 std::cerr << "警告: frame_id 超过最大值 " << ACLSHMEM_CYCLE_PROF_FRAME_CNT << ", 停止测试" << std::endl;
@@ -179,7 +197,7 @@ int test_shmem_mte_perf_test_impl(int pe_id, int n_pes, uint64_t local_mem_size,
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int status = 0;
     int n_pes = 2;
@@ -188,9 +206,9 @@ int main(int argc, char *argv[])
     g_npus = 2;
     f_pe = 0;
     f_npu = 4;
-    const char *test_type = "put";
+    const char* test_type = "put";
     fuc_data_type = "float";
-    const char *memory_type = "hbm";
+    const char* memory_type = "hbm";
     int min_block_size = 32;
     int max_block_size = 32;
     int min_exponent = 3;
@@ -198,7 +216,7 @@ int main(int argc, char *argv[])
     int loop_count = 1000;
     int ub_size_kb = 16;
     std::vector<int> block_sizes;
-    
+
     static struct option long_options[] = {
         {"pes", required_argument, 0, 0},
         {"pe-id", required_argument, 0, 0},
@@ -216,9 +234,8 @@ int main(int argc, char *argv[])
         {"loop-count", required_argument, 0, 0},
         {"ub-size", required_argument, 0, 0},
         {"memory-type", required_argument, 0, 0},
-        {0, 0, 0, 0}
-    };
-    
+        {0, 0, 0, 0}};
+
     int opt;
     int option_index = 0;
     while ((opt = getopt_long(argc, argv, "t:d:b:e:", long_options, &option_index)) != -1) {
@@ -276,7 +293,13 @@ int main(int argc, char *argv[])
                 break;
             default:
                 std::cerr << "错误: 未知参数" << std::endl;
-                std::cerr << "使用方法: " << argv[0] << " --pes <n_pes> --pe-id <pe_id> --ipport <ip:port> --gnpus <gnpu_num> --fpe <first_pe> --fnpu <first_npu> [-t <put|bi_put|get|bi_get>] [-d <float|int8|int16|int32|int64|uint8|uint16|uint32|uint64|char>] [-b <block_size>] [-e <exponent>] [--block-range <min> <max>] [--block-list <b1,b2,...>] [--exponent-range <min> <max>] [--loop-count <count>] [--ub-size <size>] [--memory-type <hbm|dram>]" << std::endl;
+                std::cerr << "使用方法: " << argv[0]
+                          << " --pes <n_pes> --pe-id <pe_id> --ipport <ip:port> --gnpus <gnpu_num> --fpe <first_pe> "
+                             "--fnpu <first_npu> [-t <put|bi_put|get|bi_get>] [-d "
+                             "<float|int8|int16|int32|int64|uint8|uint16|uint32|uint64|char>] [-b <block_size>] [-e "
+                             "<exponent>] [--block-range <min> <max>] [--block-list <b1,b2,...>] [--exponent-range "
+                             "<min> <max>] [--loop-count <count>] [--ub-size <size>] [--memory-type <hbm|dram>]"
+                          << std::endl;
                 return 1;
         }
     }
@@ -295,27 +318,28 @@ int main(int argc, char *argv[])
         std::cerr << "错误: memory-type 必须是 hbm 或 dram" << std::endl;
         return 1;
     }
-    
-    std::cout << "[SUCCESS] demo run start in pe " << pe_id << ", test type: " << test_type << ", data type: " << fuc_data_type << std::endl;
+
+    std::cout << "[SUCCESS] demo run start in pe " << pe_id << ", test type: " << test_type
+              << ", data type: " << fuc_data_type << std::endl;
     std::cout << "n_pes: " << n_pes << ", pe_id: " << pe_id << ", g_npus: " << g_npus << std::endl;
     print_block_sizes(block_sizes);
     std::cout << "幂数范围: " << min_exponent << "-" << max_exponent << std::endl;
     std::cout << "循环次数: " << loop_count << std::endl;
     std::cout << "UB size (KB): " << ub_size_kb << std::endl;
     std::cout << "Memory type: " << memory_type << std::endl;
-    
+
     fuc_test_type = test_type;
     perftest::mte_mode_t test_mode = get_mte_mode(test_type);
     perftest::perf_data_type_t data_type_enum = get_data_type(fuc_data_type);
     aclshmem_mem_type_t memory_type_enum = get_memory_type(memory_type);
-    
+
     uint64_t max_datasize = (1ULL << max_exponent);
     int max_block_size_cfg = block_sizes.empty() ? 0 : *std::max_element(block_sizes.begin(), block_sizes.end());
     uint64_t max_required_size = max_datasize * max_block_size_cfg * 2;
     uint64_t local_mem_size = 1024UL * 1024UL * 1024;
     const uint64_t ONE_GB = 1024UL * 1024UL * 1024;
     const uint64_t MAX_GB = 40;
-    
+
     if (max_required_size > local_mem_size) {
         uint64_t gb_needed = (max_required_size + ONE_GB - 1) / ONE_GB;
         if (gb_needed > MAX_GB) {
@@ -326,32 +350,34 @@ int main(int argc, char *argv[])
         local_mem_size = gb_needed * ONE_GB;
         std::cout << "INFO: Auto-adjust local_mem_size to " << gb_needed << " GB" << std::endl;
     }
-    
-    const char *prof_pe_env = std::getenv("SHMEM_CYCLE_PROF_PE");
+
+    const char* prof_pe_env = std::getenv("SHMEM_CYCLE_PROF_PE");
     int prof_pe = 0;
     if (prof_pe_env != nullptr) {
         prof_pe = std::atoi(prof_pe_env);
     }
-    
+
     std::vector<std::vector<std::string>> csv_data = {
-        {"DataSize/B", "Npus", "Blocks", "UBsize/KB", "Bandwidth/GB/s (1000)", "Bandwidth/GiB/s (1024)", "CoreMaxTime/us", "SingleCoreTime/us"},
+        {"DataSize/B", "Npus", "Blocks", "UBsize/KB", "Bandwidth/GB/s (1000)", "Bandwidth/GiB/s (1024)",
+         "CoreMaxTime/us", "SingleCoreTime/us"},
     };
-    
-    #define TEST_IMPL_OP(type) \
-        status = test_shmem_mte_perf_test_impl<type>(pe_id, n_pes, local_mem_size, \
-                                                      block_sizes, \
-                                                      min_exponent, max_exponent, loop_count, test_mode, data_type_enum, prof_pe, ub_size_kb, memory_type_enum, csv_data)
-    
+
+#define TEST_IMPL_OP(type)                                                                                            \
+    status = test_shmem_mte_perf_test_impl<type>(                                                                     \
+        pe_id, n_pes, local_mem_size, block_sizes, min_exponent, max_exponent, loop_count, test_mode, data_type_enum, \
+        prof_pe, ub_size_kb, memory_type_enum, csv_data)
+
     DISPATCH_BY_TYPE(fuc_data_type, TEST_IMPL_OP);
-    
-    #undef TEST_IMPL_OP
-    
+
+#undef TEST_IMPL_OP
+
     if (pe_id == prof_pe) {
-        std::string csv_filename = "output/" + std::string(fuc_test_type) + "_" + std::string(fuc_data_type) + "_" + int_to_string(prof_pe) + ".csv";
+        std::string csv_filename = "output/" + std::string(fuc_test_type) + "_" + std::string(fuc_data_type) + "_" +
+                                   int_to_string(prof_pe) + ".csv";
         write_csv(csv_filename, csv_data);
     }
-    
+
     std::cout << "[SUCCESS] demo run success in pe " << pe_id << std::endl;
-    
+
     return 0;
 }

@@ -70,8 +70,9 @@ int f_npu = 0;
 aclshmemx_uniqueid_t default_flag_uid;
 
 extern "C" void launch_rdma_perf_kernel(
-    uint32_t block_dim, void* stream, uint8_t* dst_gva, uint8_t* src_gva, int elements, int test_mode, int data_type,
-    int ub_size_b, int loop_count, int metric, int batch, int sync_id, uint8_t* timing_out_gva);
+    uint32_t block_dim, void* stream, uint64_t fftsAddr, uint8_t* dst_gva, uint8_t* src_gva, int elements,
+    int test_mode, int data_type, int ub_size_b, int loop_count, int metric, int batch, int sync_id,
+    uint8_t* timing_out_gva);
 
 static perftest::rdma_mode_t get_rdma_mode(const char* test_type_str)
 {
@@ -139,6 +140,7 @@ int test_rdma_perf_test_impl(
     bool stream_created = false;
     bool shmem_initialized = false;
     int ret = 0;
+    uint64_t fftsAddr = 0;
 
     CHECK_ACL_GOTO(aclInit(nullptr), ret, cleanup);
     acl_initialized = true;
@@ -148,6 +150,8 @@ int test_rdma_perf_test_impl(
 
     CHECK_ACL_GOTO(aclrtCreateStream(&stream), ret, cleanup);
     stream_created = true;
+
+    fftsAddr = util_get_ffts_config();
 
     test_set_attr(pe_id, n_pes, local_mem_size, ipport, default_flag_uid, &attributes);
     attributes.option_attr.data_op_engine_type = ACLSHMEM_DATA_OP_ROCE;
@@ -199,7 +203,7 @@ int test_rdma_perf_test_impl(
             aclrtMemcpy(dst_ptr, datasize, dst_input.data(), datasize, ACL_MEMCPY_HOST_TO_DEVICE), ret, cleanup);
 
         launch_rdma_perf_kernel(
-            block_dim, stream, (uint8_t*)dst_ptr, (uint8_t*)src_ptr, trans_size, static_cast<int>(test_mode),
+            block_dim, stream, fftsAddr, (uint8_t*)dst_ptr, (uint8_t*)src_ptr, trans_size, static_cast<int>(test_mode),
             static_cast<int>(data_type_enum), ub_size_b, loop_count, static_cast<int>(metric), batch, sync_id,
             (uint8_t*)timing_out_ptr);
         CHECK_ACL_GOTO(aclrtSynchronizeStream(stream), ret, cleanup);

@@ -45,7 +45,6 @@ def gen_golden_data():
     args = parser.parse_args()
 
     type_map = {
-        "int": np.int32,
         "int32_t": np.int32,
         "float16_t": np.float16,
         "bfloat16_t": bfloat16

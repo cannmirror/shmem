@@ -25,6 +25,7 @@
 namespace shm {
 constexpr uint32_t invalidSuperPodId = 0xFFFFFFFFU;
 constexpr uint32_t invalidServerId = 0x3FFU;
+constexpr uint32_t invalidServerIdAscend950 = 0xFFFFU;
 constexpr uint32_t ASC910B_CONN_RANKS = 8U;
 
 struct HbmExportInfo {
@@ -53,45 +54,40 @@ struct HbmExportInfo {
 
 class MemSegmentDevice : public MemSegment {
 public:
-    explicit MemSegmentDevice(const MemSegmentOptions &options, int eid) : MemSegment{options, eid} {}
-    ~MemSegmentDevice() override
-    {
-    }
+    explicit MemSegmentDevice(const MemSegmentOptions& options, int eid) : MemSegment{options, eid} {}
+    ~MemSegmentDevice() override {}
 
     Result ValidateOptions() noexcept override;
-    Result ReserveMemorySpace(void **address) noexcept override;
+    Result ReserveMemorySpace(void** address) noexcept override;
     Result UnReserveMemorySpace() noexcept override;
-    Result AllocLocalMemory(uint64_t size, std::shared_ptr<MemSlice> &slice) noexcept override;
-    Result RegisterMemory(const void *addr, uint64_t size, std::shared_ptr<MemSlice> &slice) noexcept override;
-    Result ReleaseSliceMemory(const std::shared_ptr<MemSlice> &slice) noexcept override;
-    Result Export(std::string &exInfo) noexcept override;
-    Result Export(const std::shared_ptr<MemSlice> &slice, std::string &exInfo) noexcept override;
-    Result GetExportSliceSize(size_t &size) noexcept override;
-    Result Import(const std::vector<std::string> &allExInfo, void *addresses[]) noexcept override;
+    Result AllocLocalMemory(uint64_t size, std::shared_ptr<MemSlice>& slice) noexcept override;
+    Result RegisterMemory(const void* addr, uint64_t size, std::shared_ptr<MemSlice>& slice) noexcept override;
+    Result ReleaseSliceMemory(const std::shared_ptr<MemSlice>& slice) noexcept override;
+    Result Export(std::string& exInfo) noexcept override;
+    Result Export(const std::shared_ptr<MemSlice>& slice, std::string& exInfo) noexcept override;
+    Result GetExportSliceSize(size_t& size) noexcept override;
+    Result Import(const std::vector<std::string>& allExInfo, void* addresses[]) noexcept override;
     Result RemoveImported(const std::vector<uint32_t>& ranks) noexcept override;
     Result Mmap() noexcept override;
     Result Unmap() noexcept override;
     std::shared_ptr<MemSlice> GetMemSlice(hybm_mem_slice_t slice) const noexcept override;
-    bool MemoryInRange(const void *begin, uint64_t size) const noexcept override;
-    bool GetRankIdByAddr(const void *addr, uint64_t size, uint32_t &rankId) const noexcept override;
-    hybm_mem_type GetMemoryType() const noexcept override
-    {
-        return HYBM_MEM_TYPE_DEVICE;
-    }
+    bool MemoryInRange(const void* begin, uint64_t size) const noexcept override;
+    bool GetRankIdByAddr(const void* addr, uint64_t size, uint32_t& rankId) const noexcept override;
+    hybm_mem_type GetMemoryType() const noexcept override { return HYBM_MEM_TYPE_DEVICE; }
     bool CheckSdmaReaches(uint32_t rankId) const noexcept override;
 
 public:
-    static bool CanMapRemote(const HbmExportInfo &rmi) noexcept;
-    static void GetDeviceInfo(uint32_t &sdId, uint32_t &serverId, uint32_t &superPodId) noexcept;
+    static bool CanMapRemote(const HbmExportInfo& rmi) noexcept;
+    static void GetDeviceInfo(uint32_t& sdId, uint32_t& serverId, uint32_t& superPodId) noexcept;
 
 protected:
     void FreeMemory() noexcept;
     Result SetMemAccess() noexcept;
-    Result FindAvaliableVirtualAddr(uint64_t size, uint64_t &baseVa) noexcept;
+    Result FindAvaliableVirtualAddr(uint64_t size, uint64_t& baseVa) noexcept;
     Result ReserveEachPeMemorySpace(size_t reserveAlignedSize, size_t totalReservedSize, uint64_t expectSt) noexcept;
 
 protected:
-    uint8_t *globalVirtualAddress_{nullptr};
+    uint8_t* globalVirtualAddress_{nullptr};
     std::vector<uint64_t> reservedVirtualAddresses_;
     uint64_t totalVirtualSize_{0UL};
     uint64_t allocatedSize_{0UL};
@@ -106,6 +102,6 @@ protected:
     aclrtDrvMemHandle local_handle_{nullptr};
 #endif
 };
-}
+} // namespace shm
 
-#endif  // HYBM_DEVICE_MEM_SEGMENT_H
+#endif // HYBM_DEVICE_MEM_SEGMENT_H

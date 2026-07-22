@@ -28,7 +28,7 @@ AscendSocType MemSegment::socType_{AscendSocType::ASCEND_UNKNOWN};
 std::string MemSegment::sysBoolId_{};
 uint32_t MemSegment::bootIdHead_{0};
 
-MemSegmentPtr MemSegment::Create(const MemSegmentOptions &options, int entityId)
+MemSegmentPtr MemSegment::Create(const MemSegmentOptions& options, int entityId)
 {
     if (options.rankId >= options.rankCnt) {
         SHM_LOG_ERROR("rank(" << options.rankId << ") but total " << options.rankCnt);
@@ -66,7 +66,7 @@ MemSegmentPtr MemSegment::Create(const MemSegmentOptions &options, int entityId)
     return tmpSeg;
 }
 
-Result MemSegment::GetDeviceInfo(uint32_t &sdId, uint32_t &serverId, uint32_t &superPodId)
+Result MemSegment::GetDeviceInfo(uint32_t& sdId, uint32_t& serverId, uint32_t& superPodId)
 {
     auto ret = MemSegment::InitDeviceInfo();
     if (ret != ACLSHMEM_SUCCESS) {
@@ -80,10 +80,7 @@ Result MemSegment::GetDeviceInfo(uint32_t &sdId, uint32_t &serverId, uint32_t &s
     return ACLSHMEM_SUCCESS;
 }
 
-bool MemSegment::CheckSdmaReaches(uint32_t rankId) const noexcept
-{
-    return false;
-}
+bool MemSegment::CheckSdmaReaches(uint32_t rankId) const noexcept { return false; }
 
 Result MemSegment::InitDeviceInfo()
 {
@@ -105,8 +102,8 @@ Result MemSegment::InitDeviceInfo()
 
     ret = DlAclApi::AclrtGetPhyDevIdByUserDevId(deviceId_, &devicePhyId_);
     if (ret != 0 || devicePhyId_ < 0) {
-        SHM_LOG_ERROR("Failed to get phy deviceId: user=" << deviceId_ << ", logic=" << logicDeviceId_
-                                                    << ", ret=" << ret);
+        SHM_LOG_ERROR(
+            "Failed to get phy deviceId: user=" << deviceId_ << ", logic=" << logicDeviceId_ << ", ret=" << ret);
         return ACLSHMEM_INNER_ERROR;
     }
 
@@ -137,9 +134,12 @@ Result MemSegment::InitDeviceInfo()
         SHM_LOG_ERROR("get super pod id failed: " << ret);
         return ACLSHMEM_DL_FUNC_FAILED;
     }
+    socType_ = DlApi::GetAscendSocType();
+    uint32_t invalidSrvId = (socType_ == AscendSocType::ASCEND_950) ? invalidServerIdAscend950 : invalidServerId;
+
     FillSysBootIdInfo();
     superPodId_ = static_cast<uint32_t>(value);
-    if (superPodId_ == invalidSuperPodId && serverId_ == invalidServerId) {
+    if (superPodId_ == invalidSuperPodId && serverId_ == invalidSrvId) {
         if (bootIdHead_ != 0) {
             serverId_ = bootIdHead_;
         } else {
@@ -151,10 +151,9 @@ Result MemSegment::InitDeviceInfo()
             serverId_ = networks[0];
         }
     }
-
-    socType_ = DlApi::GetAscendSocType();
-    SHM_LOG_DEBUG("local sdid=0x" << std::hex << sdid_ << ", local server=0x" << std::hex << serverId_
-                                 << ", spid=" << superPodId_);
+    SHM_LOG_DEBUG(
+        "local sdid=0x" << std::hex << sdid_ << ", local server=0x" << std::hex << serverId_
+                        << ", spid=" << superPodId_);
     deviceInfoReady = true;
     return ACLSHMEM_SUCCESS;
 }
@@ -210,26 +209,25 @@ Result MemSegment::EnableRemotePeerAccess(int32_t remotePhyId, int32_t remoteUse
         }
         ret = DlAclApi::AclrtDeviceEnablePeerAccess(remoteUserId, 0);
         if (ret != 0) {
-            SHM_LOG_ERROR("enable device access failed:" << ret << " local_user:" << deviceId_
-                                                        << " local_phy:" << devicePhyId_
-                                                        << " remote_user:" << remoteUserId
-                                                        << " remote_phy:" << remotePhyId);
+            SHM_LOG_ERROR(
+                "enable device access failed:" << ret << " local_user:" << deviceId_ << " local_phy:" << devicePhyId_
+                                               << " remote_user:" << remoteUserId << " remote_phy:" << remotePhyId);
             return ACLSHMEM_DL_FUNC_FAILED;
         }
-        SHM_LOG_DEBUG("enable device access success (aclrt fallback) local_user:" << deviceId_
-                                                                                  << " remote_user:"
-                                                                                  << remoteUserId);
+        SHM_LOG_DEBUG(
+            "enable device access success (aclrt fallback) local_user:" << deviceId_
+                                                                        << " remote_user:" << remoteUserId);
         return ACLSHMEM_SUCCESS;
     }
     if (ret != 0) {
-        SHM_LOG_ERROR("enable device access failed:" << ret << " local_user:" << deviceId_
-                                                    << " local_phy:" << devicePhyId_
-                                                    << " remote_phy:" << remotePhyId);
+        SHM_LOG_ERROR(
+            "enable device access failed:" << ret << " local_user:" << deviceId_ << " local_phy:" << devicePhyId_
+                                           << " remote_phy:" << remotePhyId);
         return ACLSHMEM_DL_FUNC_FAILED;
     }
-    SHM_LOG_DEBUG("enable device access success local_user:" << deviceId_
-                                                             << " local_phy:" << devicePhyId_
-                                                             << " remote_phy:" << remotePhyId);
+    SHM_LOG_DEBUG(
+        "enable device access success local_user:" << deviceId_ << " local_phy:" << devicePhyId_
+                                                   << " remote_phy:" << remotePhyId);
     return ACLSHMEM_SUCCESS;
 }
-}
+} // namespace shm

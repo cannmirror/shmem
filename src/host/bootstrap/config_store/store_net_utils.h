@@ -35,8 +35,8 @@ constexpr int MAX_IP = 256;
 constexpr int DEFAULT_IFNAME_LNEGTH = 4;
 
 // Invalid IPv4 address prefixes
-constexpr uint32_t IPV4_APIPA_PREFIX = 0xA9FE;     // 169.254.x.x (APIPA/Link-local)
-constexpr uint32_t IPV4_LOOPBACK_PREFIX = 0x7F;    // 127.x.x.x (Loopback)
+constexpr uint32_t IPV4_APIPA_PREFIX = 0xA9FE;  // 169.254.x.x (APIPA/Link-local)
+constexpr uint32_t IPV4_LOOPBACK_PREFIX = 0x7F; // 127.x.x.x (Loopback)
 
 // Resolve `name` (literal IP or hostname) to sockaddr_storage.
 // `family` is AF_INET / AF_INET6 / AF_UNSPEC.
@@ -46,7 +46,7 @@ constexpr uint32_t IPV4_LOOPBACK_PREFIX = 0x7F;    // 127.x.x.x (Loopback)
 // dual-stack resolution, and logs every candidate so operators can diagnose
 // mismatches.  If consistent family selection across PEs is critical, use IP
 // literals or an explicit family (AF_INET / AF_INET6) instead of AF_UNSPEC.
-inline int32_t ResolveAddress(const std::string &name, int family, sockaddr_storage &out)
+inline int32_t ResolveAddress(const std::string& name, int family, sockaddr_storage& out)
 {
     constexpr size_t maxHostnameLen = 253;
     if (name.size() > maxHostnameLen) {
@@ -57,7 +57,7 @@ inline int32_t ResolveAddress(const std::string &name, int family, sockaddr_stor
     addrinfo hints{};
     hints.ai_family = family;
     hints.ai_socktype = SOCK_STREAM;
-    addrinfo *raw = nullptr;
+    addrinfo* raw = nullptr;
     int gai = getaddrinfo(name.c_str(), nullptr, &hints, &raw);
     if (gai != 0) {
         SHM_LOG_ERROR("getaddrinfo failed for '" << name << "': " << gai_strerror(gai));
@@ -69,26 +69,26 @@ inline int32_t ResolveAddress(const std::string &name, int family, sockaddr_stor
     }
     std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> guard(raw, freeaddrinfo);
     if (family != AF_UNSPEC && raw->ai_family != family) {
-        SHM_LOG_ERROR("getaddrinfo for '" << name << "' returned address family "
-            << raw->ai_family << ", expected " << family);
+        SHM_LOG_ERROR(
+            "getaddrinfo for '" << name << "' returned address family " << raw->ai_family << ", expected " << family);
         return ACLSHMEM_INVALID_PARAM;
     }
 
     if (family == AF_UNSPEC) {
         // Iterate all results: prefer IPv4 for deterministic dual-stack behaviour,
         // log every candidate so operators can diagnose resolution mismatches.
-        addrinfo *preferred = nullptr;
-        for (addrinfo *rp = raw; rp != nullptr; rp = rp->ai_next) {
+        addrinfo* preferred = nullptr;
+        for (addrinfo* rp = raw; rp != nullptr; rp = rp->ai_next) {
             char ipBuf[INET6_ADDRSTRLEN] = {0};
             if (rp->ai_family == AF_INET) {
-                auto *sin = reinterpret_cast<struct sockaddr_in *>(rp->ai_addr);
+                auto* sin = reinterpret_cast<struct sockaddr_in*>(rp->ai_addr);
                 inet_ntop(AF_INET, &sin->sin_addr, ipBuf, sizeof(ipBuf));
                 SHM_LOG_INFO("getaddrinfo '" << name << "' candidate: IPv4 " << ipBuf);
                 if (preferred == nullptr) {
-                    preferred = rp;  // prefer first IPv4
+                    preferred = rp; // prefer first IPv4
                 }
             } else if (rp->ai_family == AF_INET6) {
-                auto *sin6 = reinterpret_cast<struct sockaddr_in6 *>(rp->ai_addr);
+                auto* sin6 = reinterpret_cast<struct sockaddr_in6*>(rp->ai_addr);
                 inet_ntop(AF_INET6, &sin6->sin6_addr, ipBuf, sizeof(ipBuf));
                 SHM_LOG_INFO("getaddrinfo '" << name << "' candidate: IPv6 " << ipBuf);
             } else {
@@ -106,7 +106,7 @@ inline int32_t ResolveAddress(const std::string &name, int family, sockaddr_stor
     return ACLSHMEM_SUCCESS;
 }
 
-inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t *innerUId)
+inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t* innerUId)
 {
     std::ifstream urandom("/dev/urandom", std::ios::binary);
     if (!urandom) {
@@ -114,7 +114,7 @@ inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t *innerUId)
         return ACLSHMEM_INNER_ERROR;
     }
 
-    urandom.read(reinterpret_cast<char *>(&innerUId->magic), sizeof(innerUId->magic));
+    urandom.read(reinterpret_cast<char*>(&innerUId->magic), sizeof(innerUId->magic));
     if (urandom.fail()) {
         SHM_LOG_ERROR("read random failed.");
         return ACLSHMEM_INNER_ERROR;
@@ -123,14 +123,14 @@ inline int32_t shmem_get_uid_magic(shmemx_bootstrap_uid_state_t *innerUId)
     return ACLSHMEM_SUCCESS;
 }
 
-inline int32_t bind_tcp_port_v4(int &sockfd, int port, shmemx_bootstrap_uid_state_t *innerUId, char *ip_str)
+inline int32_t bind_tcp_port_v4(int& sockfd, int port, shmemx_bootstrap_uid_state_t* innerUId, char* ip_str)
 {
     sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd != -1) {
         int on_v4 = 1;
         if (::setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on_v4, sizeof(on_v4)) == 0) {
             innerUId->addr.addr.addr4.sin_port = htons(port);
-            sockaddr *cur_addr = reinterpret_cast<sockaddr *>(&innerUId->addr.addr.addr4);
+            sockaddr* cur_addr = reinterpret_cast<sockaddr*>(&innerUId->addr.addr.addr4);
             if (::bind(sockfd, cur_addr, sizeof(innerUId->addr.addr.addr4)) == 0) {
                 SHM_LOG_INFO("bind ipv4 success " << ", fd:" << sockfd << ", " << ip_str << ":" << port);
                 return 0;
@@ -138,7 +138,7 @@ inline int32_t bind_tcp_port_v4(int &sockfd, int port, shmemx_bootstrap_uid_stat
                 SHM_LOG_ERROR("bind socket fail:" << errno << "," << ip_str << ":" << port);
             }
         } else {
-            SHM_LOG_ERROR("set socket opt fail:" << errno << ","  << ip_str << ":" << port);
+            SHM_LOG_ERROR("set socket opt fail:" << errno << "," << ip_str << ":" << port);
         }
         close(sockfd);
         sockfd = -1;
@@ -148,14 +148,14 @@ inline int32_t bind_tcp_port_v4(int &sockfd, int port, shmemx_bootstrap_uid_stat
     return -1;
 }
 
-inline int32_t bind_tcp_port_v6(int &sockfd, int port, shmemx_bootstrap_uid_state_t *innerUId, char *ip_str)
+inline int32_t bind_tcp_port_v6(int& sockfd, int port, shmemx_bootstrap_uid_state_t* innerUId, char* ip_str)
 {
     sockfd = ::socket(AF_INET6, SOCK_STREAM, 0);
     if (sockfd != -1) {
         int on_v6 = 1;
         if (::setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on_v6, sizeof(on_v6)) == 0) {
             innerUId->addr.addr.addr6.sin6_port = htons(port);
-            sockaddr *cur_addr = reinterpret_cast<sockaddr *>(&innerUId->addr.addr.addr6);
+            sockaddr* cur_addr = reinterpret_cast<sockaddr*>(&innerUId->addr.addr.addr6);
             if (::bind(sockfd, cur_addr, sizeof(innerUId->addr.addr.addr6)) == 0) {
                 SHM_LOG_INFO("bind ipv6 success " << ", fd:" << sockfd << ", " << ip_str << ":" << port);
                 return 0;
@@ -173,7 +173,7 @@ inline int32_t bind_tcp_port_v6(int &sockfd, int port, shmemx_bootstrap_uid_stat
     return -1;
 }
 
-inline int32_t aclshmemi_get_port_magic(shmemx_bootstrap_uid_state_t *innerUId, char *ip_str)
+inline int32_t aclshmemi_get_port_magic(shmemx_bootstrap_uid_state_t* innerUId, char* ip_str)
 {
     static std::random_device rd;
     const int min_port = MIN_PORT;
@@ -208,9 +208,9 @@ inline int32_t aclshmemi_get_port_magic(shmemx_bootstrap_uid_state_t *innerUId, 
     return -1;
 }
 
-inline int32_t aclshmemi_using_env_port(aclshmemi_bootstrap_uid_state_t *innerUId, char *ip_str, uint16_t envPort)
+inline int32_t aclshmemi_using_env_port(aclshmemi_bootstrap_uid_state_t* innerUId, char* ip_str, uint16_t envPort)
 {
-    if (envPort < MIN_PORT) {   // envPort > MAX_PORT always false
+    if (envPort < MIN_PORT) { // envPort > MAX_PORT always false
         SHM_LOG_ERROR("env port is invalid. " << envPort);
         return ACLSHMEM_INVALID_PARAM;
     }
@@ -234,48 +234,127 @@ inline int32_t aclshmemi_using_env_port(aclshmemi_bootstrap_uid_state_t *innerUI
     return ret;
 }
 
-inline int32_t parse_interface_with_type(const char *ipInfo, char *IP, sa_family_t &sockType, bool &flag)
+// Probe usable address families on interface matching ifaName (prefix match).
+// Prefer IPv4 when both are available; select IPv6 only when IPv4 is absent.
+// Logs which families are available. Returns ACLSHMEM_SUCCESS and sets sockType, or error if none.
+inline int32_t aclshmemi_detect_ifa_family(const char* ifaName, sa_family_t& sockType)
 {
-    const char *delim = ":";
-    const char *sep = strchr(ipInfo, delim[0]);
-    if (sep == nullptr) {
-        SHM_LOG_ERROR("Invalid interface format: missing ':' separator in " << ipInfo);
-        return ACLSHMEM_INVALID_VALUE;
+    struct ifaddrs* ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == -1) {
+        SHM_LOG_ERROR("get local net interfaces failed: " << errno);
+        return ACLSHMEM_INVALID_PARAM;
     }
-    
+
+    bool hasV4 = false;
+    bool hasV6 = false;
+    const size_t ifaLen = strlen(ifaName);
+    for (auto ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_name == nullptr) {
+            continue;
+        }
+        if (strncmp(ifa->ifa_name, ifaName, ifaLen) != 0) {
+            continue;
+        }
+        if ((ifa->ifa_flags & IFF_LOOPBACK) || !(ifa->ifa_flags & IFF_RUNNING) || !(ifa->ifa_flags & IFF_UP)) {
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            hasV4 = true;
+        } else if (ifa->ifa_addr->sa_family == AF_INET6) {
+            auto* sa6 = reinterpret_cast<struct sockaddr_in6*>(ifa->ifa_addr);
+            if (!IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+                hasV6 = true;
+            }
+        }
+    }
+    freeifaddrs(ifaddr);
+
+    SHM_LOG_INFO(
+        "SHMEM_UID_SOCK_IFNAME interface \"" << ifaName << "\" available families: IPv4=" << (hasV4 ? "yes" : "no")
+                                             << ", IPv6=" << (hasV6 ? "yes" : "no"));
+
+    if (hasV4) {
+        sockType = AF_INET;
+        SHM_LOG_INFO(
+            "SHMEM_UID_SOCK_IFNAME interface \"" << ifaName << "\" selected family: IPv4"
+                                                 << (hasV6 ? " (IPv6 also available, IPv4 preferred)" : ""));
+        return ACLSHMEM_SUCCESS;
+    }
+    if (hasV6) {
+        sockType = AF_INET6;
+        SHM_LOG_INFO("SHMEM_UID_SOCK_IFNAME interface \"" << ifaName << "\" selected family: IPv6");
+        return ACLSHMEM_SUCCESS;
+    }
+
+    SHM_LOG_ERROR(
+        "SHMEM_UID_SOCK_IFNAME interface \"" << ifaName
+                                             << "\" has no usable IPv4/IPv6 address (need UP+RUNNING, non-loopback; "
+                                                "IPv6 excludes link-local)");
+    return ACLSHMEM_INVALID_VALUE;
+}
+
+inline int32_t parse_interface_with_type(const char* ipInfo, char* IP, sa_family_t& sockType, bool& flag)
+{
+    const char* delim = ":";
+    const char* sep = strchr(ipInfo, delim[0]);
+    if (sep == nullptr) {
+        // No address family suffix: probe interface and prefer IPv4 over IPv6.
+        size_t nameLen = strlen(ipInfo);
+        if (nameLen == 0 || nameLen >= MAX_IFCONFIG_LENGTH - 1) {
+            SHM_LOG_ERROR("Invalid interface name length: " << nameLen);
+            return ACLSHMEM_INVALID_VALUE;
+        }
+        std::copy_n(ipInfo, nameLen, IP);
+        IP[nameLen] = '\0';
+        flag = true;
+        SHM_LOG_INFO(
+            "SHMEM_UID_SOCK_IFNAME has no family suffix (\""
+            << ipInfo << "\"), auto-detecting usable address family. Specify explicitly as \"" << ipInfo
+            << ":inet4\" or \"" << ipInfo << ":inet6\" if needed.");
+        return aclshmemi_detect_ifa_family(IP, sockType);
+    }
+
     size_t leftLen = sep - ipInfo;
-    if (leftLen >= MAX_IFCONFIG_LENGTH - 1 || leftLen == 0) {
+    if (leftLen == 0 || leftLen >= MAX_IFCONFIG_LENGTH - 1) {
         SHM_LOG_ERROR("Invalid interface name length: " << leftLen);
         return ACLSHMEM_INVALID_VALUE;
     }
-    
-    size_t actualCopyLen = std::min(strlen(ipInfo), static_cast<size_t>(leftLen));
-    std::copy(ipInfo, ipInfo + actualCopyLen, IP);
-    if (actualCopyLen < leftLen) {
-        std::fill(IP + actualCopyLen, IP + leftLen, '\0');
+    std::copy_n(ipInfo, leftLen, IP);
+    IP[leftLen] = '\0';
+    if (strcmp(sep + 1, "inet6") == 0) {
+        sockType = AF_INET6;
+    } else if (strcmp(sep + 1, "inet4") == 0) {
+        sockType = AF_INET;
+    } else {
+        flag = true;
+        SHM_LOG_WARN(
+            "SHMEM_UID_SOCK_IFNAME has invalid family suffix (\""
+            << (sep + 1) << "\"), expected \"inet4\" or \"inet6\". Auto-detecting usable address family.");
+        return aclshmemi_detect_ifa_family(IP, sockType);
     }
-    sockType = (strcmp(sep + 1, "inet6") != 0) ? AF_INET : AF_INET6;
     flag = true;
+    SHM_LOG_INFO("Parse ipInfo success: ifaPrefix=" << IP << ", sockType=" << (sockType == AF_INET ? "IPv4" : "IPv6"));
     return ACLSHMEM_SUCCESS;
 }
 
-inline int32_t aclshmemi_auto_get_ip(struct sockaddr *ifaAddr, char *local, sa_family_t &sockType)
+inline int32_t aclshmemi_auto_get_ip(struct sockaddr* ifaAddr, char* local, sa_family_t& sockType)
 {
     sa_family_t prevFamily = sockType;
     sockType = ifaAddr->sa_family;
     if (prevFamily != sockType) {
-        SHM_LOG_INFO("auto-select: address family switched from " << (prevFamily == AF_INET ? "AF_INET" : "AF_INET6")
-            << " to " << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
+        SHM_LOG_INFO(
+            "auto-select: address family switched from " << (prevFamily == AF_INET ? "AF_INET" : "AF_INET6") << " to "
+                                                         << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
     }
     if (sockType == AF_INET) {
-        auto localIp = reinterpret_cast<struct sockaddr_in *>(ifaAddr)->sin_addr;
+        auto localIp = reinterpret_cast<struct sockaddr_in*>(ifaAddr)->sin_addr;
         if (inet_ntop(sockType, &localIp, local, MAX_IP) == nullptr) {
             SHM_LOG_ERROR("convert local ipv4 to string failed. ");
             return ACLSHMEM_INVALID_PARAM;
         }
         return ACLSHMEM_SUCCESS;
     } else if (sockType == AF_INET6) {
-        auto localIp = reinterpret_cast<struct sockaddr_in6 *>(ifaAddr)->sin6_addr;
+        auto localIp = reinterpret_cast<struct sockaddr_in6*>(ifaAddr)->sin6_addr;
         if (inet_ntop(sockType, &localIp, local, MAX_IP) == nullptr) {
             SHM_LOG_ERROR("convert local ipv6 to string failed. ");
             return ACLSHMEM_INVALID_PARAM;
@@ -285,16 +364,16 @@ inline int32_t aclshmemi_auto_get_ip(struct sockaddr *ifaAddr, char *local, sa_f
     return ACLSHMEM_INVALID_PARAM;
 }
 
-inline bool aclshmemi_is_valid_ip(struct sockaddr *ifaAddr)
+inline bool aclshmemi_is_valid_ip(struct sockaddr* ifaAddr)
 {
     if (ifaAddr == nullptr) {
         return false;
     }
-    
+
     if (ifaAddr->sa_family == AF_INET) {
-        auto *addr = reinterpret_cast<struct sockaddr_in *>(ifaAddr);
+        auto* addr = reinterpret_cast<struct sockaddr_in*>(ifaAddr);
         uint32_t ip = ntohl(addr->sin_addr.s_addr);
-        
+
         // Check for invalid IPv4 addresses
         if (ip == 0) {
             SHM_LOG_DEBUG("invalid IPv4: 0.0.0.0");
@@ -310,8 +389,8 @@ inline bool aclshmemi_is_valid_ip(struct sockaddr *ifaAddr)
         }
         return true;
     } else if (ifaAddr->sa_family == AF_INET6) {
-        auto *addr6 = reinterpret_cast<struct sockaddr_in6 *>(ifaAddr);
-        
+        auto* addr6 = reinterpret_cast<struct sockaddr_in6*>(ifaAddr);
+
         // Check for invalid IPv6 addresses
         if (IN6_IS_ADDR_UNSPECIFIED(&addr6->sin6_addr)) {
             SHM_LOG_DEBUG("invalid IPv6: unspecified address ::");
@@ -328,11 +407,12 @@ inline bool aclshmemi_is_valid_ip(struct sockaddr *ifaAddr)
         }
         return true;
     }
-    
+
     return false;
 }
 
-inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool flag, char *ifaName, size_t ifaLen, bool autoSelect = false)
+inline bool aclshmemi_check_ifa(
+    struct ifaddrs* ifa, sa_family_t sockType, bool flag, char* ifaName, size_t ifaLen, bool autoSelect = false)
 {
     if (ifa->ifa_addr == nullptr || ifa->ifa_netmask == nullptr || ifa->ifa_name == nullptr) {
         SHM_LOG_DEBUG("loop ifa_addr/ifa_netmask/ifa_name is nullptr");
@@ -358,13 +438,13 @@ inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool 
     if (autoSelect) {
         std::string ifNameStr(ifa->ifa_name);
         // Exclude loopback, docker, veth, bridge and other virtual interfaces
-        if (ifNameStr.find("lo") == 0 ||          // loopback
-            ifNameStr.find("docker") == 0 ||      // docker bridge
-            ifNameStr.find("veth") == 0 ||        // virtual ethernet
-            ifNameStr.find("br-") == 0 ||         // bridge
-            ifNameStr.find("virbr") == 0 ||       // virtual bridge
-            ifNameStr.find("tun") == 0 ||         // tunnel
-            ifNameStr.find("tap") == 0) {         // tap device
+        if (ifNameStr.find("lo") == 0 ||     // loopback
+            ifNameStr.find("docker") == 0 || // docker bridge
+            ifNameStr.find("veth") == 0 ||   // virtual ethernet
+            ifNameStr.find("br-") == 0 ||    // bridge
+            ifNameStr.find("virbr") == 0 ||  // virtual bridge
+            ifNameStr.find("tun") == 0 ||    // tunnel
+            ifNameStr.find("tap") == 0) {    // tap device
             SHM_LOG_DEBUG("skip virtual interface: " << ifa->ifa_name);
             return false;
         }
@@ -383,7 +463,7 @@ inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool 
     }
 
     if (sockType == AF_INET6) {
-        struct sockaddr_in6 *sa6 = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr);
+        struct sockaddr_in6* sa6 = reinterpret_cast<struct sockaddr_in6*>(ifa->ifa_addr);
         if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
             SHM_LOG_DEBUG("ifa is scope link addr " << ifaName);
             return false;
@@ -392,14 +472,14 @@ inline bool aclshmemi_check_ifa(struct ifaddrs *ifa, sa_family_t sockType, bool 
     return true;
 }
 
-inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, const char *ipInfo)
+inline int32_t aclshmemi_get_ip_from_ifa(char* local, sa_family_t& sockType, const char* ipInfo)
 {
-    struct ifaddrs *ifaddr;
-    char ifaName[MAX_IFCONFIG_LENGTH] = {0};  // Initialize to zero
+    struct ifaddrs* ifaddr;
+    char ifaName[MAX_IFCONFIG_LENGTH] = {0}; // Initialize to zero
     sockType = AF_INET;
     bool flag = false;
     bool autoSelect = false;
-    
+
     // Treat nullptr or empty string as auto-select
     if (ipInfo == nullptr || ipInfo[0] == '\0') {
         // Auto-select network interface: skip virtual interfaces and use the first valid one
@@ -418,17 +498,17 @@ inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, con
         if (!aclshmemi_check_ifa(ifa, sockType, flag, ifaName, strlen(ifaName), autoSelect)) {
             continue;
         }
-        
+
         bool ipObtained = false;
         if (sockType == AF_INET && flag) {
-            auto localIp = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr)->sin_addr;
+            auto localIp = reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr)->sin_addr;
             if (inet_ntop(sockType, &localIp, local, 64) == nullptr) {
                 SHM_LOG_ERROR("convert local ipv4 to string failed. ");
                 continue;
             }
             ipObtained = true;
         } else if (sockType == AF_INET6 && flag) {
-            auto localIp = reinterpret_cast<struct sockaddr_in6 *>(ifa->ifa_addr)->sin6_addr;
+            auto localIp = reinterpret_cast<struct sockaddr_in6*>(ifa->ifa_addr)->sin6_addr;
             if (inet_ntop(sockType, &localIp, local, 64) == nullptr) {
                 SHM_LOG_ERROR("convert local ipv6 to string failed. ");
                 continue;
@@ -441,11 +521,12 @@ inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, con
             }
             ipObtained = true;
         }
-        
+
         if (ipObtained) {
             if (autoSelect) {
-                SHM_LOG_INFO("auto-selected interface: " << ifa->ifa_name
-                    << ", IP: " << local << ", family: " << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
+                SHM_LOG_INFO(
+                    "auto-selected interface: " << ifa->ifa_name << ", IP: " << local
+                                                << ", family: " << (sockType == AF_INET ? "AF_INET" : "AF_INET6"));
             }
             result = ACLSHMEM_SUCCESS;
             break;
@@ -455,7 +536,7 @@ inline int32_t aclshmemi_get_ip_from_ifa(char *local, sa_family_t &sockType, con
     return result;
 }
 
-inline bool aclshmemi_parse_port(const std::string &portStr, uint16_t &port)
+inline bool aclshmemi_parse_port(const std::string& portStr, uint16_t& port)
 {
     constexpr int maxPort = 65535;
     try {
@@ -471,13 +552,13 @@ inline bool aclshmemi_parse_port(const std::string &portStr, uint16_t &port)
         }
         port = static_cast<uint16_t>(portInt);
         return true;
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         SHM_LOG_ERROR("Invalid port string: " << e.what());
         return false;
     }
 }
 
-inline int32_t aclshmemi_get_ip_from_env(char *ip, uint16_t &port, sa_family_t &sockType, const char *ipPort)
+inline int32_t aclshmemi_get_ip_from_env(char* ip, uint16_t& port, sa_family_t& sockType, const char* ipPort)
 {
     if (ipPort == nullptr) {
         return ACLSHMEM_INVALID_PARAM;
@@ -545,15 +626,15 @@ inline int32_t aclshmemi_get_ip_from_env(char *ip, uint16_t &port, sa_family_t &
     return ACLSHMEM_SUCCESS;
 }
 
-inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &sock_type, char *pta_env_ip, uint16_t pta_env_port,
-                          bool is_from_ifa)
+inline int32_t aclshmemi_set_ip_info(
+    aclshmemx_uniqueid_t* uid, sa_family_t& sock_type, char* pta_env_ip, uint16_t pta_env_port, bool is_from_ifa)
 {
     // init default uid
     SHM_ASSERT_RETURN(uid != nullptr, ACLSHMEM_INVALID_PARAM);
     aclshmemx_uniqueid_t default_uid{};
     default_uid.version = ACLSHMEM_UNIQUEID_VERSION;
     *uid = default_uid;
-    shmemx_bootstrap_uid_state_t *innerUID = reinterpret_cast<shmemx_bootstrap_uid_state_t *>(uid);
+    shmemx_bootstrap_uid_state_t* innerUID = reinterpret_cast<shmemx_bootstrap_uid_state_t*>(uid);
     if (sock_type == AF_INET) {
         innerUID->addr.addr.addr4.sin_family = AF_INET;
         if (inet_pton(AF_INET, pta_env_ip, &(innerUID->addr.addr.addr4.sin_addr)) <= 0) {
@@ -561,7 +642,7 @@ inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &soc
             if (ResolveAddress(pta_env_ip, AF_INET, resolved) != ACLSHMEM_SUCCESS) {
                 return ACLSHMEM_NOT_INITED;
             }
-            auto *sin = reinterpret_cast<const struct sockaddr_in *>(&resolved);
+            auto* sin = reinterpret_cast<const struct sockaddr_in*>(&resolved);
             innerUID->addr.addr.addr4.sin_addr = sin->sin_addr;
         }
         innerUID->addr.type = ADDR_IPv4;
@@ -572,7 +653,7 @@ inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &soc
             if (ResolveAddress(pta_env_ip, AF_INET6, resolved) != ACLSHMEM_SUCCESS) {
                 return ACLSHMEM_NOT_INITED;
             }
-            auto *sin6 = reinterpret_cast<const struct sockaddr_in6 *>(&resolved);
+            auto* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&resolved);
             innerUID->addr.addr.addr6.sin6_addr = sin6->sin6_addr;
         }
         innerUID->addr.type = ADDR_IPv6;
@@ -600,7 +681,7 @@ inline int32_t aclshmemi_set_ip_info(aclshmemx_uniqueid_t *uid, sa_family_t &soc
     return ACLSHMEM_SUCCESS;
 }
 
-}  // namespace utils
-}  // namespace shm
+} // namespace utils
+} // namespace shm
 
 #endif

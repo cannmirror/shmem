@@ -150,6 +150,8 @@ status = aclshmemx_init_attr(ACLSHMEMX_INIT_WITH_UNIQUEID, &attributes);
 
     `SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6` 取ipv6
 
+    `SHMEM_UID_SOCK_IFNAME=eth0` 自动探测可用协议（优先ipv4）
+
 注意: 同时配置时只读取`SHMEM_UID_SESSION_ID`
 
 ## RDMA相关问题

@@ -364,12 +364,21 @@ torchrun --nproc-per-node=<n> test.py # <n> 为想运行的 ranksize，替换为
 ## 7 `unique id` 初始化方式
 
 注：使用unique id的接口初始化，可以配置环境变量SHMEM_UID_SESSION_ID或者SHMEM_UID_SOCK_IFNAME，同时配置时只读SHMEM_UID_SESSION_ID，都不配置时会自动搜索可用网口。SHMEM_UID_SESSION_ID支持IPv4地址、IPv6地址和主机名。SHMEM_UID_SESSION_ID配置示例：
+
+```bash
 SHMEM_UID_SESSION_ID=127.0.0.1:1234
 SHMEM_UID_SESSION_ID=[6666:6666:6666:6666:6666:6666:6666:6666]:886
 SHMEM_UID_SESSION_ID=localhost:8888
+```
+
 SHMEM_UID_SOCK_IFNAME配置示例：
+
+```bash
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet4  取ipv4
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
+SHMEM_UID_SOCK_IFNAME=eth0          自动探测可用协议（优先ipv4）
+```
+
 未配置时可自动搜索可用网口（IPv4/IPv6均可，优先非虚拟网口）。
 
 - python初始化例子
@@ -400,13 +409,22 @@ ret = aclshmemx_set_attr_uniqueid_args(my_pe, n_pes, mem_size, &uid, attr);
 
 注：使用unique id的接口初始化，可以手动配置环境变量SHMEM_UID_SESSION_ID或者SHMEM_UID_SOCK_IFNAME，同时配置时只读SHMEM_UID_SESSION_ID，都不配置会自动搜索可用网口。SHMEM_UID_SESSION_ID支持IPv4地址、IPv6地址和主机名。
 SHMEM_UID_SESSION_ID配置示例：
+
+```bash
 SHMEM_UID_SESSION_ID=127.0.0.1:1234
 SHMEM_UID_SESSION_ID=[6666:6666:6666:6666:6666:6666:6666:6666]:886
 SHMEM_UID_SESSION_ID=[6666:6666:6666:6666:6666:6666:6666:6666%eth]:886
 SHMEM_UID_SESSION_ID=localhost:8888
+```
+
 SHMEM_UID_SOCK_IFNAME配置示例：
+
+```bash
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet4  取ipv4
 SHMEM_UID_SOCK_IFNAME=enpxxxx:inet6  取ipv6
+SHMEM_UID_SOCK_IFNAME=eth0          自动探测可用协议（优先ipv4）
+```
+
 不配置默认自动搜索可用网口(IPv4/IPv6均可)，搜索优先级：非虚拟网口(排除lo/docker/veth/br-/virbr/tun/tap) >> 虚拟网口。
 
 - c++ 初始化例子

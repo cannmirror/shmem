@@ -12,6 +12,9 @@
 import argparse
 import json
 import os
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 from ._soc import detect_soc, select_backend, _read_proc_maps
@@ -20,9 +23,11 @@ _PKG_ROOT = Path(__file__).resolve().parent
 
 
 def _read_version():
-    version_file = _PKG_ROOT / "VERSION"
+    version_file = _PKG_ROOT / "version.info"
     if version_file.exists():
         first_line = version_file.read_text(encoding="utf-8").splitlines()[0].strip()
+        if ":" in first_line:
+            return first_line.split(":", 1)[-1].strip()
         return first_line if first_line else "unknown"
     return "unknown"
 
@@ -127,10 +132,12 @@ def _check_backend_artifacts():
 
 
 def _is_release_build():
-    """Return True for release builds (no build_type: debug in VERSION)."""
-    version_file = _PKG_ROOT / "VERSION"
+    """Return True for release builds (parses 'Build Type' key from VERSION)."""
+    version_file = _PKG_ROOT / "version.info"
     if version_file.exists():
-        return "build_type: debug" not in version_file.read_text(encoding="utf-8")
+        for line in version_file.read_text(encoding="utf-8").splitlines():
+            if re.match(r'build[_:\s]*type[_:\s]*:', line, re.IGNORECASE):
+                return line.split(":", 1)[-1].strip().lower() != "debug"
     return True
 
 
@@ -230,11 +237,29 @@ def cmd_diagnose():
     print(json.dumps(result, indent=2))
 
 
+def cmd_check(package=None):
+    """转发到打包的 preinstall_check.sh 进行环境检测。"""
+    check_script = _PKG_ROOT / "scripts" / "preinstall_check.sh"
+    if not check_script.exists():
+        print(f"错误：未找到环境检测脚本：{check_script}", file=sys.stderr)
+        sys.exit(1)
+
+    shell_args = [str(check_script)]
+    if package:
+        shell_args += ["--package", package]
+    else:
+        shell_args += ["--package", str(_PKG_ROOT)]
+    sys.exit(subprocess.run(shell_args).returncode)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="shmem-config",
         description="SHMEM configuration utility - query paths, backend, and diagnostics",
     )
+
+    parser.add_argument("--check", action="store_true", help="Run environment check")
+    parser.add_argument("--package", help="指定 SHMEM 包根目录（配合 --check 使用）")
     parser.add_argument("--include", action="store_true", help="Output C/C++ header include path")
     parser.add_argument("--lib", action="store_true", help="Output current backend library path")
     parser.add_argument("--backend", action="store_true", help="Output backend selection result")
@@ -247,7 +272,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.include:
+    if args.check:
+        cmd_check(package=args.package)
+    elif args.include:
         cmd_include()
     elif args.lib:
         cmd_lib()

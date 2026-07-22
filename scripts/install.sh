@@ -10,10 +10,10 @@
 # -----------------------------------------------------------------------------------------------------------
 set -e
 install_flag=n
-quiet_flag=n
 uninstall_flag=n
 install_path_flag=n
 install_for_all_flag=n
+check_flag=n
 sourcedir=$PWD
 default_install_dir="/usr/local/Ascend/shmem"
 VERSION=VERSION_PLACEHOLDER
@@ -49,7 +49,7 @@ function chmod_file()
 
 function chmod_dir()
 {
-    chmod_recursion ${1} ${2} "dir" 
+    chmod_recursion ${1} ${2} "dir"
 }
 
 function chmod_recursion()
@@ -73,10 +73,6 @@ function parse_script_args()
             install_flag=y
             shift
         ;;
-        --quiet)
-            quiet_flag=y
-            shift
-        ;;
         --install-path=*)
             install_path_flag=y
             target_dir=$(echo $1 | cut -d"=" -f2-)
@@ -89,6 +85,10 @@ function parse_script_args()
         ;;
         --install-for-all)
             install_for_all_flag=y
+            shift
+        ;;
+        --check)
+            check_flag=y
             shift
         ;;
         --*)
@@ -131,7 +131,7 @@ function check_owner()
     if [[ "${cur_owner}" != "root" && "${install_flag}" == "y" ]]; then
         default_install_dir="${HOME}/Ascend/shmem"
     fi
-    
+
     if [ "${install_path_flag}" == "y" ]; then
         default_install_dir="${target_dir}"
     fi
@@ -309,9 +309,33 @@ function install_process()
     fi
 }
 
+function run_preinstall_check()
+{
+    local check_script="${sourcedir}/scripts/preinstall_check.sh"
+    if [ ! -f "$check_script" ]; then
+        print "ERROR" "preinstall check script not found: $check_script"
+        exit 1
+    fi
+
+    print "INFO" "Running pre-installation environment check..."
+    print "INFO" "--------------------------------------------"
+    bash "$check_script" --package "${sourcedir}" || true
+    print "INFO" "--------------------------------------------"
+}
+
 function main()
 {
     parse_script_args $*
+
+    # --check：执行环境检测，与 --install 组合则安装前检测
+    if [ "$check_flag" == "y" ]; then
+        run_preinstall_check
+        # --check 不配合 --install 的话，检测完就退出
+        if [ "$install_flag" != "y" ] && [ "$install_path_flag" != "y" ]; then
+            exit 0
+        fi
+    fi
+
     if [ "$uninstall_flag" == "y" ]; then
         uninstall
     elif [ "$install_flag" == "y" ] || [ "$install_path_flag" == "y" ]; then

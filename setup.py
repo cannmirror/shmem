@@ -132,6 +132,15 @@ class BuildCppLibs(build_py):
                 so_list = list(backend_dir.glob("*.so"))
                 print(f"  Backend {backend_dir.name}: {len(so_list)} .so files")
 
+        # Copy root_info_generate binary (Ascend950 UDMA tool)
+        install_bin = Path("install/shmem") / "bin"
+        if install_bin.exists() and install_bin.is_dir():
+            dst_bin = package_src_dir / "bin"
+            if dst_bin.exists():
+                shutil.rmtree(dst_bin)
+            shutil.copytree(install_bin, dst_bin)
+            print(f"Copied {install_bin} -> {dst_bin}")
+
         src_include = Path("include")
         dst_include = package_src_dir / "include"
         if dst_include.exists():
@@ -151,9 +160,18 @@ class BuildCppLibs(build_py):
             shutil.copytree(src_device, dst_src / "device")
         print(f"Copied src/device -> {dst_src}")
 
-        version_file = Path("install") / "VERSION"
+        # version.info 由 build.sh 写入 install/ 目录
+        version_file = Path("install") / "version.info"
         if version_file.exists():
-            shutil.copy(version_file, package_src_dir / "VERSION")
+            shutil.copy(version_file, package_src_dir / "version.info")
+
+        # 将 preinstall_check.sh 打包进 wheel
+        scripts_dir = package_src_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        shell_script_src = Path("scripts") / "preinstall_check.sh"
+        if shell_script_src.exists():
+            shutil.copy(shell_script_src, scripts_dir / "preinstall_check.sh")
+            print(f"Copied {shell_script_src} -> {scripts_dir / 'preinstall_check.sh'}")
 
 
 setup(
@@ -170,11 +188,13 @@ setup(
     package_data={
         "shmem": [
             "*.so",
-            "VERSION",
+            "version.info",
             "include/**/*.h",
             "src/**/*.h",
             "src/**/*.hpp",
             "backends/**/*.so",
+            "bin/root_info_generate",
+            "scripts/*.sh",
         ]
     },
     entry_points={

@@ -122,6 +122,71 @@ function fn_build()
     cd -
 }
 
+function _get_cann_build_version() {
+    # 从 ASCEND_HOME_PATH 下的 version.info 中提取 CANN 版本号
+    local cann_ver="UNKNOWN"
+    if [ -n "${ASCEND_HOME_PATH:-}" ]; then
+        for candidate in \
+            "$ASCEND_HOME_PATH/opp/version.info" \
+            "$ASCEND_HOME_PATH/version.info"; do
+            if [ -f "$candidate" ]; then
+                cann_ver=$(grep -m1 -iE "Version|version" "$candidate" | awk -F'=' '{print $NF}' | tr -d ' "' || echo "UNKNOWN")
+                if [ "$cann_ver" != "UNKNOWN" ] && [ -n "$cann_ver" ]; then
+                    break
+                fi
+            fi
+        done
+    fi
+    echo "$cann_ver"
+}
+
+function _write_version_info() {
+    local output_path="$1"
+
+    local arch
+    arch=$(uname -m)
+
+    local branch
+    branch=$(git symbolic-ref -q --short HEAD 2>/dev/null || echo "unknown")
+
+    local commit_id
+    commit_id=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+
+    local build_timestamp
+    build_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+    local build_type_display="${BUILD_TYPE:-RELEASE}"
+    local soc_display="${SOC_TYPE:-Ascend910B}"
+    local rdma_display="${RDMA_BACKEND:-NONE}"
+    local cann_version=$(_get_cann_build_version)
+
+    local has_root_info="否"
+    if [ -f "${PROJECT_ROOT}/install/shmem/bin/root_info_generate" ]; then
+        has_root_info="是"
+    elif [ -f "${PROJECT_ROOT}/build/bin/root_info_generate" ]; then
+        has_root_info="是"
+    fi
+
+    local udma_support="否"
+    if grep -q 'ACLSHMEM_UDMA_SUPPORT:\w*=ON' "${PROJECT_ROOT}/build/CMakeCache.txt" 2>/dev/null; then
+        udma_support="是"
+    fi
+
+    {
+        echo "SHMEM Version : ${VERSION}"
+        echo "Platform : ${arch}"
+        echo "branch : ${branch}"
+        echo "commit id : ${commit_id}"
+        echo "Build Timestamp : ${build_timestamp}"
+        echo "Build Type : ${build_type_display}"
+        echo "SOC Type : ${soc_display}"
+        echo "CANN Version : ${cann_version}"
+        echo "RDMA Backend : ${rdma_display}"
+        echo "Root Info Generate Tool : ${has_root_info}"
+        echo "UDMA Support : ${udma_support}"
+    } > "$output_path"
+}
+
 function fn_whl_build()
 {
     echo "Python extension enabled. Building multi-SOC wheel (910 + 950)..."
@@ -137,16 +202,6 @@ function fn_whl_build()
 
     cd "${PROJECT_ROOT}/src/python"
     rm -rf shmem.egg-info ${PROJECT_ROOT}/dist
-
-    GIT_COMMIT=`git rev-parse HEAD` || true
-    {
-        echo "${VERSION}"
-        echo "commit_id: ${GIT_COMMIT}"
-        if [ "${BUILD_TYPE}" = "Debug" ]; then
-            echo "build_type: debug"
-        fi
-    } > "${PROJECT_ROOT}/src/python/shmem/VERSION"
-
     cd "${PROJECT_ROOT}"
 
     py_ver=$(python3 -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
@@ -177,9 +232,12 @@ function fn_whl_build()
 
     echo "===== [1/3] Building backend: 910 ====="
     # Ascend910B backend covers Ascend910 A2/A3 series.
+    # 910B 不依赖特定 RDMA Backend，剔除 -DACLSHMEM_RDMA_BACKEND 但保留 RDMA_SUPPORT
+    local compile_opts_910=$COMPILE_OPTIONS
+    compile_opts_910=$(echo "$compile_opts_910" | sed 's/-DACLSHMEM_RDMA_BACKEND=\S*//g')
     [ -d build ] && rm -rf build
     mkdir -p build && cd build
-    cmake ${COMPILE_OPTIONS_910} \
+    cmake $compile_opts_910 \
         -DCMAKE_INSTALL_PREFIX=../install \
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
         -DUSE_CXX11_ABI=${USE_CXX11_ABI} \
@@ -227,6 +285,9 @@ function fn_whl_build()
     cp ../install/shmem/lib/*.so ../install/shmem/backends/950/ || { echo "[ERROR] Failed to copy 950 backend libraries"; exit 1; }
     cd -
     echo "===== Backend 950 built ====="
+
+    # Write unified version info after all backends are built
+    _write_version_info "${PROJECT_ROOT}/src/python/shmem/version.info"
 
     # ============================================================
     # Package wheel (skip cmake in setup.py via _SHMEM_PREBUILT)
@@ -285,28 +346,22 @@ function fn_make_run_package()
         exit 1
     fi
 
-    branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match 2> /dev/null || echo $branch)
-    commit_id=$(git rev-parse HEAD) || true
     mkdir -p $OUTPUT_DIR
-    touch $OUTPUT_DIR/version.info
-    cat>$OUTPUT_DIR/version.info<<EOF
-        SHMEM Version :  ${VERSION}
-        Platform : ${ARCH}
-        branch : ${branch}
-        commit id : ${commit_id}
-EOF
+    _write_version_info "$OUTPUT_DIR/version.info"
 
     mkdir -p $OUTPUT_DIR/scripts
     mkdir -p $RELEASE_DIR/$ARCH
     cp $PROJECT_ROOT/scripts/install.sh $OUTPUT_DIR
     cp $PROJECT_ROOT/scripts/set_env.sh $OUTPUT_DIR
     cp $PROJECT_ROOT/scripts/uninstall.sh $OUTPUT_DIR/scripts
+    cp $PROJECT_ROOT/scripts/preinstall_check.sh $OUTPUT_DIR/scripts
 
     sed -i "s/SHMEMPKGARCH/${ARCH}/" $OUTPUT_DIR/install.sh
     sed -i "s!VERSION_PLACEHOLDER!${VERSION}!" $OUTPUT_DIR/install.sh
     sed -i "s!VERSION_PLACEHOLDER!${VERSION}!" $OUTPUT_DIR/scripts/uninstall.sh
 
     chmod +x $OUTPUT_DIR/*.sh
+    chmod +x $OUTPUT_DIR/scripts/*.sh
 
     makeself_dir=${ASCEND_HOME_PATH}/toolkit/tools/op_project_templates/ascendc/customize/cmake/util/makeself/
     ${makeself_dir}/makeself.sh --header ${makeself_dir}/makeself-header.sh \
@@ -553,9 +608,9 @@ fi
 
 # Validate RDMA parameter dependencies
 if [ -n "$RDMA_BACKEND" ]; then
-    if [ "$SOC_TYPE" != "Ascend950" ]; then
-        echo "Error: -rdma_backend can only be specified when SOC_TYPE is Ascend950."
-        echo "       Please use -soc_type Ascend950 when specifying -rdma_backend."
+    if [ "$SOC_TYPE" != "Ascend950" ] && [ "$PACKAGE" != "ON" ]; then
+        echo "Error: -rdma_backend can only be specified when SOC_TYPE is Ascend950 (or with -package for multi-SOC)."
+        echo "       Please use -soc_type Ascend950 or -package when specifying -rdma_backend."
         print_usage
         exit 1
     fi
@@ -567,12 +622,17 @@ if [ -n "$RDMA_BACKEND" ]; then
     fi
 fi
 
-if [ "$SOC_TYPE" = "Ascend950" ]; then
+if [ "$SOC_TYPE" = "Ascend950" ] || [ "$PACKAGE" = "ON" ]; then
     if [ -n "$(echo "$COMPILE_OPTIONS" | grep -o '\-DACLSHMEM_RDMA_SUPPORT=ON')" ]; then
         if [ -z "$RDMA_BACKEND" ]; then
-            echo "Error: -rdma_backend must be specified when SOC_TYPE is Ascend950 and RDMA is enabled."
-            print_usage
-            exit 1
+            if [ "$SOC_TYPE" = "Ascend950" ]; then
+                echo "Error: -rdma_backend must be specified when SOC_TYPE is Ascend950 and RDMA is enabled."
+                print_usage
+                exit 1
+            else
+                echo "WARNING: -enable_rdma specified without -rdma_backend. RDMA for 950 may not link correctly."
+                echo "         Consider adding -rdma_backend XSCALE or -rdma_backend HNS_1825."
+            fi
         fi
     fi
     fn_build_nlohmann_json
@@ -604,6 +664,14 @@ else
         fn_whl_build
     fi
 
+    # fn_build 使用全局 SOC_TYPE（默认 910），剔除 950 专用的 RDMA_BACKEND
+    # 除非用户显式指定了 SOC_TYPE=Ascend950
+    _compile_opts_default=$COMPILE_OPTIONS
+    if [ "$SOC_TYPE" != "Ascend950" ]; then
+        _compile_opts_default=$(echo "$_compile_opts_default" | sed 's/-DACLSHMEM_RDMA_BACKEND=[^ ]*//g')
+    fi
+    COMPILE_OPTIONS="$_compile_opts_default"
+    rm -rf build   # 确保干净构建，清除可能残留的 CMake 缓存
     fn_build
     fn_make_run_package
     if [ "$PACKAGE" == "ON" ]; then

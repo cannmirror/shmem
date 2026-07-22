@@ -12,14 +12,17 @@
 #
 
 import os
+import re
 import sys
 import ctypes
 import logging
+import subprocess
 import torch
 import torch_npu
 from pathlib import Path
 
 from ._soc import detect_soc, select_backend, _read_proc_maps
+from .shmem_config import _read_version
 
 current_path = os.path.abspath(__file__)
 current_dir = os.path.dirname(current_path)
@@ -28,14 +31,18 @@ sys.path.append(current_dir)
 _PKG_ROOT = Path(current_dir)
 
 def _is_debug_build():
-    """Return True for debug builds (build_type: debug line in VERSION)."""
-    version_file = _PKG_ROOT / "VERSION"
+    """Return True for debug builds (parses 'Build Type' key from version.info)."""
+    version_file = _PKG_ROOT / "version.info"
     if version_file.exists():
-        return "build_type: debug" in version_file.read_text(encoding="utf-8")
+        for line in version_file.read_text(encoding="utf-8").splitlines():
+            if re.match(r'build[_:\s]*type[_:\s]*:', line, re.IGNORECASE):
+                return line.split(":", 1)[-1].strip().lower() == "debug"
     return False
 
 
 _STRICT_MODE = not _is_debug_build()
+
+_env_already_checked = False
 
 
 def _hint():
@@ -150,6 +157,64 @@ def _post_load_guard():
     for w in warnings:
         logging.warning(f"[SHMEM startup guard] {w}")
 
+
+def _run_pre_import_env_check():
+    """首次 import shmem 时执行一次环境检测，后续跳过。
+
+    调用打包的 preinstall_check.sh，与 shmem-config check 使用同一检测逻辑。
+    检测结果写入 ~/.cache/shmem/.env_checked 标记文件，
+    之后 import 不再重复检测。用户可随时手动运行 shmem-config check 命令。
+
+    哨兵文件读写全部包裹 OSError 保护，避免 HOME 不可写或只读文件系统
+    导致 import shmem 直接崩溃。
+    """
+    global _env_already_checked
+    if _env_already_checked:
+        return
+
+    sentinel = Path.home() / ".cache" / "shmem" / ".env_checked"
+    current_version = _read_version()
+
+    try:
+        if sentinel.exists():
+            cached_version = sentinel.read_text(encoding="utf-8").strip()
+            if cached_version == current_version:
+                _env_already_checked = True
+                return
+    except OSError:
+        pass
+
+    check_script = _PKG_ROOT / "scripts" / "preinstall_check.sh"
+    if not check_script.exists():
+        _env_already_checked = True
+        return
+
+    try:
+        subprocess.run(
+            [str(check_script), "--package", str(_PKG_ROOT)],
+            timeout=15
+        )
+    except subprocess.TimeoutExpired:
+        print("\n[SHMEM env check] 环境检测超时（>15s），跳过。请手动运行 shmem-config check。",
+              file=sys.stderr)
+        _env_already_checked = True
+        return
+    except Exception as e:
+        logging.warning("[SHMEM env check] 环境检测执行失败：%s", e)
+        _env_already_checked = True
+        return
+
+    # 写入标记，后续不再检测
+    try:
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.write_text(current_version or "unknown", encoding="utf-8")
+    except OSError:
+        pass
+    _env_already_checked = True
+
+
+# -- 装包后首次 import 自动检测一次，后续跳过 --
+_run_pre_import_env_check()
 
 _pre_load_guard()
 

@@ -2,3 +2,4 @@
   --install                         Install run mode
   --uninstall                       Uninstall run mode
   --install-for-all                 Install for all users
+  --check                           Run environment check

@@ -26,29 +26,32 @@ function fn_make_run_package()
         rm -rf "$OUTPUT_DIR/$ARCH"
         echo "$OUTPUT_DIR/$ARCH is deleted."
     fi
-    branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match 2> /dev/null || echo $branch)
-    commit_id=$(git rev-parse HEAD)
-    touch $OUTPUT_DIR/version.info
-    cat>$OUTPUT_DIR/version.info<<EOF
-        SHMEM Version :  ${VERSION}
-        Platform : ${ARCH}
-        branch : ${branch}
-        commit id : ${commit_id}
-EOF
+
     mkdir -p $RELEASE_DIR/$ARCH
     mkdir -p $OUTPUT_DIR/scripts
     cp $PROJECT_ROOT/scripts/install.sh $OUTPUT_DIR
+    cp $PROJECT_ROOT/scripts/set_env.sh $OUTPUT_DIR
     cp $PROJECT_ROOT/scripts/uninstall.sh $OUTPUT_DIR/scripts
+    cp $PROJECT_ROOT/scripts/preinstall_check.sh $OUTPUT_DIR/scripts
     sed -i "s/SHMEMPKGARCH/${ARCH}/" $OUTPUT_DIR/install.sh
     sed -i "s!VERSION_PLACEHOLDER!${VERSION}!" $OUTPUT_DIR/install.sh
     sed -i "s!VERSION_PLACEHOLDER!${VERSION}!" $OUTPUT_DIR/scripts/uninstall.sh
 
-    chmod +x $OUTPUT_DIR/*
+    chmod +x $OUTPUT_DIR/*.sh
+    chmod +x $OUTPUT_DIR/scripts/*.sh
+
+    # version.info 由 build.sh 生成并放置在 $OUTPUT_DIR 下
+    # makeself.sh 会归档 $OUTPUT_DIR 的全部内容，无需额外拷贝
+    if [ ! -f "$OUTPUT_DIR/version.info" ]; then
+        echo "WARNING: version.info not found in $OUTPUT_DIR"
+        echo "The .run package will be missing build metadata (CANN version, SOC type, etc.)."
+    fi
+
     makeself_dir=${ASCEND_HOME_PATH}/toolkit/tools/op_project_templates/ascendc/customize/cmake/util/makeself/
     ${makeself_dir}/makeself.sh --header ${makeself_dir}/makeself-header.sh \
         --help-header $PROJECT_ROOT/scripts/help.info --gzip --complevel 4 --nomd5 --sha256 --chown \
         ${OUTPUT_DIR} $RELEASE_DIR/$ARCH/SHMEM_${VERSION}_linux-${ARCH}.run "SHMEM-api" ./install.sh
-    
+
     rm -rf $OUTPUT_DIR/*
     mv $RELEASE_DIR/$ARCH $OUTPUT_DIR
     echo "SHMEM_${VERSION}_linux-${ARCH}.run is successfully generated in $OUTPUT_DIR"

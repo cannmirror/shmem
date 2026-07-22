@@ -139,7 +139,7 @@ UB2GM 主要服务通信与计算融合场景：
 
 - MTE：`aclshmemx_mte_put_nbi`、`aclshmemx_mte_get_nbi`。适合 GM2GM 或 UB2GM 的高带宽搬运，可传入临时 UB buffer、buffer size、元素数和 `sync_id`。
 - SDMA：`aclshmemx_sdma_put_nbi`、`aclshmemx_sdma_get_nbi`。适合 SDMA 通路；需要预留至少 64B UB buffer，Device 侧完成后使用 `aclshmemx_sdma_quiet` 或 `aclshmemx_sdma_notify_record`。
-- RDMA/RoCE：`aclshmemx_roce_put_nbi`、`aclshmemx_roce_get_nbi`。适合跨机或 scale-out 通路；需要 RDMA 可达配置和大于 64B 的 UB buffer。底层不支持同一 PE 目标上的 RMA/AMO 并发乱序写，应通过 `sync_id`、pipeline 或分 PE 串行化规避。
+- RDMA/RoCE：`aclshmemx_roce_put_nbi`、`aclshmemx_roce_get_nbi`。适合跨机或 scale-out 通路；需要 RDMA 可达配置和大于 128B 的 UB buffer。底层不支持同一 PE 目标上的 RMA/AMO 并发乱序写，应通过 `sync_id`、pipeline 或分 PE 串行化规避。
 
 transport 初始化时可通过 `option_attr.data_op_engine_type` 选择默认数据通路，如 `ACLSHMEM_DATA_OP_MTE`、`ACLSHMEM_DATA_OP_SDMA`、`ACLSHMEM_DATA_OP_ROCE`。
 

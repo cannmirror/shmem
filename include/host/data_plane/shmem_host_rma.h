@@ -1,14 +1,14 @@
 /**
  * @cond IGNORE_COPYRIGHT
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
  * @endcond
- */
+ */
 #ifndef SHMEM_HOST_RMA_H
 #define SHMEM_HOST_RMA_H
 
@@ -20,22 +20,22 @@ extern "C" {
 #endif
 
 /**
-* @brief Standard RMA Types and Names valid on Host
-*
-* |NAME       | TYPE      |
-* |-----------|-----------|
-* |float      | float     |
-* |double     | double    |
-* |int8       | int8      |
-* |int16      | int16     |
-* |int32      | int32     |
-* |int64      | int64     |
-* |uint8      | uint8     |
-* |uint16     | uint16    |
-* |uint32     | uint32    |
-* |uint64     | uint64    |
-* |char       | char      |
-*/
+ * @brief Standard RMA Types and Names valid on Host
+ *
+ * |NAME       | TYPE      |
+ * |-----------|-----------|
+ * |float      | float     |
+ * |double     | double    |
+ * |int8       | int8      |
+ * |int16      | int16     |
+ * |int32      | int32     |
+ * |int64      | int64     |
+ * |uint8      | uint8     |
+ * |uint16     | uint16    |
+ * |uint32     | uint32    |
+ * |uint64     | uint64    |
+ * |char       | char      |
+ */
 #define ACLSHMEM_TYPE_FUNC(FUNC) \
     FUNC(float, float);          \
     FUNC(double, double);        \
@@ -49,15 +49,14 @@ extern "C" {
     FUNC(uint64, uint64_t);      \
     FUNC(char, char)
 
-
 /**
  * @addtogroup group_enums
  * @{
-*/
+ */
 /// \brief Enumeration indicating whether the method is blocking or non-blocking
-enum aclshmem_block_mode_t{
-    NO_NBI = 0,  ///< Non-blocking mode disabled (method is blocking)
-    NBI          ///< Non-blocking mode enabled (method is non-blocking, NBI = Non-Blocking Interface)
+enum aclshmem_block_mode_t {
+    NO_NBI = 0, ///< Non-blocking mode disabled (method is blocking)
+    NBI         ///< Non-blocking mode enabled (method is non-blocking, NBI = Non-Blocking Interface)
 };
 /**@} */ // end of group_enums
 
@@ -71,13 +70,13 @@ enum aclshmem_block_mode_t{
  * @return If the input address is legal, returns a remote symmetric address on the specified PE that can be
  *         accessed using memory loads and stores. Otherwise, a null pointer is returned.
  */
-ACLSHMEM_HOST_API void* aclshmem_ptr(void *ptr, int pe);
+ACLSHMEM_HOST_API void* aclshmem_ptr(void* ptr, int pe);
 #define shmem_ptr aclshmem_ptr
 
 /**
  * @brief  Automatically generates aclshmem put functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_put(TYPE *dest, TYPE *source, size_t nelems, int pe)
  *
  * @par Function Description
@@ -89,8 +88,8 @@ ACLSHMEM_HOST_API void* aclshmem_ptr(void *ptr, int pe);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_PUT(NAME, TYPE)                                                                                 \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_put(TYPE *dest, TYPE *source, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_PUT(NAME, TYPE) \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_put(TYPE* dest, TYPE* source, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT);
@@ -111,7 +110,7 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT);
 /**
  * @brief  Automatically generates aclshmem put nbi functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_put_nbi(TYPE *dest, TYPE *source, size_t nelems, int pe)
  *
  * @par Function Description
@@ -123,8 +122,8 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_PUT_NBI(NAME, TYPE)                                                                             \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_put_nbi(TYPE *dest, TYPE *source, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_PUT_NBI(NAME, TYPE) \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_put_nbi(TYPE* dest, TYPE* source, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT_NBI);
@@ -145,8 +144,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT_NBI);
 /**
  * @brief  Automatically generates aclshmem put functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
- * \remark ACLSHMEM_HOST_API void aclshmem_NAME_iput(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+ *
+ * \remark ACLSHMEM_HOST_API void aclshmem_NAME_iput(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t
+ * nelems, int pe)
  *
  * @par Function Description
  *      Synchronous interface. Copy strided data elements (specified by sst) of an array from a source array on the
@@ -160,8 +160,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_PUT_NBI);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_IPUT(NAME, TYPE)                                                                             \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_iput(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_IPUT(NAME, TYPE)             \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_iput( \
+        TYPE* dest, TYPE* source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IPUT);
@@ -171,7 +172,7 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IPUT);
 /**
  * @brief  Automatically generates aclshmem put functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_putBITS(void *dst, void *src, uint32_t elem_size, int32_t pe)
  *
  * @par Function Description
@@ -183,8 +184,8 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IPUT);
  * - **elem_size**   - [in] Number of elements in the destination and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_PUT_SIZE(BITS)                                                                                   \
-    ACLSHMEM_HOST_API void aclshmem_put##BITS(void *dst, void *src, uint32_t elem_size, int32_t pe)
+#define ACLSHMEM_PUT_SIZE(BITS) \
+    ACLSHMEM_HOST_API void aclshmem_put##BITS(void* dst, void* src, uint32_t elem_size, int32_t pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE);
@@ -194,7 +195,7 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE);
 /**
  * @brief  Automatically generates aclshmem put functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_putBITS_nbi(void *dst, void *src, uint32_t elem_size, int32_t pe)
  *
  * @par Function Description
@@ -206,8 +207,8 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE);
  * - **elem_size**   - [in] Number of elements in the destination and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_PUT_SIZE_NBI(BITS)                                                                                  \
-    ACLSHMEM_HOST_API void aclshmem_put##BITS##_nbi(void *dst, void *src, uint32_t elem_size, int32_t pe)
+#define ACLSHMEM_PUT_SIZE_NBI(BITS) \
+    ACLSHMEM_HOST_API void aclshmem_put##BITS##_nbi(void* dst, void* src, uint32_t elem_size, int32_t pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE_NBI);
@@ -217,8 +218,9 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE_NBI);
 /**
  * @brief  Automatically generates aclshmem put functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
- * \remark ACLSHMEM_HOST_API void aclshmem_iputBITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+ *
+ * \remark ACLSHMEM_HOST_API void aclshmem_iputBITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t
+ * nelems, int pe)
  *
  * @par Function Description
  *      Synchronous interface. Copy strided data elements (specified by sst) of an array from a source array on the
@@ -232,8 +234,9 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_PUT_SIZE_NBI);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_IPUT_SIZE(BITS)                                                                             \
-    ACLSHMEM_HOST_API void aclshmem_iput##BITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+#define ACLSHMEM_IPUT_SIZE(BITS)                \
+    ACLSHMEM_HOST_API void aclshmem_iput##BITS( \
+        void* dest, void* source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_IPUT_SIZE);
@@ -243,7 +246,7 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_IPUT_SIZE);
 /**
  * @brief  Automatically generates aclshmem get functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_get(TYPE *dest, TYPE *source, size_t nelems, int pe)
  *
  * @par Function Description
@@ -255,8 +258,8 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_IPUT_SIZE);
  * - **nelems**      - [in] Number of elements in the dest and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_GET(NAME, TYPE)                                                                                 \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_get(TYPE *dest, TYPE *source, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_GET(NAME, TYPE) \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_get(TYPE* dest, TYPE* source, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET);
@@ -277,11 +280,11 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET);
 /**
  * @brief  Automatically generates aclshmem get nbi functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_get_nbi(TYPE *dest, TYPE *source, size_t nelems, int pe)
  *
  * @par Function Description
- * Asynchronous interface. Copy contiguous data on symmetric memory from the specified PE to address on the local PE. 
+ * Asynchronous interface. Copy contiguous data on symmetric memory from the specified PE to address on the local PE.
  *
  * @par Parameters
  * - **dest**        - [in] Pointer on local device of the destination data.
@@ -289,8 +292,8 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET);
  * - **nelems**      - [in] Number of elements in the dest and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_GET_NBI(NAME, TYPE)                                                                             \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_get_nbi(TYPE *dest, TYPE *source, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_GET_NBI(NAME, TYPE) \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_get_nbi(TYPE* dest, TYPE* source, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET_NBI);
@@ -311,11 +314,13 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET_NBI);
 /**
  * @brief  Automatically generates aclshmem get functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
- * \remark ACLSHMEM_HOST_API void aclshmem_NAME_iget(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+ *
+ * \remark ACLSHMEM_HOST_API void aclshmem_NAME_iget(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t
+ * nelems, int pe)
  *
  * @par Function Description
- * Synchronous interface. Copy strided data elements from a symmetric array from a specified remote PE to strided locations on a local array.
+ * Synchronous interface. Copy strided data elements from a symmetric array from a specified remote PE to strided
+ * locations on a local array.
  *
  * @par Parameters
  * - **dest**     - [in] Pointer on local device of the destination data.
@@ -325,8 +330,9 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_GET_NBI);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_TYPE_IGET(NAME, TYPE)                                                                                 \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_iget(TYPE *dest, TYPE *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+#define ACLSHMEM_TYPE_IGET(NAME, TYPE)             \
+    ACLSHMEM_HOST_API void aclshmem_##NAME##_iget( \
+        TYPE* dest, TYPE* source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IGET);
@@ -336,7 +342,7 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IGET);
 /**
  * @brief  Automatically generates aclshmem get functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_getBITS(void *dst, void *src, uint32_t elem_size, int32_t pe)
  *
  * @par Function Description
@@ -348,8 +354,8 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPE_IGET);
  * - **elem_size**   - [in] Number of elements in the dest and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_GET_SIZE(BITS)                                                                                  \
-    ACLSHMEM_HOST_API void aclshmem_get##BITS(void *dst, void *src, uint32_t elem_size, int32_t pe)
+#define ACLSHMEM_GET_SIZE(BITS) \
+    ACLSHMEM_HOST_API void aclshmem_get##BITS(void* dst, void* src, uint32_t elem_size, int32_t pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE);
@@ -359,7 +365,7 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE);
 /**
  * @brief  Automatically generates aclshmem get functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_getBITS_nbi(void *dst, void *src, uint32_t elem_size, int32_t pe)
  *
  * @par Function Description
@@ -371,8 +377,8 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE);
  * - **elem_size**   - [in] Number of elements in the dest and source arrays.
  * - **pe**          - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_GET_SIZE_NBI(BITS)                                                                                  \
-    ACLSHMEM_HOST_API void aclshmem_get##BITS##_nbi(void *dst, void *src, uint32_t elem_size, int32_t pe)
+#define ACLSHMEM_GET_SIZE_NBI(BITS) \
+    ACLSHMEM_HOST_API void aclshmem_get##BITS##_nbi(void* dst, void* src, uint32_t elem_size, int32_t pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE_NBI);
@@ -382,11 +388,13 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE_NBI);
 /**
  * @brief  Automatically generates aclshmem get functions for different bits (e.g., 8, 16).
  *         The macro parameters: BITS is the bits.
- * 
- * \remark ACLSHMEM_HOST_API void aclshmem_igetBITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+ *
+ * \remark ACLSHMEM_HOST_API void aclshmem_igetBITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t
+ * nelems, int pe)
  *
  * @par Function Description
- * Synchronous interface. Copy strided data elements from a symmetric array from a specified remote PE to strided locations on a local array.
+ * Synchronous interface. Copy strided data elements from a symmetric array from a specified remote PE to strided
+ * locations on a local array.
  *
  * @par Parameters
  * - **dest**     - [in] Pointer on local device of the destination data.
@@ -396,8 +404,9 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_GET_SIZE_NBI);
  * - **nelems**   - [in] Number of elements in the destination and source arrays.
  * - **pe**       - [in] PE number of the remote PE.
  */
-#define ACLSHMEM_IGET_SIZE(BITS)                                                                                 \
-    ACLSHMEM_HOST_API void aclshmem_iget##BITS(void *dest, void *source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
+#define ACLSHMEM_IGET_SIZE(BITS)                \
+    ACLSHMEM_HOST_API void aclshmem_iget##BITS( \
+        void* dest, void* source, ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe)
 
 /** \cond */
 ACLSHMEM_SIZE_FUNC(ACLSHMEM_IGET_SIZE);
@@ -407,7 +416,7 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_IGET_SIZE);
 /**
  * @brief  Automatically generates aclshmem p functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_p(TYPE* dst, const TYPE value, int pe)
  *
  * @par Function Description
@@ -418,8 +427,7 @@ ACLSHMEM_SIZE_FUNC(ACLSHMEM_IGET_SIZE);
  * - **value**  - [in] The element to be put.
  * - **pe**     - [in] The number of the remote PE.
  */
-#define ACLSHMEM_TYPENAME_P(NAME, TYPE)                                                     \
-    ACLSHMEM_HOST_API void aclshmem_##NAME##_p(TYPE* dst, const TYPE value, int pe)
+#define ACLSHMEM_TYPENAME_P(NAME, TYPE) ACLSHMEM_HOST_API void aclshmem_##NAME##_p(TYPE* dst, const TYPE value, int pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_P);
@@ -440,7 +448,7 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_P);
 /**
  * @brief  Automatically generates aclshmem g functions for different data types (e.g., float, int8_t).
  *        The macro parameters: NAME is the function name suffix, TYPE is the operation data type.
- * 
+ *
  * \remark ACLSHMEM_HOST_API void aclshmem_NAME_g(TYPE* src, int32_t pe)
  *
  * @par Function Description
@@ -453,8 +461,7 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_P);
  * @par Returns
  *      A single element of type specified in the input pointer.
  */
-#define ACLSHMEM_TYPENAME_G(NAME, TYPE)                                                     \
-    ACLSHMEM_HOST_API TYPE aclshmem_##NAME##_g(TYPE* src, int32_t pe)
+#define ACLSHMEM_TYPENAME_G(NAME, TYPE) ACLSHMEM_HOST_API TYPE aclshmem_##NAME##_g(TYPE* src, int32_t pe)
 
 /** \cond */
 ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_G);
@@ -473,82 +480,81 @@ ACLSHMEM_TYPE_FUNC(ACLSHMEM_TYPENAME_G);
 #undef ACLSHMEM_TYPENAME_G
 
 /**
-* @brief Synchronous interface. Copy contiguous data on local PE to symmetric address on the specified PE.
-*
-* @param dst                [in] Pointer on Symmetric memory of the destination data.
-* @param src                [in] Pointer on local memory of the source data.
-* @param elem_size          [in] size of elements in the destination and source addr.
-* @param pe                 [in] PE number of the remote PE.
-*/
+ * @brief Synchronous interface. Copy contiguous data on local PE to symmetric address on the specified PE.
+ *
+ * @param dst                [in] Pointer on Symmetric memory of the destination data.
+ * @param src                [in] Pointer on local memory of the source data.
+ * @param elem_size          [in] size of elements in the destination and source addr.
+ * @param pe                 [in] PE number of the remote PE.
+ */
 ACLSHMEM_HOST_API void aclshmem_putmem(void* dst, void* src, size_t elem_size, int32_t pe);
 #define shmem_putmem aclshmem_putmem
 
-
 /**
-* @brief Synchronous interface. Copy contiguous data on symmetric memory from the specified PE to
-*        address on the local PE.
-*
-* @param dst                [in] Pointer on local device of the destination data.
-* @param src                [in] Pointer on Symmetric memory of the source data.
-* @param elem_size          [in] size of elements in the destination and source addr.
-* @param pe                 [in] PE number of the remote PE.
-*/
+ * @brief Synchronous interface. Copy contiguous data on symmetric memory from the specified PE to
+ *        address on the local PE.
+ *
+ * @param dst                [in] Pointer on local device of the destination data.
+ * @param src                [in] Pointer on Symmetric memory of the source data.
+ * @param elem_size          [in] size of elements in the destination and source addr.
+ * @param pe                 [in] PE number of the remote PE.
+ */
 ACLSHMEM_HOST_API void aclshmem_getmem(void* dst, void* src, size_t elem_size, int32_t pe);
 #define shmem_getmem aclshmem_getmem
 
-
-
 /**
-* @brief Asynchronous interface. Copy contiguous data on local PE to symmetric address on the specified PE.
-*
-* @param dst                [in] Pointer on Symmetric memory of the destination data.
-* @param src                [in] Pointer on local memory of the source data.
-* @param elem_size          [in] size of elements in the destination and source addr.
-* @param pe                 [in] PE number of the remote PE.
-*/
+ * @brief Asynchronous interface. Copy contiguous data on local PE to symmetric address on the specified PE.
+ *
+ * @param dst                [in] Pointer on Symmetric memory of the destination data.
+ * @param src                [in] Pointer on local memory of the source data.
+ * @param elem_size          [in] size of elements in the destination and source addr.
+ * @param pe                 [in] PE number of the remote PE.
+ */
 ACLSHMEM_HOST_API void aclshmem_putmem_nbi(void* dst, void* src, size_t elem_size, int32_t pe);
 #define shmem_putmem_nbi aclshmem_putmem_nbi
 
 /**
-* @brief Asynchronous interface. Copy contiguous data on symmetric memory from the specified PE to
-*        address on the local PE.
-*
-* @param dst                [in] Pointer on local device of the destination data.
-* @param src                [in] Pointer on Symmetric memory of the source data.
-* @param elem_size          [in] size of elements in the destination and source addr.
-* @param pe                 [in] PE number of the remote PE.
-*/
+ * @brief Asynchronous interface. Copy contiguous data on symmetric memory from the specified PE to
+ *        address on the local PE.
+ *
+ * @param dst                [in] Pointer on local device of the destination data.
+ * @param src                [in] Pointer on Symmetric memory of the source data.
+ * @param elem_size          [in] size of elements in the destination and source addr.
+ * @param pe                 [in] PE number of the remote PE.
+ */
 ACLSHMEM_HOST_API void aclshmem_getmem_nbi(void* dst, void* src, size_t elem_size, int32_t pe);
 #define shmem_getmem_nbi aclshmem_getmem_nbi
 
 /**
-    * @brief Copy contiguous data on symmetric memory from the specified PE to address on the local PE.
-    *
-    * @param dst               [in] Pointer on local device of the destination data.
-    * @param src               [in] Pointer on Symmetric memory of the source data.
-    * @param elem_size         [in] Number of elements in the dest and source arrays.
-    * @param pe                [in] PE number of the remote PE.
-    * @param stream            [in] copy used stream(use default stream if stream == NULL).
-    *
-    * @note Cross-machine support: Supports cross-machine. Uses MTE when HCCS is connected, otherwise uses RDMA if available.
+ * @brief Copy contiguous data on symmetric memory from the specified PE to address on the local PE.
+ *
+ * @param dst               [in] Pointer on local device of the destination data.
+ * @param src               [in] Pointer on Symmetric memory of the source data.
+ * @param elem_size         [in] Number of elements in the dest and source arrays.
+ * @param pe                [in] PE number of the remote PE.
+ * @param stream            [in] copy used stream(use default stream if stream == NULL).
+ *
+ * @note Cross-machine support: Supports cross-machine. Uses MTE when HCCS is connected, otherwise uses RDMA if
+ * available.
  */
-ACLSHMEM_HOST_API void aclshmemx_getmem_on_stream(void* dst, void* src, size_t elem_size,
-                                            int32_t pe, aclrtStream stream);
+ACLSHMEM_HOST_API void aclshmemx_getmem_on_stream(
+    void* dst, void* src, size_t elem_size, int32_t pe, aclrtStream stream);
 #define shmemx_getmem_on_stream aclshmemx_getmem_on_stream
 
 /**
-    * @brief Copy contiguous data on local PE to symmetric address on the specified PE.
-    *
-    * @param dst               [in] Pointer on Symmetric memory of the destination data.
-    * @param src               [in] Pointer on local device of the source data.
-    * @param elem_size         [in] Number of elements in the dest and source arrays.
-    * @param pe                [in] PE number of the remote PE.
-    * @param stream            [in] copy used stream(use default stream if stream == NULL).
-    *
-    * @note Cross-machine support: Supports cross-machine. Uses MTE when HCCS is connected, otherwise uses RDMA if available.
+ * @brief Copy contiguous data on local PE to symmetric address on the specified PE.
+ *
+ * @param dst               [in] Pointer on Symmetric memory of the destination data.
+ * @param src               [in] Pointer on local device of the source data.
+ * @param elem_size         [in] Number of elements in the dest and source arrays.
+ * @param pe                [in] PE number of the remote PE.
+ * @param stream            [in] copy used stream(use default stream if stream == NULL).
+ *
+ * @note Cross-machine support: Supports cross-machine. Uses MTE when HCCS is connected, otherwise uses RDMA if
+ * available.
  */
-ACLSHMEM_HOST_API void aclshmemx_putmem_on_stream(void* dst, void* src, size_t elem_size,
-                                            int32_t pe, aclrtStream stream);
+ACLSHMEM_HOST_API void aclshmemx_putmem_on_stream(
+    void* dst, void* src, size_t elem_size, int32_t pe, aclrtStream stream);
 #define shmemx_putmem_on_stream aclshmemx_putmem_on_stream
 /**
  * @brief Set necessary parameters for put or get.
@@ -573,10 +579,13 @@ ACLSHMEM_HOST_API int aclshmemx_set_sdma_config(uint64_t offset, uint32_t ub_siz
 
 /**
  * @brief Set necessary parameters for RDMA operations.
+ *        RDMA RMA APIs use this UB scratch to stage a full WQE via MTE3.
  *
  * @param offset                [in] The start address on UB.
- * @param ub_size               [in] The Size of Temp UB Buffer.
- * @param sync_id               [in] Sync ID for put or get.
+ * @param ub_size               [in] The Size of Temp UB Buffer in bytes. It
+ *                              must be at least ACLSHMEM_RDMA_MTE_STAGING_UB_SIZE
+ *                              bytes (128) for RDMA MTE3 WQE staging.
+ * @param sync_id               [in] Sync ID for MTE3 pipeline synchronization.
  * @return Returns 0 on success or an error code on failure.
  */
 ACLSHMEM_HOST_API int aclshmemx_set_rdma_config(uint64_t offset, uint32_t ub_size, uint32_t sync_id);

@@ -18,20 +18,23 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_sync_all_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     aclshmemx_roce_barrier_all();
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, i, 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, i, 0);
     }
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_quiet(i, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_quiet(i, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
     }
     aclshmemx_roce_sync_all();
 #endif
@@ -46,22 +49,25 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_sync_all_with_buf_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     aclshmemx_roce_barrier_all();
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, i, 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, i, 0);
     }
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_quiet(i, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_quiet(i, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
     }
-    aclshmemx_roce_sync_all((__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+    aclshmemx_roce_sync_all((__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
 #endif
 }
 
@@ -72,16 +78,18 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_barrier_all_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     aclshmemx_roce_barrier_all();
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, i, 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, i, 0);
     }
     aclshmemx_roce_barrier_all();
 #endif
@@ -94,18 +102,20 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_barrier_all_with_buf_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     aclshmemx_roce_barrier_all();
     for (int i = 0; i < rank_size; i++) {
-        if (i == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, i, 0);
+        if (i == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, i, 0);
     }
-    aclshmemx_roce_barrier_all((__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+    aclshmemx_roce_barrier_all((__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
 #endif
 }
 
@@ -117,26 +127,29 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_sync_team_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
-    aclshmemx_team_t *team = aclshmemi_get_state()->team_pools[team_id];
+    aclshmemx_team_t* team = aclshmemi_get_state()->team_pools[team_id];
     int start = team->start;
     int stride = team->stride;
     int size = team->size;
     aclshmemx_roce_barrier(team);
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, peer, 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, peer, 0);
     }
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
     }
     aclshmemx_roce_sync(team);
 #endif
@@ -151,28 +164,31 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_sync_team_with_buf_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
-    aclshmemx_team_t *team = aclshmemi_get_state()->team_pools[team_id];
+    aclshmemx_team_t* team = aclshmemi_get_state()->team_pools[team_id];
     int start = team->start;
     int stride = team->stride;
     int size = team->size;
     aclshmemx_roce_barrier(team);
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, peer, 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, peer, 0);
     }
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_quiet(peer, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
     }
-    aclshmemx_roce_sync(team, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+    aclshmemx_roce_sync(team, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
 #endif
 }
 
@@ -183,21 +199,23 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_barrier_team_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
-    aclshmemx_team_t *team = aclshmemi_get_state()->team_pools[team_id];
+    aclshmemx_team_t* team = aclshmemi_get_state()->team_pools[team_id];
     int start = team->start;
     int stride = team->stride;
     int size = team->size;
     aclshmemx_roce_barrier(team);
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, peer, 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, peer, 0);
     }
     aclshmemx_roce_barrier(team);
 #endif
@@ -210,23 +228,25 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_barrier_team_with_buf_data(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
-    aclshmemx_team_t *team = aclshmemi_get_state()->team_pools[team_id];
+    aclshmemx_team_t* team = aclshmemi_get_state()->team_pools[team_id];
     int start = team->start;
     int stride = team->stride;
     int size = team->size;
     aclshmemx_roce_barrier(team);
     for (int i = 0; i < size; i++) {
         int peer = start + i * stride;
-        if (peer == rank_id) continue;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, peer, 0);
+        if (peer == rank_id)
+            continue;
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, peer, 0);
     }
-    aclshmemx_roce_barrier(team, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+    aclshmemx_roce_barrier(team, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
 #endif
 }
 
@@ -238,67 +258,76 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void roce_quiet_data_test(
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     AscendC::PipeBarrier<PIPE_ALL>();
 
 #if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
     if (rank_id == 0) {
         int next_pe = (rank_id + 1) % rank_size;
-        aclshmemx_roce_put_nbi(addr + rank_id * message_length, addr + rank_id * message_length,
-                                (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), message_length, next_pe, 0);
-        aclshmemx_roce_quiet(next_pe, (__ubuf__ uint8_t *)ubLocal.GetPhyAddr(), 0);
+        aclshmemx_roce_put_nbi(
+            addr + rank_id * message_length, addr + rank_id * message_length, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, next_pe, 0);
+        aclshmemx_roce_quiet(next_pe, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), 0);
     }
     aclshmemx_roce_sync_all();
 #endif
 }
 
 // ---- Host 端启动函数 ----
-void roce_sync_all_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id, int rank_size, int message_length)
+void roce_sync_all_data_do(void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length)
 {
     roce_sync_all_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length);
 }
 
-void roce_sync_all_with_buf_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id, int rank_size, int message_length)
+void roce_sync_all_with_buf_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length)
 {
     roce_sync_all_with_buf_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length);
 }
 
-void roce_barrier_all_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id, int rank_size, int message_length)
+void roce_barrier_all_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length)
 {
     roce_barrier_all_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length);
 }
 
-void roce_barrier_all_with_buf_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id, int rank_size, int message_length)
+void roce_barrier_all_with_buf_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length)
 {
     roce_barrier_all_with_buf_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length);
 }
 
-void roce_sync_team_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id,
-    int rank_size, int message_length, aclshmem_team_t team_id)
+void roce_sync_team_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length,
+    aclshmem_team_t team_id)
 {
     roce_sync_team_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length, team_id);
 }
 
-void roce_sync_team_with_buf_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id,
-    int rank_size, int message_length, aclshmem_team_t team_id)
+void roce_sync_team_with_buf_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length,
+    aclshmem_team_t team_id)
 {
     roce_sync_team_with_buf_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length, team_id);
 }
 
-void roce_barrier_team_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id,
-    int rank_size, int message_length, aclshmem_team_t team_id)
+void roce_barrier_team_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length,
+    aclshmem_team_t team_id)
 {
     roce_barrier_team_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length, team_id);
 }
 
-void roce_barrier_team_with_buf_data_do(void *stream, uint64_t config, uint8_t *addr, int rank_id,
-    int rank_size, int message_length, aclshmem_team_t team_id)
+void roce_barrier_team_with_buf_data_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length,
+    aclshmem_team_t team_id)
 {
     roce_barrier_team_with_buf_data<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length, team_id);
 }
 
-void roce_quiet_data_test_do(void *stream, uint64_t config, uint8_t *addr, int rank_id, int rank_size, int message_length)
+void roce_quiet_data_test_do(
+    void* stream, uint64_t config, uint8_t* addr, int rank_id, int rank_size, int message_length)
 {
     roce_quiet_data_test<<<1, nullptr, stream>>>(config, addr, rank_id, rank_size, message_length);
 }

@@ -18,7 +18,7 @@
 #include "perftest_common_types.h"
 #include "mte_perftest_common.h"
 
-constexpr int UB_ALIGN_SIZE = 64;
+constexpr int UB_ALIGN_SIZE = 128;
 
 #define CHECK_ACL_GOTO(call, ret_var, label)                        \
     do {                                                            \
@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
     int min_exponent = 3;
     int max_exponent = 17;
     int loop_count = 1000;
-    int ub_size_b = 64;
+    int ub_size_b = 128;
     const char* metric_str = "bw";
     int batch = 0;
     int sync_id = 0;

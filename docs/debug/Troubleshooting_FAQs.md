@@ -2,7 +2,7 @@
 
 1. GM2GM的高阶 RMA 操作使用默认buffer，不支持并发操作，否则可能造成数据覆盖。若有并发需求，建议使用低阶接口。
 2. barrier接口当前必须在Mix Kernel（包含mmad和GM2UB/UB2GM操作）中使用，可参考example样例。该限制待编译器更新后移除。
-3. 使用RDMA的高阶接口前，需要先使用`aclshmemx_rdma_config`接口配置UB Buffer和sync_id等信息。若不配置，则使用默认的190KB处的UB Buffer和EVENT_ID0作为接口内部的同步EVENT_ID。RDMA相关接口内部使用`PipeBarrier<PIPE_MTE3>`阻塞MTE3流水以确保RDMA任务下发完成。
+3. 使用RDMA的高阶接口前，需要先使用`aclshmemx_rdma_config`接口配置UB Buffer和sync_id等信息。且需要保证预留UB Buffer大小大于等于128字节。若不配置，则使用默认的190KB处的UB Buffer和EVENT_ID0作为接口内部的同步EVENT_ID。RDMA相关接口内部使用`PipeBarrier<PIPE_MTE3>`阻塞MTE3流水以确保RDMA任务下发完成。
 4. 使用SDMA的高阶接口前，需要先使用`aclshmemx_sdma_config`接口配置UB Buffer和sync_id等信息，且需要保证预留UB Buffer大小大于等于64字节。若不配置，则使用默认的191KB处的UB Buffer和EVENT_ID0作为接口内部的同步EVENT_ID。
 5. 使用UDMA的高阶接口前，可使用`aclshmemx_set_udma_config`接口配置UB Buffer和sync_id等信息，且需要保证预留UB Buffer大小大于等于128字节。若不配置，则使用默认的189KB处的UB Buffer和EVENT_ID0作为接口内部的同步EVENT_ID。UDMA高阶接口默认通过`PIPE_MTE3` staging下发WQE，该UB Buffer用于暂存一块完整WQE。
 6. A2 16卡机型：NPU分为前八卡后八卡两个8P Fullmesh组，每个8P组内通过HCCS总线完成两两互联，两个8P Fullmesh组之间通过PCIe-SW完成互连，因此不支持直接使用MTE接口在跨组NPU间完成数据搬运。部分example用例使用MTE搬运接口，单机用例请勿跨组指定NPU，以防发生未知报错（如流同步失败等）。

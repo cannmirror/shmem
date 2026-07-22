@@ -71,8 +71,7 @@ ACLSHMEM_DEVICE void aclshmemi_roce_quiet(
 }
 
 ACLSHMEM_DEVICE void aclshmemi_roce_quiet(
-    uint32_t pe, AscendC::LocalTensor<uint64_t> ub_local64, AscendC::LocalTensor<uint32_t> ub_local32,
-    uint32_t sync_id)
+    uint32_t pe, AscendC::LocalTensor<uint64_t> ub_local64, AscendC::LocalTensor<uint32_t> ub_local32, uint32_t sync_id)
 {
     __gm__ aclshmemi_rdma_info* rdma_info = aclshmemi_qp_info_fetch();
     uint32_t qp_num = rdma_info->qp_num;
@@ -87,7 +86,7 @@ ACLSHMEM_DEVICE void aclshmemi_roce_quiet(
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id)
+ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id)
 {
     int my_pe = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD]->mype;
     int start = team->start;
@@ -98,23 +97,24 @@ ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T
 
     int shift = 1;
     int my_pe_in_team = (my_pe - start) / stride;
-    int32_t count = aclshmemi_load((__gm__ int32_t *)sync_counter) + 1;
-    aclshmemi_store((__gm__ int32_t *)sync_counter, count);
-    dcci_cacheline((__gm__ uint8_t *)sync_counter);
+    int32_t count = aclshmemi_load((__gm__ int32_t*)sync_counter) + 1;
+    aclshmemi_store((__gm__ int32_t*)sync_counter, count);
+    dcci_cacheline((__gm__ uint8_t*)sync_counter);
     while (shift < size) {
         int pre_pe_in_team = (my_pe_in_team - shift + size) % size;
         int next_pe_in_team = (my_pe_in_team + shift) % size;
         int next_pe = start + next_pe_in_team * stride;
 
-        aclshmemi_highlevel_signal_set((__gm__ int32_t *)(sync_pool + my_pe_in_team), (__gm__ int32_t *)sync_counter, next_pe, buf, sync_id);
-        aclshmemi_signal_wait_until_eq_for_barrier((__gm__ int32_t *)(sync_pool + pre_pe_in_team), count);
+        aclshmemi_highlevel_signal_set(
+            (__gm__ int32_t*)(sync_pool + my_pe_in_team), (__gm__ int32_t*)sync_counter, next_pe, buf, sync_id);
+        aclshmemi_signal_wait_until_eq_for_barrier((__gm__ int32_t*)(sync_pool + pre_pe_in_team), count);
 
         shift *= SHIFT_MULTIPLIER;
     }
 }
 
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_barrier(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id)
+ACLSHMEM_DEVICE void aclshmemi_roce_barrier(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id)
 {
     __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();
     int mype = device_state->team_pools[ACLSHMEM_TEAM_WORLD]->mype;
@@ -275,6 +275,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(__gm__ T* dst, __gm__ T* src, __ubuf
     ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf) + UB_ALIGN_SIZE;
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
+
     aclshmemi_roce_write(
         (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T), ub_tensor_64, ub_tensor_32, sync_id);
 }
@@ -292,6 +293,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
     ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf) + UB_ALIGN_SIZE;
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
+
     aclshmemi_roce_write(
         (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)src, pe, 0, elem_size * sizeof(T), ub_tensor_64, ub_tensor_32, sync_id);
 }
@@ -311,6 +313,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
     ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf.GetPhyAddr()) + UB_ALIGN_SIZE;
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
+
     aclshmemi_roce_write(
         (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)(src.GetPhyAddr()), pe, 0, elem_size * sizeof(T), ub_tensor_64,
         ub_tensor_32, sync_id);
@@ -330,6 +333,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
     ub_tensor_64.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ub_tensor_64.address_.bufferAddr = reinterpret_cast<uint64_t>(buf.GetPhyAddr()) + UB_ALIGN_SIZE;
     ub_tensor_64.address_.dataLen = UB_ALIGN_SIZE;
+
     aclshmemi_roce_write(
         (__gm__ uint8_t*)ptr, (__gm__ uint8_t*)(src.GetPhyAddr()), pe, 0, elem_size * sizeof(T), ub_tensor_64,
         ub_tensor_32, sync_id);
@@ -350,7 +354,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_quiet(uint32_t pe, __ubuf__ T* buf, uint32_t
     aclshmemi_roce_quiet(pe, ub_tensor_64, ub_tensor_32, sync_id);
 }
 
-ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team)
+ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t* team)
 {
     __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();
     uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;
@@ -360,13 +364,13 @@ ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team)
 }
 
 template <typename T>
-ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id)
+ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id)
 {
     aclshmemi_roce_team_sync(team, buf, sync_id);
     return 0;
 }
 
-ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team)
+ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t* team)
 {
     __gm__ aclshmem_device_host_state_t* device_state = aclshmemi_get_state();
     uint64_t copy_ub = device_state->rdma_config.aclshmem_ub;
@@ -376,7 +380,7 @@ ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team)
 }
 
 template <typename T>
-ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id)
+ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id)
 {
     aclshmemi_roce_barrier(team, buf, sync_id);
     return 0;
@@ -384,25 +388,25 @@ ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team, __ubuf__ T* b
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_sync_all(__ubuf__ T* buf, uint32_t sync_id)
 {
-    aclshmemx_team_t *world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
+    aclshmemx_team_t* world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
     aclshmemx_roce_team_sync(world_team, buf, sync_id);
 }
 
 ACLSHMEM_DEVICE void aclshmemx_roce_sync_all()
 {
-    aclshmemx_team_t *world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
+    aclshmemx_team_t* world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
     aclshmemx_roce_team_sync(world_team);
 }
 
 ACLSHMEM_DEVICE void aclshmemx_roce_barrier_all()
 {
-    aclshmemx_team_t *world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
+    aclshmemx_team_t* world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
     aclshmemx_roce_barrier(world_team);
 }
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_barrier_all(__ubuf__ T* buf, uint32_t sync_id)
 {
-    aclshmemx_team_t *world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
+    aclshmemx_team_t* world_team = aclshmemi_get_state()->team_pools[ACLSHMEM_TEAM_WORLD];
     aclshmemx_roce_barrier(world_team, buf, sync_id);
 }
 

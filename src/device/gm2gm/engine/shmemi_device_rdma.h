@@ -51,8 +51,8 @@ struct aclshmemi_rdma_sq_ctx {
     uint32_t amo_lkey; // lkey for amo_addr
     // hns1825 (Ascend950) specific fields
     uint64_t db_sw_addr; // software shadow doorbell address (used by hns_1825)
-    uint8_t  mtu_shift;  // MTU shift for WQE size calculation (used by hns_1825)
-    uint8_t  reserved[7]; // padding
+    uint8_t mtu_shift;   // MTU shift for WQE size calculation (used by hns_1825)
+    uint8_t reserved[7]; // padding
 };
 
 struct aclshmemi_rdma_cq_ctx {
@@ -201,11 +201,11 @@ ACLSHMEM_DEVICE void aclshmemi_roce_quiet(
  * Uses RDMA-based dissemination algorithm with highlevel signal operations.
  *
  * @param team              [in] Pointer to the team on which to perform synchronization.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id);
 
 /**
  * @brief RDMA Barrier function with explicit UB buffer and sync_id. Performs a barrier operation
@@ -216,11 +216,11 @@ ACLSHMEM_DEVICE void aclshmemi_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T
  * conflicts with the default rdma_config in device_state.
  *
  * @param team                   [in] Pointer to the team on which to perform barrier.
- * @param buf                    [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf                    [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id                [in] ID used to Sync S\\MTE3 Event.
  */
 template <typename T>
-ACLSHMEM_DEVICE void aclshmemi_roce_barrier(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id);
+ACLSHMEM_DEVICE void aclshmemi_roce_barrier(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id);
 
 /**
  * @brief Asynchronous RDMA Atomic Fetch and Add function.

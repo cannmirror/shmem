@@ -32,9 +32,10 @@ ACLSHMEM_DEVICE __gm__ void* aclshmem_roce_ptr(__gm__ void* ptr, int pe);
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations
  *        to the same PE are not supported. Use sync_id in device_state.rdma_config for pipeline synchronization.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] Pointer on local device of the destination data.
  * @param src               [in] Pointer on Symmetric memory of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
  */
@@ -47,12 +48,13 @@ ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(__gm__ T* dst, __gm__ T* src, __ubuf
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations
  *        to the same PE are not supported.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] Pointer on local device of the destination data.
  * @param src               [in] Pointer on Symmetric memory of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
- * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
+ * @param sync_id           [in] Hardware event ID for MTE3 pipeline synchronization.
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(
@@ -64,9 +66,10 @@ ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations
  *        to the same PE are not supported. Use sync_id in device_state.rdma_config for pipeline synchronization.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] GlobalTensor on local device of the destination data.
  * @param src               [in] GlobalTensor on Symmetric memory of the source data.
- * @param buf               [in] LocalTensor on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] LocalTensor on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
  */
@@ -81,12 +84,13 @@ ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations
  *        to the same PE are not supported.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] GlobalTensor on local device of the destination data.
  * @param src               [in] GlobalTensor on Symmetric memory of the source data.
- * @param buf               [in] LocalTensor on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] LocalTensor on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
- * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
+ * @param sync_id           [in] Hardware event ID for MTE3 pipeline synchronization.
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(
@@ -98,9 +102,10 @@ ACLSHMEM_DEVICE void aclshmemx_roce_get_nbi(
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations to the same PE
  *        are not supported. Use sync_id in device_state.rdma_config for pipeline synchronization.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] Pointer on Symmetric memory of the destination data.
  * @param src               [in] Pointer on local device of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
  */
@@ -112,12 +117,13 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(__gm__ T* dst, __gm__ T* src, __ubuf
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations to the same PE
  *        are not supported.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] Pointer on Symmetric memory of the destination data.
  * @param src               [in] Pointer on local device of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
- * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
+ * @param sync_id           [in] Hardware event ID used for MTE3 pipeline synchronization.
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
@@ -128,9 +134,10 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations to the same
  *        PE are not supported. Use sync_id in device_state.rdma_config for pipeline synchronization.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] GlobalTensor on Symmetric memory of the destination data.
  * @param src               [in] GlobalTensor on local device of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] LocalTensor on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
  */
@@ -144,12 +151,13 @@ ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
  *        WARNING: When using RDMA as the underlying transport, concurrent RMA/AMO operations to the same
  *        PE are not supported.
  *
+ * @tparam T                  Element type of the transfer.
  * @param dst               [in] GlobalTensor on Symmetric memory of the destination data.
  * @param src               [in] GlobalTensor on local device of the source data.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] LocalTensor on local UB. Must be at least 128 bytes.
  * @param elem_size         [in] Number of elements in the destination and source arrays.
  * @param pe                [in] PE number of the remote PE.
- * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
+ * @param sync_id           [in] Hardware event ID used for MTE3 pipeline synchronization.
  */
 template <typename T>
 ACLSHMEM_DEVICE void aclshmemx_roce_put_nbi(
@@ -179,7 +187,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_quiet(uint32_t pe, __ubuf__ T* buf, uint32_t
  *
  * @param team              [in] Pointer to the team on which to perform synchronization.
  */
-ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team);
+ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t* team);
 #define aclshmemx_roce_sync aclshmemx_roce_team_sync
 
 /**
@@ -190,12 +198,12 @@ ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team);
  *        conflicts with the default rdma_config in device_state.
  *
  * @param team              [in] Pointer to the team on which to perform synchronization.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
  * @return 0 on success, non-zero on failure.
  */
 template <typename T>
-ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id);
+ACLSHMEM_DEVICE int aclshmemx_roce_team_sync(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id);
 
 /**
  * @brief RDMA Sync All function. Performs a synchronization operation on all PEs
@@ -215,7 +223,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_sync_all();
  *        This version allows the caller to explicitly provide UB buffer and sync_id, avoiding resource
  *        conflicts with the default rdma_config in device_state.
  *
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
  */
 template <typename T>
@@ -233,7 +241,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_sync_all(__ubuf__ T* buf, uint32_t sync_id);
  *
  * @param team              [in] Pointer to the team on which to perform barrier.
  */
-ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team);
+ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t* team);
 
 /**
  * @brief RDMA Barrier function with explicit UB buffer and sync_id. Performs a barrier operation
@@ -244,11 +252,11 @@ ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team);
  *        conflicts with the default rdma_config in device_state.
  *
  * @param team              [in] Pointer to the team on which to perform barrier.
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
  */
 template <typename T>
-ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t *team, __ubuf__ T* buf, uint32_t sync_id);
+ACLSHMEM_DEVICE int aclshmemx_roce_barrier(aclshmemx_team_t* team, __ubuf__ T* buf, uint32_t sync_id);
 
 /**
  * @brief RDMA Barrier All function. Performs a barrier operation on all PEs
@@ -270,7 +278,7 @@ ACLSHMEM_DEVICE void aclshmemx_roce_barrier_all();
  *        This version allows the caller to explicitly provide UB buffer and sync_id, avoiding resource
  *        conflicts with the default rdma_config in device_state.
  *
- * @param buf               [in] Pointer on local UB, available space larger than 64 Bytes.
+ * @param buf               [in] Pointer on local UB, available space larger than 128 Bytes.
  * @param sync_id           [in] ID used to Sync S\\MTE3 Event.
  */
 template <typename T>

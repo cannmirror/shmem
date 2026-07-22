@@ -17,33 +17,35 @@
 
 constexpr int64_t RDMA_SYNC_FLAG_INTERVAL = 16;
 
-extern "C" [[bisheng::core_ratio(0,1)]] __global__ __aicore__ void device_all_gather_test(GM_ADDR gva, int message_length)
+extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void device_all_gather_test(
+    GM_ADDR gva, int message_length)
 {
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
     int64_t my_rank = aclshmem_my_pe();
     int64_t pe_size = aclshmem_n_pes();
     AscendC::PipeBarrier<PIPE_ALL>();
 
     aclshmemx_roce_barrier_all();
-    
+
     for (int i = 0; i < pe_size; i++) {
         if (i == my_rank) {
             continue;
         }
-        aclshmemx_roce_put_nbi(gva + message_length * my_rank, gva + message_length * my_rank,
-                                (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(), message_length, i, 0);
+        aclshmemx_roce_put_nbi(
+            gva + message_length * my_rank, gva + message_length * my_rank, (__ubuf__ uint8_t*)ubLocal.GetPhyAddr(),
+            message_length, i, 0);
     }
     aclshmemx_roce_barrier_all();
 }
 
-void allgather_demo(uint32_t block_dim, void *stream, uint8_t *gva, int elements)
+void allgather_demo(uint32_t block_dim, void* stream, uint8_t* gva, int elements)
 {
     device_all_gather_test<<<block_dim, nullptr, stream>>>(gva, elements);
 }
 
-template void run_vector_add<int>(int64_t numElements, void *a, void *b, void *c, void *stream);
+template void run_vector_add<int>(int64_t numElements, void* a, void* b, void* c, void* stream);
 
-#endif  // _RDMA_ACLGRAPH_DEMO_KERNEL_
+#endif // _RDMA_ACLGRAPH_DEMO_KERNEL_

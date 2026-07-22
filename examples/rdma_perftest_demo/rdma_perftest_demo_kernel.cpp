@@ -91,7 +91,7 @@ extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_postsen
     }
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
     AscendC::LocalTensor<uint32_t> ubLocal32 = buf.GetWithOffset<uint32_t>(UB_ALIGN_SIZE / sizeof(uint32_t), 0);
     AscendC::LocalTensor<uint64_t> ubLocal64 =
         buf.GetWithOffset<uint64_t>(UB_ALIGN_SIZE / sizeof(uint64_t), UB_ALIGN_SIZE);
@@ -177,7 +177,7 @@ extern "C" [[bisheng::core_ratio(0, 1)]] __global__ __aicore__ void rdma_mte_put
     AscendC::LocalTensor<uint32_t> ubLocal;
     ubLocal.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::VECOUT);
     ubLocal.address_.bufferAddr = reinterpret_cast<uint64_t>(ACLSHMEM_INTERNAL_UB_BUF_START_ADDR);
-    ubLocal.address_.dataLen = UB_ALIGN_SIZE_64;
+    ubLocal.address_.dataLen = UB_ALIGN_SIZE_64 * 2;
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();

@@ -34,7 +34,7 @@ constexpr int DEFAULT_BLOCK_NUM = 1;
 constexpr uint32_t DEFAULT_MTE_UB_SIZE = 16 * 1024;
 constexpr uint32_t DEFAULT_SDMA_UB_SIZE = 64;
 constexpr int64_t DEFAULT_SDMA_UB_OFFSET = 191 * 1024;
-constexpr uint32_t DEFAULT_RDMA_UB_SIZE = 64;
+constexpr uint32_t DEFAULT_RDMA_UB_SIZE = ACLSHMEM_RDMA_MTE_STAGING_UB_SIZE;
 constexpr int64_t DEFAULT_RDMA_UB_OFFSET = 190 * 1024;
 // UDMA PIPE_MTE3 stages one full WQE block in UB; 128 B covers current data-mover opcodes.
 constexpr uint32_t DEFAULT_UDMA_UB_SIZE = ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE;
@@ -128,7 +128,7 @@ bool aclshmemi_parse_port_strict(const std::string& port_str, uint16_t& port)
         return false;
     }
 }
-}
+} // namespace
 
 int32_t version_compatible()
 {
@@ -321,7 +321,8 @@ static int32_t aclshmemi_instance_port_selection(aclshmemx_init_attr_t* attribut
     std::size_t pos;
     if (ip_port_str.find("tcp6://") == 0) {
         std::size_t bracketEnd = ip_port_str.find(']');
-        if (bracketEnd == std::string::npos || bracketEnd + 2 >= ip_port_str.size() || ip_port_str[bracketEnd + 1] != ':') {
+        if (bracketEnd == std::string::npos || bracketEnd + 2 >= ip_port_str.size() ||
+            ip_port_str[bracketEnd + 1] != ':') {
             SHM_LOG_ERROR("ip_port format should be tcp6://[ipv6_addr]:port");
             return ACLSHMEM_INVALID_VALUE;
         }
@@ -595,7 +596,6 @@ static int32_t aclshmemi_finalize_impl(uint64_t instance_id)
         g_state_host.default_stream = nullptr;
     }
 
-
     // Synchronize all ranks before destroying the store, so that no rank
     // can start the next init while another rank's store is still alive.
     ACLSHMEM_CHECK_RET(aclshmemi_control_barrier_all());
@@ -733,10 +733,7 @@ void aclshmem_global_exit(int status)
     SHM_LOG_WARN("Bootstrap not initialized. Global_exit Do nothing. ");
 }
 
-void aclshmemx_show_prof()
-{
-    prof_data_print(&g_host_profs, &g_state, nullptr, true);
-}
+void aclshmemx_show_prof() { prof_data_print(&g_host_profs, &g_state, nullptr, true); }
 
 void aclshmemx_get_prof(aclshmem_prof_pe_t** out_profs, bool verbose)
 {

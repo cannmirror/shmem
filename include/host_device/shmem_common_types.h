@@ -1,14 +1,14 @@
 /**
  * @cond IGNORE_COPYRIGHT
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
  * @endcond
- */
+ */
 #ifndef SHMEM_TYPES_H
 #define SHMEM_TYPES_H
 
@@ -18,26 +18,26 @@ extern "C" {
 #endif
 /**
  * @private
-*/
+ */
 #define ACLSHMEM_GLOBAL __global__ __aicore__
 /**
  * @private
-*/
+ */
 #define ACLSHMEM_GLOBAL_VECTOR [[bisheng::core_ratio(0, 1)]] __global__ __aicore__
 /**
  * @addtogroup group_macros
  * @{
-*/
+ */
 /**
  * @def ACLSHMEM_DEVICE
  * @brief A macro that identifies a function on the device side.
-*/
+ */
 #define ACLSHMEM_DEVICE __attribute__((always_inline)) __aicore__ __inline__
 /**@} */ // end of group_macros
 /**
  * @addtogroup group_enums
  * @{
-*/
+ */
 
 /**
  * @brief Standard test Types and Names
@@ -56,28 +56,25 @@ extern "C" {
  * |char       | char      |
  */
 #define ACLSHMEM_P2P_SYNC_TYPE_FUNC(FUNC) \
-    FUNC(float, float);               \
-    FUNC(int8, int8_t);               \
-    FUNC(int16, int16_t);             \
-    FUNC(int32, int32_t);             \
-    FUNC(int64, int64_t);             \
-    FUNC(uint8, uint8_t);             \
-    FUNC(uint16, uint16_t);           \
-    FUNC(uint32, uint32_t);           \
-    FUNC(uint64, uint64_t);           \
+    FUNC(float, float);                   \
+    FUNC(int8, int8_t);                   \
+    FUNC(int16, int16_t);                 \
+    FUNC(int32, int32_t);                 \
+    FUNC(int64, int64_t);                 \
+    FUNC(uint8, uint8_t);                 \
+    FUNC(uint16, uint16_t);               \
+    FUNC(uint32, uint32_t);               \
+    FUNC(uint64, uint64_t);               \
     FUNC(char, char)
 
 /**
  * @brief Team's index.
-*/
-enum aclshmem_team_index_t {
-    ACLSHMEM_TEAM_INVALID = -1,
-    ACLSHMEM_TEAM_WORLD = 0
-};
+ */
+enum aclshmem_team_index_t { ACLSHMEM_TEAM_INVALID = -1, ACLSHMEM_TEAM_WORLD = 0 };
 
 /**
  * @brief Data operation engine type.
-*/
+ */
 enum data_op_engine_type_t {
     ACLSHMEM_DATA_OP_MTE = 0x01,
     ACLSHMEM_DATA_OP_SDMA = 0x02,
@@ -97,10 +94,7 @@ enum aclshmem_mem_type_t {
 /**
  * @brief Signal operations, used by the signaler in peer-to-peer synchronization
  */
-enum aclshmem_signal_op_type_t {
-    ACLSHMEM_SIGNAL_SET,
-    ACLSHMEM_SIGNAL_ADD
-};
+enum aclshmem_signal_op_type_t { ACLSHMEM_SIGNAL_SET, ACLSHMEM_SIGNAL_ADD };
 
 /**
  * @brief Signal comparison operations, used by the signalee in peer-to-peer synchronization
@@ -119,19 +113,18 @@ enum aclshmem_cmp_op_type_t {
 /**
  * @defgroup group_typedef Typedef
  * @{
-*/
+ */
 /**
  * @brief A typedef of int
-*/
+ */
 typedef int aclshmem_team_t;
 
 /**
  * @brief A typedef of uint64_t
-*/
+ */
 typedef uint64_t aclshmemx_team_uniqueid_t;
 
 /**@} */ // end of group_typedef
-
 
 /**
  * @addtogroup group_macros
@@ -183,11 +176,16 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 /// \brief Minimum UB scratch size in bytes for UDMA PIPE_MTE3 WQE staging
 #define ACLSHMEM_UDMA_MTE_STAGING_UB_SIZE 128U
 
+/// \def ACLSHMEM_RDMA_MTE_STAGING_UB_SIZE
+/// \brief Minimum UB scratch size in bytes for RDMA MTE3 WQE staging
+#define ACLSHMEM_RDMA_MTE_STAGING_UB_SIZE 128U
+
 /// \def ALIGN_TO
 /// \brief Memory address/size alignment macro
 /// \param size Original size/address to be aligned
 /// \param page Target alignment granularity (usually page size)
-/// \details Aligns the size up to an integer multiple of the page to avoid memory fragmentation and out-of-bounds access
+/// \details Aligns the size up to an integer multiple of the page to avoid memory fragmentation and out-of-bounds
+/// access
 #define ALIGN_TO(size, page) (((size) + (page) - 1) / (page) * (page))
 /// @deprecated Use ALIGN_TO instead
 #define ALIGH_TO ALIGN_TO
@@ -205,11 +203,13 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 #define SYNC_LOG_MAX_PES 5
 
 /// \def ACLSHMEM_BARRIER_TG_DISSEM_KVAL
-/// \brief Task group dissemination coefficient (8) for ACLSHMEM barrier synchronization, used for synchronization algorithm optimization
+/// \brief Task group dissemination coefficient (8) for ACLSHMEM barrier synchronization, used for synchronization
+/// algorithm optimization
 #define ACLSHMEM_BARRIER_TG_DISSEM_KVAL 8
 
 /// \def SYNC_ARRAY_SIZE
-/// \brief Total size of the NPU-level synchronization array, calculated from sync bit size, log bits and dissemination coefficient
+/// \brief Total size of the NPU-level synchronization array, calculated from sync bit size, log bits and dissemination
+/// coefficient
 #define SYNC_ARRAY_SIZE (ACLSHMEM_SYNCBIT_SIZE * SYNC_LOG_MAX_PES * ACLSHMEM_BARRIER_TG_DISSEM_KVAL)
 
 /// \def SYNC_COUNTER_SIZE
@@ -221,7 +221,8 @@ typedef uint64_t aclshmemx_team_uniqueid_t;
 #define SYNC_POOL_SIZE (SYNC_ARRAY_SIZE * ACLSHMEM_MAX_TEAMS)
 
 /// \def SYNC_COUNTERS_SIZE
-/// \brief Total size of the NPU-level synchronization counter pool, expanding the counter by the maximum number of teams
+/// \brief Total size of the NPU-level synchronization counter pool, expanding the counter by the maximum number of
+/// teams
 #define SYNC_COUNTERS_SIZE (SYNC_COUNTER_SIZE * ACLSHMEM_MAX_TEAMS)
 
 // core level sync
@@ -267,13 +268,13 @@ typedef int32_t aclshmemx_sync_bit[ACLSHMEM_SYNCBIT_SIZE / sizeof(int32_t)];
 /**
  * @addtogroup group_structs
  * @{
-*/
+ */
 /**
  * @struct aclshmem_handle_t
  * @brief Handle information used for non-blocking API synchronization.
  *
  * - aclshmem_team_t team_id: Team ID used for synchronization.
-*/
+ */
 struct aclshmem_handle_t {
     aclshmem_team_t team_id;
 };
@@ -281,7 +282,7 @@ struct aclshmem_handle_t {
 /**@} */ // end of group_structs
 
 // devmm constants reference
-constexpr uint64_t ACLSHMEM_HEAP_ALIGNMENT_SIZE = (1UL << 30UL);     // same definition with DEVMM_HEAP_SIZE
+constexpr uint64_t ACLSHMEM_HEAP_ALIGNMENT_SIZE = (1UL << 30UL); // same definition with DEVMM_HEAP_SIZE
 #ifndef ALIGN_UP
 #define ALIGN_UP(val, al) (((val) + ((al) - 1)) & ~((al) - 1))
 #endif
@@ -289,16 +290,16 @@ constexpr uint64_t ACLSHMEM_HEAP_ALIGNMENT_SIZE = (1UL << 30UL);     // same def
 /**
  * @addtogroup group_structs
  * @{
-*/
+ */
 /**
  * @struct aclshmem_team_config_t
  * @brief Group management configuration structure, used to store core configuration information of the team
  */
 typedef struct {
-    int32_t version;                      /// Version number
-    int32_t num_contexts;                 /// Reserved field
-    aclshmemx_team_uniqueid_t uniqueid;   /// Unique ID within the group
-    char padding[TEAM_CONFIG_PADDING];    /// Used to pad the structure to 64 bytes
+    int32_t version;                    /// Version number
+    int32_t num_contexts;               /// Reserved field
+    aclshmemx_team_uniqueid_t uniqueid; /// Unique ID within the group
+    char padding[TEAM_CONFIG_PADDING];  /// Used to pad the structure to 64 bytes
 } aclshmem_team_config_t;
 static_assert(sizeof(aclshmem_team_config_t) == 64, "aclshmem_team_config_t must be 64 bytes.");
 
@@ -306,16 +307,18 @@ static_assert(sizeof(aclshmem_team_config_t) == 64, "aclshmem_team_config_t must
 /**
  * @struct aclshmemx_team_t
  * @brief Core data structure of a team, storing the topology and mapping relationship of the team
- * @details Contains the local view of PEs in the team, global view mapping, as well as team configuration and PE mapping table
+ * @details Contains the local view of PEs in the team, global view mapping, as well as team configuration and PE
+ * mapping table
  */
 typedef struct {
-    int mype;           ///< Local number of the current PE within the team, range [0, size)
-    int start;          ///< Global number of the starting PE of the team, range [0, npes)
-    int stride;         ///< Global stride of PEs in the team, range [1, npes-1]
-    int size;           ///< Total number of PEs in the team (team size)
-    int team_idx;       ///< Global index number of the team
-    aclshmem_team_config_t config;  ///< Configuration information structure of the team
-    int32_t pe_mapping[2 * ACLSHMEM_MAX_PES];  ///< PE mapping table, storing the correspondence between team and global PEs
+    int mype;                      ///< Local number of the current PE within the team, range [0, size)
+    int start;                     ///< Global number of the starting PE of the team, range [0, npes)
+    int stride;                    ///< Global stride of PEs in the team, range [1, npes-1]
+    int size;                      ///< Total number of PEs in the team (team size)
+    int team_idx;                  ///< Global index number of the team
+    aclshmem_team_config_t config; ///< Configuration information structure of the team
+    int32_t
+        pe_mapping[2 * ACLSHMEM_MAX_PES]; ///< PE mapping table, storing the correspondence between team and global PEs
 } aclshmemx_team_t;
 
 // ub_config
@@ -325,9 +328,9 @@ typedef struct {
  * @details Stores buffer address, size and optional synchronization event ID for memory transfer operations
  */
 typedef struct {
-    int64_t aclshmem_ub;     ///< __ubuf__ buffer pointer, used as temporary buffer for memory copy operations
-    uint32_t ub_size;        ///< Size of the UB buffer in bytes
-    uint32_t sync_id;        ///< TEventID/MutexID for pipeline synchronization
+    int64_t aclshmem_ub; ///< __ubuf__ buffer pointer, used as temporary buffer for memory copy operations
+    uint32_t ub_size;    ///< Size of the UB buffer in bytes
+    uint32_t sync_id;    ///< TEventID/MutexID for pipeline synchronization
 } aclshmem_ub_config_t;
 
 /// \def ACLSHMEM_CYCLE_PROF_MAX_BLOCK
@@ -360,46 +363,53 @@ typedef struct {
 
 // Legacy type aliases for backward compatibility
 typedef aclshmem_ub_config_t aclshmem_mte_config_t;  ///< @deprecated Use aclshmem_mte_config_t instead
-typedef aclshmem_ub_config_t aclshmem_sdma_config_t;  ///< @deprecated Use aclshmem_sdma_config_t instead
-typedef aclshmem_ub_config_t aclshmem_rdma_config_t;  ///< @deprecated Use aclshmem_rdma_config_t instead
-typedef aclshmem_ub_config_t aclshmem_udma_config_t;  ///< UDMA MTE staging config; ub_size must be >= 128 bytes
+typedef aclshmem_ub_config_t aclshmem_sdma_config_t; ///< @deprecated Use aclshmem_sdma_config_t instead
+typedef aclshmem_ub_config_t aclshmem_rdma_config_t; ///< @deprecated Use aclshmem_rdma_config_t instead
+typedef aclshmem_ub_config_t aclshmem_udma_config_t; ///< UDMA MTE staging config; ub_size must be >= 128 bytes
 
 // state
 /**
  * @struct aclshmem_device_host_state_t
  * @brief Global state structure of the ACLSHMEM device and host
- * @details Stores core global data such as system initialization state, memory heap information, team pool, sync pool, etc., which is the core state carrier of ACLSHMEM
+ * @details Stores core global data such as system initialization state, memory heap information, team pool, sync pool,
+ * etc., which is the core state carrier of ACLSHMEM
  */
 typedef struct {
-    int version;                  ///< Version number of the state structure
-    int mype;                     ///< Global number of the local PE
-    int npes;                     ///< Total number of PEs in the system
-    void *heap_base;              ///< Start address of the local memory heap
-    void *host_heap_base;         ///< heap_base for host side memory type
+    int version;          ///< Version number of the state structure
+    int mype;             ///< Global number of the local PE
+    int npes;             ///< Total number of PEs in the system
+    void* heap_base;      ///< Start address of the local memory heap
+    void* host_heap_base; ///< heap_base for host side memory type
 
     // Store All Devices' heap_base.
-    void **p2p_device_heap_base;  ///< Array of P2P memory heap base addresses for all devices
-    void **rdma_device_heap_base; ///< Array of RDMA memory heap base addresses for all devices
-    void **sdma_device_heap_base; ///< Array of SDMA memory heap base addresses for all devices
+    void** p2p_device_heap_base;  ///< Array of P2P memory heap base addresses for all devices
+    void** rdma_device_heap_base; ///< Array of RDMA memory heap base addresses for all devices
+    void** sdma_device_heap_base; ///< Array of SDMA memory heap base addresses for all devices
 
     // Store All Host' heap_base.
-    void **p2p_host_heap_base;    ///< Array of P2P memory heap base addresses for all hosts
-    void **rdma_host_heap_base;   ///< Array of RDMA memory heap base addresses for all hosts
-    void **sdma_host_heap_base;   ///< Array of SDMA memory heap base addresses for all hosts
+    void** p2p_host_heap_base;  ///< Array of P2P memory heap base addresses for all hosts
+    void** rdma_host_heap_base; ///< Array of RDMA memory heap base addresses for all hosts
+    void** sdma_host_heap_base; ///< Array of SDMA memory heap base addresses for all hosts
 
-    uint8_t topo_list[ACLSHMEM_MAX_PES]; ///< PE topology list, storing the topological relationship of PEs in the system
-    size_t heap_size;                   ///< Total size of the local memory heap in bytes
+    uint8_t
+        topo_list[ACLSHMEM_MAX_PES]; ///< PE topology list, storing the topological relationship of PEs in the system
+    size_t heap_size;                ///< Total size of the local memory heap in bytes
 
-    aclshmemx_team_t *team_pools[ACLSHMEM_MAX_TEAMS]; ///< Team pool array, storing all created team instances
+    aclshmemx_team_t* team_pools[ACLSHMEM_MAX_TEAMS]; ///< Team pool array, storing all created team instances
 
     // Using aclshmemx_sync_bit instead of basic types as sync flag,
     // avoiding concurrent write due to cacheline sharing.
     // Refer to shmemi_device_cc.h for more details.
-    // These members are 'aclshmemx_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler restriction.
-    uint64_t sync_pool;          ///< NPU-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t sync_counter;       ///< NPU-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_pool;     ///< Core-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
-    uint64_t core_sync_counter;  ///< Core-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to compiler restrictions)
+    // These members are 'aclshmemx_sync_bit *' types actually, but are defined as 'uint64_t' due to compiler
+    // restriction.
+    uint64_t sync_pool; ///< NPU-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t due to
+                        ///< compiler restrictions)
+    uint64_t sync_counter; ///< NPU-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t
+                           ///< due to compiler restrictions)
+    uint64_t core_sync_pool; ///< Core-level sync pool pointer (actual type is aclshmemx_sync_bit*, defined as uint64_t
+                             ///< due to compiler restrictions)
+    uint64_t core_sync_counter; ///< Core-level sync counter pointer (actual type is aclshmemx_sync_bit*, defined as
+                                ///< uint64_t due to compiler restrictions)
 
     bool is_aclshmem_initialized; ///< Flag indicating whether ACLSHMEM has completed initialization
     bool is_aclshmem_created;     ///< Flag indicating whether ACLSHMEM has been created
@@ -408,11 +418,11 @@ typedef struct {
     aclshmem_sdma_config_t sdma_config; ///< Configuration information of the SDMA memory transfer engine
     aclshmem_rdma_config_t rdma_config; ///< Configuration information of RDMA
     aclshmem_udma_config_t udma_config; ///< UDMA MTE staging config for high-level UDMA APIs
-    uint64_t qp_info;                 ///< Queue Pair (QP) information, used for communication mechanisms such as RDMA
+    uint64_t qp_info;                   ///< Queue Pair (QP) information, used for communication mechanisms such as RDMA
 
-    uint64_t sdma_workspace_addr;  /// sdma aicpu和aiv的共享内存
-    aclshmem_prof_pe_t *profs;     ///< for profiling
-    uint64_t signal_addr; ///< Address of the signal counter for put and get
+    uint64_t sdma_workspace_addr; /// sdma aicpu和aiv的共享内存
+    aclshmem_prof_pe_t* profs;    ///< for profiling
+    uint64_t signal_addr;         ///< Address of the signal counter for put and get
 } aclshmem_device_host_state_t;
 
 // host only state
@@ -422,11 +432,13 @@ typedef struct {
  * @details Stores configuration information such as streams, events, and block counts used only by the host side
  */
 typedef struct {
-    // typedef void *aclrtStream; as in https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/API/appdevgapi/aclcppdevg_03_1355.html
-    void *default_stream;       ///< Default ACL runtime stream (aclrtStream type) on the host, used for asynchronous task scheduling
-    int8_t default_event_id;    ///< Default event ID on the host, used for stream synchronization
+    // typedef void *aclrtStream; as in
+    // https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/API/appdevgapi/aclcppdevg_03_1355.html
+    void* default_stream;    ///< Default ACL runtime stream (aclrtStream type) on the host, used for asynchronous task
+                             ///< scheduling
+    int8_t default_event_id; ///< Default event ID on the host, used for stream synchronization
     uint32_t default_block_num; ///< Default block count on the host, used for memory/task block management
-    void *notify_arr[ACLSHMEM_MAX_AIV_PER_NPU];
+    void* notify_arr[ACLSHMEM_MAX_AIV_PER_NPU];
 } aclshmem_host_state_t;
 
 /**
@@ -435,8 +447,8 @@ typedef struct {
  * @details Stores the instance identifier and reserved fields for future extension
  */
 typedef struct {
-    uint64_t id;            // ACL SHMEM Instance's Unique identifier
-    void *instance;         // Reserved
+    uint64_t id;    // ACL SHMEM Instance's Unique identifier
+    void* instance; // Reserved
 } aclshmem_instance_ctx;
 
 /**@} */ // end of group_structs

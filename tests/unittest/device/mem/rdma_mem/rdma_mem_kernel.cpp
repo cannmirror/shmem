@@ -17,8 +17,8 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAGetTestLowLevel(GM_ADDR gva, uint64_t
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();
@@ -43,8 +43,8 @@ extern "C" ACLSHMEM_GLOBAL_VECTOR void RDMAPutTestLowLevel(GM_ADDR gva, uint64_t
     util_set_ffts_config(config);
     AscendC::TPipe pipe;
     AscendC::TBuf<AscendC::TPosition::VECOUT> buf;
-    pipe.InitBuffer(buf, UB_ALIGN_SIZE * 2);
-    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE * 2, 0);
+    pipe.InitBuffer(buf, UB_ALIGN_SIZE_64 * 2);
+    AscendC::LocalTensor<uint8_t> ubLocal = buf.GetWithOffset<uint8_t>(UB_ALIGN_SIZE_64 * 2, 0);
 
     int64_t rank = aclshmem_my_pe();
     int64_t rank_size = aclshmem_n_pes();

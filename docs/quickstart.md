@@ -243,6 +243,21 @@ source /usr/local/Ascend/shmem/latest/set_env.sh
 source ${install_path}/shmem/latest/set_env.sh
 ```
 
+#### 5.1.3 方式三：pip 安装
+
+```bash
+# 从昇腾 PyPI 源直接安装
+pip install cann-shmem -i https://ascend.devcloud.huaweicloud.com/cann/pypi/simple/
+```
+
+安装完成后可通过 `shmem-config --backend` 验证：
+
+```bash
+shmem-config --backend
+```
+
+更多 `shmem-config` 命令（`--diagnose`、`--check`、`--ldflags` 等）详见 [shmem-config 命令参考](tools/shmem_config_guide.md)。
+
 shmem 默认开启tls通信加密。如果需要关闭，需要调用接口主动关闭：
 
 ```c
@@ -336,7 +351,7 @@ bash scripts/run.sh -ranks 8 -ipport 127.0.0.1:8666 -test_filter Init
 4. 在src/python/dist目录下，安装wheel包
 
    ```sh
-   pip3 install shmem-xxx.whl --force-reinstall
+   pip3 install cann_shmem-xxx.whl --force-reinstall
    ```
 
 5. 设置是否开启 TLS 认证，默认开启，若关闭 TLS 认证，请使用如下接口
@@ -488,14 +503,14 @@ bash scripts/build.sh -python_extension
 # Ascend950 平台
 bash scripts/build.sh -soc_type Ascend950 -python_extension
 # 安装构建脚本生成的 wheel 包
-pip3 install dist/shmem-xxx.whl --force-reinstall
+pip3 install dist/cann_shmem-xxx.whl --force-reinstall
 ```
 
 也可以在仓库根目录手动构建并安装 wheel 包：
 
 ```bash
 python3 setup.py bdist_wheel
-pip3 install dist/shmem-xxx.whl --force-reinstall
+pip3 install dist/cann_shmem-xxx.whl --force-reinstall
 ```
 
 ```bash

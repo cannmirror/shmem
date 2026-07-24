@@ -37,10 +37,10 @@ SHMEM的基本编译命令是`bash build.sh`，默认构建模式下生成版本
 - `-enable_rdma`：构建并启用RDMA相关能力。A2/A3 默认配置 RDMA 后端类型，Ascend950 需要配合 `-rdma_backend` 来指定后端类型。
 - `-rdma_backend`：指定RDMA后端类型（A2/A3 不支持该选项），可选值为 `XSCALE`（使用云脉网卡）或 `HNS_1825`（使用 1825 网卡）。**必须配合 `-enable_rdma` 使用**，否则会报错。参数顺序不限。
 - `-enable_ascendc_dump`：启用`AscendC_Dump`模式，用于对算子内核代码进行调测
-- `-package`：构建py扩展的whl包
-    * 生成run包SHMEM\_{version}\_linux-{arch}.run，生成路径为{project_root}/package/{arch}/
-    * 生成python whl包shmem-xxx.whl，生成路径为{project_root}/package/{arch}/
-- `-python_extension`：生成python whl包shmem-xxx.whl，生成路径为{project_root}/dist/
+- `-package`：构建交付安装包，同时生成 run 包和 whl 包（包含 `-python_extension` 行为）
+    * 生成 run 包 SHMEM\_{version}\_linux-{arch}.run，路径为 `{project_root}/package/{arch}/`
+    * 生成 whl 包 `cann_shmem-xxx.whl`，路径为 `{project_root}/package/{arch}/`
+- `-python_extension`：仅生成 python whl 包 `cann_shmem-xxx.whl`，路径为 `{project_root}/dist/`
 - `-gendoc`：生成文档
 - `-onlygendoc`: 生成文档，不构建源码
 - `-debug`：设置构建类型为 `Debug` 模式

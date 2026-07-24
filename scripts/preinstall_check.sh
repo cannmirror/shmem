@@ -101,7 +101,7 @@ step1_check_chip_platform() {
     fi
 
     local npu_info
-    npu_info=$(npu-smi info 2>/dev/null) || true
+    npu_info=$(npu-smi info 2>&1 | sed $'s/\033\[[0-9;]*[a-zA-Z]//g' | tr -d '\r') || true
     if [ -z "$npu_info" ]; then
         log_error "npu-smi info 无输出，无法检测芯片平台"
         CHIP="UNKNOWN"
@@ -109,7 +109,8 @@ step1_check_chip_platform() {
     fi
 
     # 提取芯片型号
-    if echo "$npu_info" | grep -qi "910B\|910C"; then
+    # 910B/C 系列芯片名可能为 Ascend910 / Ascend 910B / Ascend 910C 等
+    if echo "$npu_info" | grep -qiE "Ascend.*910|910[BbCc]"; then
         CHIP="910B/C"
         log_info "检测到芯片型号：910B/C 系列"
     elif echo "$npu_info" | grep -qi "Ascend950\|Ascend 950\|950"; then
@@ -129,14 +130,35 @@ step1_check_chip_platform() {
         fi
     fi
 
-    # 提取卡数：通过 npu-smi info -t topo 的 header 行统计 NPU 数量
-    # header 行格式：           NPU0       NPU1       NPU2  ...  CPU Affinity
-    local topo_output
-    topo_output=$(npu-smi info -t topo 2>/dev/null) || true
-    if [ -n "$topo_output" ]; then
-        CARD_COUNT=$(echo "$topo_output" | grep -E '^\s+NPU[0-9]+' | grep -oE 'NPU[0-9]+' | wc -l)
+    # 提取卡数：优先从 npu-smi info 输出统计唯一 NPU ID（设备编号）
+    # 910B: 每卡 1 芯片，NPU 编号 = Phy-ID，如 0-7 共 8 卡
+    # 910C: 每卡 2 芯片，NPU 编号 = 0-7 共 8 卡，Phy-ID = 0-15 共 16 个
+    # 提取规则：第2列为数字(NPU ID)、第3列为字母开头(芯片名)的行
+    #   如 "| 0     Ascend910  ..." → NPU ID=0
+    #   排除子芯片行 "| 0     0  ..." (第3列为数字)
+    local npu_card_count=0
+    npu_card_count=$(echo "$npu_info" | awk '$2 ~ /^[0-9]+$/ && $3 ~ /^[A-Za-z]/ {print $2}' | sort -n | uniq | wc -l)
+
+    if [ "$npu_card_count" -gt 0 ]; then
+        CARD_COUNT=$npu_card_count
     else
-        CARD_COUNT=0
+        # 兜底：从 npu-smi info -t topo 的 header 行提取
+        local topo_output
+        topo_output=$(npu-smi info -t topo 2>&1 | sed $'s/\033\[[0-9;]*[a-zA-Z]//g' | tr -d '\r') || true
+        if [ -n "$topo_output" ]; then
+            # 910B 格式：NPU0, NPU1, ...
+            # 仅统计唯一的 NPU 标签，避免 header 行 + 每行行标签导致重复计数
+            CARD_COUNT=$(echo "$topo_output" | grep -oE 'NPU[0-9]+' | sort -u | wc -l)
+            if [ "$CARD_COUNT" -eq 0 ]; then
+                # 910C 格式：Phy-ID0, Phy-ID1, ...
+                # 仅取 header 行（第一行）避免与行标签重复计数
+                local phy_count
+                phy_count=$(echo "$topo_output" | head -n 1 | grep -oE 'Phy-ID[0-9]+' | wc -l)
+                CARD_COUNT=$((phy_count / 2))
+            fi
+        else
+            CARD_COUNT=0
+        fi
     fi
     log_info "卡数：$CARD_COUNT"
 
@@ -151,7 +173,7 @@ step2_check_version_baseline() {
 
     # --- HDK 版本 ---
     local npu_info
-    npu_info=$(npu-smi info 2>/dev/null) || true
+    npu_info=$(npu-smi info 2>&1 | sed $'s/\033\[[0-9;]*[a-zA-Z]//g' | tr -d '\r') || true
     if [ -n "$npu_info" ]; then
         HDK_VERSION=$(echo "$npu_info" | grep -m1 -ioP 'Version:\s*\K\S+' || echo "UNKNOWN")
     fi
@@ -223,7 +245,7 @@ step3_check_topology() {
     fi
 
     local topo_output
-    topo_output=$(npu-smi info -t topo 2>/dev/null) || true
+    topo_output=$(npu-smi info -t topo 2>&1 | sed $'s/\033\[[0-9;]*[a-zA-Z]//g' | tr -d '\r') || true
 
     if [ -z "$topo_output" ]; then
         log_warn "npu-smi info -t topo 无输出"
@@ -385,16 +407,21 @@ step5_check_udma() {
         if [ "$max_id" -le 0 ] || [ "$max_id" -gt 64 ]; then
             max_id=16
         fi
+        # 使用 mktemp 创建唯一临时文件，避免并发进程互相覆盖 stderr，
+        # 同时防止 /tmp 下固定文件名被符号链接攻击利用
+        local rootinfo_stderr_file
+        rootinfo_stderr_file=$(mktemp 2>/dev/null) || rootinfo_stderr_file="/tmp/rootinfo_stderr_$$.$RANDOM.txt"
+        trap 'rm -f "$rootinfo_stderr_file"' RETURN
         for phy_id in $(seq 0 $((max_id - 1))); do
             local rootinfo_output
             local rootinfo_stderr
             if [ -n "$rootinfo_ld_path" ]; then
-                rootinfo_output=$(LD_LIBRARY_PATH="$rootinfo_ld_path:${LD_LIBRARY_PATH:-}" "$rootinfo_bin" "$phy_id" 2>/tmp/rootinfo_stderr.txt) || true
+                rootinfo_output=$(LD_LIBRARY_PATH="$rootinfo_ld_path:${LD_LIBRARY_PATH:-}" "$rootinfo_bin" "$phy_id" 2>"$rootinfo_stderr_file") || true
             else
-                rootinfo_output=$("$rootinfo_bin" "$phy_id" 2>/tmp/rootinfo_stderr.txt) || true
+                rootinfo_output=$("$rootinfo_bin" "$phy_id" 2>"$rootinfo_stderr_file") || true
             fi
-            rootinfo_stderr=$(cat /tmp/rootinfo_stderr.txt 2>/dev/null || true)
-            rm -f /tmp/rootinfo_stderr.txt
+            rootinfo_stderr=$(cat "$rootinfo_stderr_file" 2>/dev/null || true)
+            : > "$rootinfo_stderr_file"  # 清空而不是删除，供下次迭代复用
             if [ -z "$rootinfo_output" ]; then
                 if [ -n "$rootinfo_stderr" ]; then
                     log_warn "root_info_generate phyId=${phy_id}：无 stdout 输出，stderr：$rootinfo_stderr"
@@ -423,6 +450,8 @@ step5_check_udma() {
                 break
             fi
         done
+        rm -f "$rootinfo_stderr_file"
+        trap - RETURN
 
         if $rootinfo_udma_ok; then
             log_info "UDMA UB 组网检测通过 ✓"

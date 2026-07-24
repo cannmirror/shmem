@@ -115,6 +115,13 @@ class BuildCppLibs(build_py):
         install_backends = Path("install/shmem") / "backends"
         package_src_dir = Path("src/python") / "shmem"
 
+        scripts_dir = package_src_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        shell_script_src = Path("scripts") / "preinstall_check.sh"
+        if shell_script_src.exists():
+            shutil.copy(shell_script_src, scripts_dir / "preinstall_check.sh")
+            print(f"Copied {shell_script_src} -> {scripts_dir / 'preinstall_check.sh'}")
+
         if not install_backends.exists():
             print("Warning: install/shmem/backends not found, skipping so copy")
             return
@@ -165,14 +172,6 @@ class BuildCppLibs(build_py):
         if version_file.exists():
             shutil.copy(version_file, package_src_dir / "version.info")
 
-        # 将 preinstall_check.sh 打包进 wheel
-        scripts_dir = package_src_dir / "scripts"
-        scripts_dir.mkdir(parents=True, exist_ok=True)
-        shell_script_src = Path("scripts") / "preinstall_check.sh"
-        if shell_script_src.exists():
-            shutil.copy(shell_script_src, scripts_dir / "preinstall_check.sh")
-            print(f"Copied {shell_script_src} -> {scripts_dir / 'preinstall_check.sh'}")
-
 
 setup(
     name="cann-shmem",
@@ -186,6 +185,7 @@ setup(
     install_requires=["torch-npu"],
     python_requires=">=3.7",
     package_data={
+
         "shmem": [
             "*.so",
             "version.info",
